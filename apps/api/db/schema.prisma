@@ -1,0 +1,23 @@
+// Workforce 360 ERP — Prisma schema (API-only)
+// Migrations live in /db/migrations. Never access this from /apps/web.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+/// Minimal ping table used by GET /api/health to prove DB connectivity.
+/// Soft-delete / audit conventions apply to all domain tables in later phases.
+model HealthProbe {
+  id        String    @id @default(cuid())
+  label     String    @default("ok")
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  @@map("health_probes")
+}

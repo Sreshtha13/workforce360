@@ -1,0 +1,99 @@
+You are helping me build "Workforce 360 ERP" — a production-grade, modular ERP web
+application, based on an internal PRD (Workforce 360 ERP PRD v1.0). Treat this as a
+long-lived project spanning many sessions. I will give you one phase at a time. Do not
+build modules from later phases unless I explicitly ask.
+
+PRODUCT SUMMARY
+Workforce 360 ERP centralizes an organization's core operations: recruitment/candidate
+onboarding, HR, attendance/leave, asset management, finance/invoicing, payroll, business
+development, project management, development & QA support, help desk, document
+management, notifications, approval workflows, administration, reporting, and security.
+It must be built so advanced features (AI, multi-tenancy, native mobile apps, enterprise
+integrations, predictive analytics) can be added later WITHOUT major architectural rework.
+Favor modular, decoupled design over shortcuts, even in the MVP.
+
+ARCHITECTURE — HARD RULE
+This is a strict two-tier system: a Next.js frontend and a standalone Node.js backend.
+- The frontend (/apps/web) NEVER connects to the database, Supabase Admin SDK, or any
+  data store directly. It has zero DB credentials, zero service-role keys, and zero
+  ORM/DB driver dependencies. Its only source of data is the backend's REST API, called
+  through a typed API client.
+- The backend (/apps/api) owns ALL database access, ALL business logic, ALL auth
+  issuing/verification, and ALL RBAC enforcement. Every write and every sensitive read
+  goes through backend middleware (auth check -> RBAC check -> validation -> controller
+  -> service -> repository).
+- If Cursor ever proposes calling Supabase, Prisma, Postgres, or any DB client from
+  inside /apps/web (including Server Components, Server Actions, or Route Handlers),
+  stop and flag it — that violates this rule. Server Components in the frontend may call
+  the backend API server-side (e.g. for SSR), but must still go through HTTP, not a DB
+  driver.
+
+TECH STACK
+- Frontend (/apps/web): Next.js 14+ (App Router), TypeScript strict mode, Tailwind CSS
+  + shadcn/ui, TanStack Query for all server-state, calling the backend via a typed API
+  client. No direct DB access (see ARCHITECTURE above).
+- Backend (/apps/api): Node.js + TypeScript, Express (or Fastify), layered as
+  routes -> middleware -> controllers -> services -> repositories. Exposes a REST API
+  consumed only by the frontend (and later, external integrations).
+- Database: PostgreSQL, accessed only from the backend via Prisma (preferred) or Knex.
+  Supabase may be used as the hosted Postgres instance and for Storage, but the
+  frontend never talks to Supabase directly — the backend proxies everything.
+- Auth: Backend-issued JWT access + refresh tokens (httpOnly cookies or an
+  Authorization header — decide in Phase 0 and document it). Backend owns password
+  hashing, OAuth callback handling, and token verification.
+- Validation: Zod, with schemas defined once (shared package if monorepo) and enforced
+  as backend middleware on every route — this is the authoritative validation layer.
+  Frontend may reuse the schemas for UX but must never be trusted as the source of truth.
+- Role-Based Access Control (RBAC) enforced as backend middleware on every route —
+  never rely on hiding UI alone, and never enforce it only in the frontend.
+
+TARGET USER ROLES (design permissions around these from day one)
+Super Administrator, Administrator, HR Team, Finance Team, Payroll Team,
+Business Development Team, Project Managers, Developers, QA Engineers, Team Leads,
+Employees, Candidates.
+
+CODING STANDARDS
+- Monorepo folder structure:
+  /apps/web        (Next.js frontend: /app, /components, /lib, /types)
+  /apps/api        (Node.js backend: /src/routes, /src/middleware, /src/controllers,
+                     /src/services, /src/repositories, /src/types, /db/migrations)
+  /packages/shared (optional: shared Zod schemas / TS types used by both apps)
+- Every table has: created_at, updated_at, deleted_at (soft delete — never hard-delete)
+- Every write action (create/update/delete/approve) writes an audit log entry
+  (actor, action, entity, before/after or diff, timestamp) — written by the backend
+  service layer, never by the frontend
+- Versioned SQL migrations only (Prisma Migrate or a migrations folder) — never
+  hand-edit prod schema
+- All API responses use a consistent shape: { data, error, meta }
+- All list endpoints support pagination, sorting, and filtering
+- TypeScript types/interfaces for every entity, defined in the backend and either
+  shared via a package or re-declared in the frontend's /types — but the backend's
+  shape is always the source of truth
+- Every module must be self-contained enough to be extended or replaced later without
+  touching unrelated modules — this is a hard requirement, on both frontend and backend
+- Every backend route runs through: auth middleware -> RBAC/permission middleware ->
+  Zod validation middleware -> controller -> service -> repository, in that order
+
+NON-FUNCTIONAL REQUIREMENTS (apply to every phase)
+- Page load under 3 seconds, API response under 2 seconds
+- Encryption in transit (HTTPS everywhere) and at rest; no secrets in client bundles or
+  plaintext; no DB credentials or service-role keys ever ship to the frontend
+- Daily backups, disaster recovery readiness
+- Responsive UI (desktop-first, must work on tablet and mobile browser)
+- Role-based dashboards — a user only ever sees data/actions relevant to their role,
+  enforced by the backend, not just hidden in the UI
+
+OUT OF SCOPE FOR NOW (do not build unless I explicitly ask later)
+AI features (AI assistant, resume ranking, predictive analytics, HR/Finance/Project AI),
+native mobile apps, multi-company/multi-tenant support, Microsoft Teams/Slack/GitHub/
+GitLab/Jira/Zoom/QuickBooks/Xero/Azure AD/LDAP/SAML integrations, offline support,
+international payroll/localization.
+
+WORKING STYLE
+- Ask before making irreversible schema decisions if something is ambiguous.
+- After finishing a phase, summarize what was built and list TODOs or shortcuts taken.
+- Write basic tests for critical logic (RBAC checks, payroll calculations, invoice totals,
+  leave balance math) — these live in the backend, next to the service they test.
+- Keep commits scoped to one phase/feature at a time.
+- If a requirement's exact field list or validation rule isn't given in the phase prompt,
+  make a reasonable assumption, state it in your summary, and move on rather than stalling.
