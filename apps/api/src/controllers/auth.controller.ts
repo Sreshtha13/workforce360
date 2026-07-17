@@ -1,7 +1,7 @@
 import type { Request, Response } from "express";
 import { AuthService } from "../services/auth.service";
+import { authCookieOptions } from "../lib/cookies";
 import { sendSuccess, sendError } from "../lib/response";
-import { env } from "../lib/env";
 import type {
   LoginInput,
   GoogleLoginInput,
@@ -30,19 +30,8 @@ export class AuthController {
         userAgent,
       );
       
-      res.cookie("accessToken", result.accessToken, {
-        httpOnly: true,
-        secure: env.COOKIE_SECURE,
-        sameSite: "strict",
-        maxAge: 15 * 60 * 1000,
-      });
-      
-      res.cookie("refreshToken", result.refreshToken, {
-        httpOnly: true,
-        secure: env.COOKIE_SECURE,
-        sameSite: "strict",
-        maxAge: 7 * 24 * 60 * 60 * 1000,
-      });
+      res.cookie("accessToken", result.accessToken, authCookieOptions(15 * 60 * 1000));
+      res.cookie("refreshToken", result.refreshToken, authCookieOptions(7 * 24 * 60 * 60 * 1000));
       
       sendSuccess(res, {
         user: result.user,
@@ -69,19 +58,8 @@ export class AuthController {
         userAgent,
       );
       
-      res.cookie("accessToken", result.accessToken, {
-        httpOnly: true,
-        secure: env.COOKIE_SECURE,
-        sameSite: "strict",
-        maxAge: 15 * 60 * 1000,
-      });
-      
-      res.cookie("refreshToken", result.refreshToken, {
-        httpOnly: true,
-        secure: env.COOKIE_SECURE,
-        sameSite: "strict",
-        maxAge: 7 * 24 * 60 * 60 * 1000,
-      });
+      res.cookie("accessToken", result.accessToken, authCookieOptions(15 * 60 * 1000));
+      res.cookie("refreshToken", result.refreshToken, authCookieOptions(7 * 24 * 60 * 60 * 1000));
       
       sendSuccess(res, {
         user: result.user,
@@ -111,12 +89,7 @@ export class AuthController {
       
       const result = await this.authService.refreshAccessToken(refreshToken);
       
-      res.cookie("accessToken", result.accessToken, {
-        httpOnly: true,
-        secure: env.COOKIE_SECURE,
-        sameSite: "strict",
-        maxAge: 15 * 60 * 1000,
-      });
+      res.cookie("accessToken", result.accessToken, authCookieOptions(15 * 60 * 1000));
       
       sendSuccess(res, {
         accessToken: result.accessToken,
@@ -137,8 +110,8 @@ export class AuthController {
         await this.authService.logout(refreshToken);
       }
       
-      res.clearCookie("accessToken");
-      res.clearCookie("refreshToken");
+      res.clearCookie("accessToken", { path: "/" });
+      res.clearCookie("refreshToken", { path: "/" });
       
       sendSuccess(res, { message: "Logged out successfully" });
     } catch (error) {

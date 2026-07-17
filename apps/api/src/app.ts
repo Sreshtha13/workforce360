@@ -2,7 +2,7 @@ import cookieParser from "cookie-parser";
 import cors from "cors";
 import express from "express";
 import helmet from "helmet";
-import { env } from "./lib/env";
+import { env, isAllowedCorsOrigin } from "./lib/env";
 import { errorHandler, notFoundHandler } from "./middleware/error-handler";
 import { apiRouter } from "./routes";
 
@@ -18,7 +18,13 @@ export function createApp() {
   );
   app.use(
     cors({
-      origin: env.CORS_ORIGIN,
+      origin(origin, callback) {
+        if (isAllowedCorsOrigin(origin)) {
+          callback(null, origin ?? true);
+          return;
+        }
+        callback(new Error(`CORS blocked for origin: ${origin}`));
+      },
       credentials: true,
     }),
   );

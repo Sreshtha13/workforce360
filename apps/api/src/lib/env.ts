@@ -53,3 +53,24 @@ if (!parsed.success) {
 }
 
 export const env = parsed.data;
+
+/** Comma-separated CORS_ORIGIN values, e.g. http://localhost:3000,http://localhost:3001 */
+export const corsOrigins = env.CORS_ORIGIN.split(",")
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+
+export function isAllowedCorsOrigin(origin: string | undefined): boolean {
+  if (!origin) return true;
+
+  if (corsOrigins.includes(origin)) return true;
+
+  // Dev convenience: Next.js may run on 3001+ if 3000 is taken
+  if (
+    env.NODE_ENV === "development" &&
+    /^http:\/\/(localhost|127\.0\.0\.1):\d+$/.test(origin)
+  ) {
+    return true;
+  }
+
+  return false;
+}

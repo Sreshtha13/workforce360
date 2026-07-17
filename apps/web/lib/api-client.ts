@@ -65,6 +65,43 @@ async function request<T>(
   return body;
 }
 
+/** Session probe — 401 means logged out, not an application error. */
+async function requestSession<T>(path: string): Promise<ApiResponse<T> | null> {
+  const url = `${API_BASE_URL}${path}`;
+
+  const response = await fetch(url, {
+    headers: { Accept: "application/json" },
+    credentials: "include",
+    cache: "no-store",
+  });
+
+  if (response.status === 401) {
+    return null;
+  }
+
+  let body: ApiResponse<T>;
+  try {
+    body = (await response.json()) as ApiResponse<T>;
+  } catch {
+    throw new ApiClientError(
+      "Invalid JSON response from API",
+      response.status,
+      "INVALID_RESPONSE",
+    );
+  }
+
+  if (!response.ok || body.error) {
+    throw new ApiClientError(
+      body.error?.message ?? `Request failed with status ${response.status}`,
+      response.status,
+      body.error?.code,
+      body.error?.details,
+    );
+  }
+
+  return body;
+}
+
 /**
  * Typed HTTP client for the Workforce 360 API.
  * The web app must never import Prisma, Postgres drivers, or Supabase Admin SDK.
@@ -91,8 +128,7 @@ export const apiClient = {
         method: "POST",
       }),
     
-    getMe: () =>
-      request<any>("/api/auth/me"),
+    getMe: () => requestSession<any>("/api/auth/me"),
     
     requestPasswordReset: (email: string) =>
       request<{ message: string }>("/api/auth/password/request-reset", {

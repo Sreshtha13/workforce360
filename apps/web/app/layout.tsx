@@ -32,8 +32,9 @@ export default function RootLayout({
     <html
       lang="en"
       className={cn(sourceSans.variable, sourceSerif.variable, "font-sans")}
+      suppressHydrationWarning
     >
-      <body className="min-h-screen antialiased">
+      <body className="min-h-screen antialiased" suppressHydrationWarning>
         <QueryProvider>
           <AuthProvider>
             {children}
