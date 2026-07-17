@@ -10,8 +10,10 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-/// Minimal ping table used by GET /api/health to prove DB connectivity.
-/// Soft-delete / audit conventions apply to all domain tables in later phases.
+// ============================================================================
+// SYSTEM & HEALTH
+// ============================================================================
+
 model HealthProbe {
   id        String    @id @default(cuid())
   label     String    @default("ok")
@@ -20,4 +22,380 @@ model HealthProbe {
   deletedAt DateTime? @map("deleted_at")
 
   @@map("health_probes")
+}
+
+// ============================================================================
+// ORGANIZATION STRUCTURE
+// ============================================================================
+
+model Company {
+  id              String    @id @default(cuid())
+  name            String
+  legalName       String?   @map("legal_name")
+  registrationNo  String?   @unique @map("registration_no")
+  taxId           String?   @unique @map("tax_id")
+  email           String?
+  phone           String?
+  website         String?
+  logo            String?
+  address         String?
+  city            String?
+  state           String?
+  country         String?
+  postalCode      String?   @map("postal_code")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+  deletedAt       DateTime? @map("deleted_at")
+
+  departments     Department[]
+  offices         Office[]
+
+  @@map("companies")
+}
+
+model Department {
+  id          String    @id @default(cuid())
+  companyId   String    @map("company_id")
+  name        String
+  code        String?
+  description String?
+  managerId   String?   @map("manager_id")
+  parentId    String?   @map("parent_id")
+  isActive    Boolean   @default(true) @map("is_active")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+  deletedAt   DateTime? @map("deleted_at")
+
+  company     Company      @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  manager     User?        @relation("DepartmentManager", fields: [managerId], references: [id])
+  parent      Department?  @relation("DepartmentHierarchy", fields: [parentId], references: [id])
+  children    Department[] @relation("DepartmentHierarchy")
+  teams       Team[]
+  users       User[]
+
+  @@unique([companyId, code])
+  @@index([companyId])
+  @@index([managerId])
+  @@index([parentId])
+  @@map("departments")
+}
+
+model Team {
+  id           String    @id @default(cuid())
+  departmentId String    @map("department_id")
+  name         String
+  code         String?
+  description  String?
+  leadId       String?   @map("lead_id")
+  isActive     Boolean   @default(true) @map("is_active")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+  deletedAt    DateTime? @map("deleted_at")
+
+  department   Department   @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+  lead         User?        @relation("TeamLead", fields: [leadId], references: [id])
+  members      TeamMember[]
+
+  @@unique([departmentId, code])
+  @@index([departmentId])
+  @@index([leadId])
+  @@map("teams")
+}
+
+model TeamMember {
+  id        String    @id @default(cuid())
+  teamId    String    @map("team_id")
+  userId    String    @map("user_id")
+  role      String?
+  joinedAt  DateTime  @default(now()) @map("joined_at")
+  leftAt    DateTime? @map("left_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  team      Team      @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([teamId, userId])
+  @@index([teamId])
+  @@index([userId])
+  @@map("team_members")
+}
+
+model Designation {
+  id          String    @id @default(cuid())
+  name        String
+  code        String?   @unique
+  level       Int?
+  description String?
+  isActive    Boolean   @default(true) @map("is_active")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+  deletedAt   DateTime? @map("deleted_at")
+
+  users       User[]
+
+  @@map("designations")
+}
+
+model Office {
+  id          String    @id @default(cuid())
+  companyId   String    @map("company_id")
+  name        String
+  code        String?
+  type        String?
+  address     String?
+  city        String?
+  state       String?
+  country     String?
+  postalCode  String?   @map("postal_code")
+  phone       String?
+  email       String?
+  isActive    Boolean   @default(true) @map("is_active")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+  deletedAt   DateTime? @map("deleted_at")
+
+  company     Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  users       User[]
+
+  @@unique([companyId, code])
+  @@index([companyId])
+  @@map("offices")
+}
+
+model EmployeeType {
+  id          String    @id @default(cuid())
+  name        String    @unique
+  code        String?   @unique
+  description String?
+  isActive    Boolean   @default(true) @map("is_active")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+  deletedAt   DateTime? @map("deleted_at")
+
+  users       User[]
+
+  @@map("employee_types")
+}
+
+model EmploymentStatus {
+  id          String    @id @default(cuid())
+  name        String    @unique
+  code        String?   @unique
+  description String?
+  isActive    Boolean   @default(true) @map("is_active")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+  deletedAt   DateTime? @map("deleted_at")
+
+  users       User[]
+
+  @@map("employment_statuses")
+}
+
+// ============================================================================
+// USER & AUTH
+// ============================================================================
+
+model User {
+  id                 String    @id @default(cuid())
+  email              String    @unique
+  passwordHash       String?   @map("password_hash")
+  firstName          String    @map("first_name")
+  lastName           String    @map("last_name")
+  phone              String?
+  avatar             String?
+  status             String    @default("active")
+  employeeId         String?   @unique @map("employee_id")
+  dateOfBirth        DateTime? @map("date_of_birth")
+  dateOfJoining      DateTime? @map("date_of_joining")
+  departmentId       String?   @map("department_id")
+  designationId      String?   @map("designation_id")
+  officeId           String?   @map("office_id")
+  employeeTypeId     String?   @map("employee_type_id")
+  employmentStatusId String?   @map("employment_status_id")
+  managerId          String?   @map("manager_id")
+  emailVerified      Boolean   @default(false) @map("email_verified")
+  emailVerifiedAt    DateTime? @map("email_verified_at")
+  googleId           String?   @unique @map("google_id")
+  lastLoginAt        DateTime? @map("last_login_at")
+  createdAt          DateTime  @default(now()) @map("created_at")
+  updatedAt          DateTime  @updatedAt @map("updated_at")
+  deletedAt          DateTime? @map("deleted_at")
+
+  department         Department?       @relation(fields: [departmentId], references: [id])
+  designation        Designation?      @relation(fields: [designationId], references: [id])
+  office             Office?           @relation(fields: [officeId], references: [id])
+  employeeType       EmployeeType?     @relation(fields: [employeeTypeId], references: [id])
+  employmentStatus   EmploymentStatus? @relation(fields: [employmentStatusId], references: [id])
+  manager            User?             @relation("UserReportsTo", fields: [managerId], references: [id])
+  subordinates       User[]            @relation("UserReportsTo")
+
+  managedDepartments Department[]      @relation("DepartmentManager")
+  ledTeams           Team[]            @relation("TeamLead")
+  teamMemberships    TeamMember[]
+  userRoles          UserRole[]
+  refreshTokens      RefreshToken[]
+  loginHistory       LoginHistory[]
+  auditLogs          AuditLog[]
+  passwordResets     PasswordReset[]
+
+  @@index([email])
+  @@index([departmentId])
+  @@index([managerId])
+  @@index([status])
+  @@map("users")
+}
+
+model RefreshToken {
+  id          String    @id @default(cuid())
+  userId      String    @map("user_id")
+  token       String    @unique
+  expiresAt   DateTime  @map("expires_at")
+  isRevoked   Boolean   @default(false) @map("is_revoked")
+  revokedAt   DateTime? @map("revoked_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([token])
+  @@map("refresh_tokens")
+}
+
+model LoginHistory {
+  id          String   @id @default(cuid())
+  userId      String   @map("user_id")
+  ipAddress   String?  @map("ip_address")
+  userAgent   String?  @map("user_agent")
+  status      String
+  method      String
+  timestamp   DateTime @default(now())
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([timestamp])
+  @@map("login_history")
+}
+
+model PasswordReset {
+  id          String    @id @default(cuid())
+  userId      String    @map("user_id")
+  token       String    @unique
+  expiresAt   DateTime  @map("expires_at")
+  isUsed      Boolean   @default(false) @map("is_used")
+  usedAt      DateTime? @map("used_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([token])
+  @@map("password_resets")
+}
+
+// ============================================================================
+// RBAC
+// ============================================================================
+
+model Role {
+  id          String    @id @default(cuid())
+  name        String    @unique
+  code        String?   @unique
+  description String?
+  isSystem    Boolean   @default(false) @map("is_system")
+  isActive    Boolean   @default(true) @map("is_active")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+  deletedAt   DateTime? @map("deleted_at")
+
+  userRoles        UserRole[]
+  rolePermissions  RolePermission[]
+
+  @@map("roles")
+}
+
+model Permission {
+  id          String    @id @default(cuid())
+  name        String    @unique
+  code        String    @unique
+  resource    String
+  action      String
+  description String?
+  isActive    Boolean   @default(true) @map("is_active")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+  deletedAt   DateTime? @map("deleted_at")
+
+  rolePermissions RolePermission[]
+
+  @@index([resource])
+  @@index([action])
+  @@map("permissions")
+}
+
+model RolePermission {
+  id           String    @id @default(cuid())
+  roleId       String    @map("role_id")
+  permissionId String    @map("permission_id")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@unique([roleId, permissionId])
+  @@index([roleId])
+  @@index([permissionId])
+  @@map("role_permissions")
+}
+
+model UserRole {
+  id          String    @id @default(cuid())
+  userId      String    @map("user_id")
+  roleId      String    @map("role_id")
+  assignedBy  String?   @map("assigned_by")
+  assignedAt  DateTime  @default(now()) @map("assigned_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+  deletedAt   DateTime? @map("deleted_at")
+
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role        Role      @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, roleId])
+  @@index([userId])
+  @@index([roleId])
+  @@map("user_roles")
+}
+
+// ============================================================================
+// AUDIT LOG
+// ============================================================================
+
+model AuditLog {
+  id          String   @id @default(cuid())
+  userId      String?  @map("user_id")
+  action      String
+  entity      String
+  entityId    String?  @map("entity_id")
+  before      Json?
+  after       Json?
+  ipAddress   String?  @map("ip_address")
+  userAgent   String?  @map("user_agent")
+  timestamp   DateTime @default(now())
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  user        User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([entity])
+  @@index([entityId])
+  @@index([timestamp])
+  @@map("audit_logs")
 }

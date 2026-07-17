@@ -21,6 +21,28 @@ const envSchema = z.object({
     .enum(["true", "false"])
     .default("false")
     .transform((v) => v === "true"),
+  
+  GOOGLE_CLIENT_ID: z.string().optional(),
+  GOOGLE_CLIENT_SECRET: z.string().optional(),
+  GOOGLE_REDIRECT_URI: z.string().optional(),
+  
+  PASSWORD_MIN_LENGTH: z.coerce.number().int().positive().default(8),
+  PASSWORD_REQUIRE_UPPERCASE: z
+    .enum(["true", "false"])
+    .default("true")
+    .transform((v) => v === "true"),
+  PASSWORD_REQUIRE_LOWERCASE: z
+    .enum(["true", "false"])
+    .default("true")
+    .transform((v) => v === "true"),
+  PASSWORD_REQUIRE_NUMBER: z
+    .enum(["true", "false"])
+    .default("true")
+    .transform((v) => v === "true"),
+  PASSWORD_REQUIRE_SPECIAL: z
+    .enum(["true", "false"])
+    .default("false")
+    .transform((v) => v === "true"),
 });
 
 const parsed = envSchema.safeParse(process.env);

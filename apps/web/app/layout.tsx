@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Source_Sans_3, Source_Serif_4 } from "next/font/google";
-import { AppShell } from "@/components/layout/app-shell";
 import { QueryProvider } from "@/components/providers/query-provider";
+import { AuthProvider } from "@/lib/auth-context";
 import { cn } from "@/lib/utils";
 import "./globals.css";
 
@@ -20,7 +20,7 @@ const sourceSerif = Source_Serif_4({
 export const metadata: Metadata = {
   title: "Workforce 360 ERP",
   description:
-    "Workforce 360 ERP — modular operations platform (Phase 0 foundation)",
+    "Workforce 360 ERP — modular operations platform (Phase 1 foundation)",
 };
 
 export default function RootLayout({
@@ -35,7 +35,9 @@ export default function RootLayout({
     >
       <body className="min-h-screen antialiased">
         <QueryProvider>
-          <AppShell title="System health">{children}</AppShell>
+          <AuthProvider>
+            {children}
+          </AuthProvider>
         </QueryProvider>
       </body>
     </html>
