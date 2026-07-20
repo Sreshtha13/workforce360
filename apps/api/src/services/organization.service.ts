@@ -1,4 +1,6 @@
 import { OrganizationRepository } from "../repositories/organization.repository";
+import { departmentManagerService } from "./department-manager.service";
+import { prisma } from "../lib/prisma";
 import type {
   CreateDepartmentData,
   CreateTeamData,
@@ -28,7 +30,28 @@ export class OrganizationService {
   }
   
   async createDepartment(data: CreateDepartmentData) {
-    return this.orgRepo.createDepartment(data);
+    if (data.managerId) {
+      await departmentManagerService.validateManagerUser(data.managerId);
+    }
+
+    const department = await prisma.$transaction(async (tx) => {
+      const created = await tx.department.create({ data });
+
+      if (created.managerId) {
+        await tx.user.updateMany({
+          where: {
+            departmentId: created.id,
+            deletedAt: null,
+            id: { not: created.managerId },
+          },
+          data: { managerId: created.managerId },
+        });
+      }
+
+      return created;
+    });
+
+    return this.orgRepo.findDepartmentById(department.id);
   }
   
   async updateDepartment(id: string, data: Partial<CreateDepartmentData>) {
@@ -36,7 +59,31 @@ export class OrganizationService {
     if (!existing) {
       throw new Error("Department not found");
     }
-    return this.orgRepo.updateDepartment(id, data);
+
+    if (data.managerId) {
+      await departmentManagerService.validateManagerUser(data.managerId);
+    }
+
+    await prisma.$transaction(async (tx) => {
+      await tx.department.update({ where: { id }, data });
+
+      if (data.managerId !== undefined) {
+        const nextManagerId = data.managerId ?? null;
+        const previousManagerId = existing.managerId ?? null;
+
+        if (nextManagerId === null && previousManagerId) {
+          await departmentManagerService.assertCanRemoveDepartmentManager(id);
+        }
+
+        await departmentManagerService.syncMembersToDepartmentManager(
+          id,
+          nextManagerId,
+          previousManagerId,
+        );
+      }
+    });
+
+    return this.orgRepo.findDepartmentById(id);
   }
   
   async deleteDepartment(id: string) {

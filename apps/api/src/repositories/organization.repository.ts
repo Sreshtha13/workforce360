@@ -6,8 +6,8 @@ export type CreateDepartmentData = {
   name: string;
   code?: string;
   description?: string;
-  managerId?: string;
-  parentId?: string;
+  managerId?: string | null;
+  parentId?: string | null;
 };
 
 export type CreateTeamData = {

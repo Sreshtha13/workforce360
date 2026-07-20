@@ -1,4 +1,5 @@
 import { UserRepository } from "../repositories/user.repository";
+import { departmentManagerService } from "./department-manager.service";
 import { hashPassword } from "../lib/password";
 import { getNextEmployeeId } from "../lib/employee-id";
 import type { CreateUserInput, UpdateUserInput } from "../repositories/user.repository";
@@ -32,7 +33,7 @@ export class UserService {
   }
   
   async createUser(data: CreateUserInput & { password?: string }) {
-    const { password, ...userData } = data;
+    const { password, managerId: _ignoredManagerId, ...userData } = data;
 
     if (!userData.employeeId) {
       userData.employeeId = await this.getNextEmployeeId();
@@ -43,10 +44,22 @@ export class UserService {
       passwordHash = await hashPassword(password);
     }
     
-    return this.userRepo.createUser({
+    const created = await this.userRepo.createUser({
       ...userData,
       passwordHash,
     });
+
+    if (userData.departmentId) {
+      const derivedManagerId = await departmentManagerService.resolveManagerForDepartmentAssignment(
+        created.id,
+        userData.departmentId,
+      );
+      if (derivedManagerId) {
+        return this.userRepo.updateUser(created.id, { managerId: derivedManagerId });
+      }
+    }
+
+    return created;
   }
   
   async updateUser(id: string, data: UpdateUserInput & { password?: string }) {
@@ -55,6 +68,39 @@ export class UserService {
     const existing = await this.userRepo.findUserById(id);
     if (!existing) {
       throw new Error("User not found");
+    }
+
+    if (userData.departmentId !== undefined) {
+      const nextDepartmentId = userData.departmentId ?? null;
+      const previousDepartmentId = existing.departmentId ?? null;
+
+      if (nextDepartmentId !== previousDepartmentId) {
+        if (previousDepartmentId) {
+          const clearedManagerId = await departmentManagerService.resolveManagerAfterDepartmentRemoval(
+            id,
+            previousDepartmentId,
+            existing.managerId ?? null,
+          );
+          if (clearedManagerId === null) {
+            userData.managerId = null;
+          }
+        }
+
+        if (nextDepartmentId) {
+          const derivedManagerId = await departmentManagerService.resolveManagerForDepartmentAssignment(
+            id,
+            nextDepartmentId,
+          );
+          if (derivedManagerId) {
+            userData.managerId = derivedManagerId;
+          }
+        }
+      }
+    }
+
+    if (userData.managerId) {
+      await departmentManagerService.validateManagerUser(userData.managerId);
+      await departmentManagerService.validateNoReportingCycle(id, userData.managerId);
     }
     
     let passwordHash: string | undefined;
@@ -73,6 +119,8 @@ export class UserService {
     if (!existing) {
       throw new Error("User not found");
     }
+
+    await departmentManagerService.assertUserCanBeDeleted(id);
     return this.userRepo.deleteUser(id);
   }
   

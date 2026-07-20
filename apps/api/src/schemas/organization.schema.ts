@@ -5,8 +5,8 @@ export const createDepartmentSchema = z.object({
   name: z.string().min(1).max(255),
   code: z.string().max(50).optional(),
   description: z.string().optional(),
-  managerId: z.string().optional(),
-  parentId: z.string().optional(),
+  managerId: z.string().nullable().optional(),
+  parentId: z.string().nullable().optional(),
 });
 
 export const updateDepartmentSchema = createDepartmentSchema.partial();

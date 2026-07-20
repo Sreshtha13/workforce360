@@ -54,11 +54,16 @@ export class UserRepository {
         status: true,
         employeeId: true,
         dateOfJoining: true,
-        department: { select: { id: true, name: true } },
+        department: { select: { id: true, name: true, managerId: true } },
         designation: { select: { id: true, name: true } },
         office: { select: { id: true, name: true } },
         employeeType: { select: { id: true, name: true } },
         employmentStatus: { select: { id: true, name: true } },
+        manager: { select: { id: true, firstName: true, lastName: true, email: true } },
+        managedDepartments: {
+          where: { deletedAt: null },
+          select: { id: true, name: true },
+        },
         userRoles: {
           where: { deletedAt: null },
           include: { role: { select: { id: true, name: true } } },
@@ -80,6 +85,10 @@ export class UserRepository {
         employeeType: true,
         employmentStatus: true,
         manager: { select: { id: true, firstName: true, lastName: true, email: true } },
+        managedDepartments: {
+          where: { deletedAt: null },
+          select: { id: true, name: true },
+        },
         userRoles: {
           where: { deletedAt: null },
           include: { role: true },

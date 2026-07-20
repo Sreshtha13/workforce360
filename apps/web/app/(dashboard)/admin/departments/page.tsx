@@ -24,8 +24,8 @@ type Department = {
   code?: string;
   description?: string;
   isActive: boolean;
-  manager?: { firstName: string; lastName: string };
-  parent?: { name: string };
+  manager?: { id: string; firstName: string; lastName: string };
+  parent?: { id: string; name: string };
   _count?: { teams: number; users: number };
 };
 
@@ -78,8 +78,8 @@ export default function DepartmentsPage() {
         name: form.name,
         code: form.code || undefined,
         description: form.description || undefined,
-        managerId: form.managerId || undefined,
-        parentId: form.parentId || undefined,
+        managerId: form.managerId || null,
+        parentId: form.parentId || null,
       };
       if (editing) return apiClient.organization.departments.update(editing.id, payload);
       return apiClient.organization.departments.create(payload);
@@ -87,6 +87,8 @@ export default function DepartmentsPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["departments"] });
       queryClient.invalidateQueries({ queryKey: ["department-lookups"] });
+      queryClient.invalidateQueries({ queryKey: ["users"] });
+      queryClient.invalidateQueries({ queryKey: ["user-form-lookups"] });
       setSheetOpen(false);
       setEditing(null);
       setForm(emptyForm);
@@ -167,7 +169,7 @@ export default function DepartmentsPage() {
               render: (d) => (
                 <div className="flex justify-end gap-2">
                   {canUpdate && (
-                    <Button variant="outline" size="sm" onClick={() => { setEditing(d); setForm({ name: d.name, code: d.code ?? "", description: d.description ?? "", managerId: "", parentId: "" }); setSheetOpen(true); }}>
+                    <Button variant="outline" size="sm" onClick={() => { setEditing(d); setForm({ name: d.name, code: d.code ?? "", description: d.description ?? "", managerId: d.manager?.id ?? "", parentId: d.parent?.id ?? "" }); setSheetOpen(true); }}>
                       Edit
                     </Button>
                   )}

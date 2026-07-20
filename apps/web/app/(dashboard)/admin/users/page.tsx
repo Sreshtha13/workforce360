@@ -42,11 +42,13 @@ type UserRow = {
   phone?: string;
   status: string;
   employeeId?: string;
-  department?: { id: string; name: string };
+  department?: { id: string; name: string; managerId?: string | null };
   designation?: { id: string; name: string };
   office?: { id: string; name: string };
   employeeType?: { id: string; name: string };
   employmentStatus?: { id: string; name: string };
+  manager?: { id: string; firstName: string; lastName: string; email: string };
+  managedDepartments?: { id: string; name: string }[];
   userRoles: { role: { id: string; name: string } }[];
 };
 
@@ -392,6 +394,28 @@ export default function UsersAdminPage() {
               render: (u) => u.department?.name ?? "—",
             },
             {
+              key: "manager",
+              header: "Manager",
+              render: (u) =>
+                u.manager ? `${u.manager.firstName} ${u.manager.lastName}` : "—",
+            },
+            {
+              key: "deptHead",
+              header: "Dept Head",
+              render: (u) =>
+                u.managedDepartments?.length ? (
+                  <div className="flex flex-wrap gap-1">
+                    {u.managedDepartments.map((dept) => (
+                      <Badge key={dept.id} variant="outline">
+                        {dept.name}
+                      </Badge>
+                    ))}
+                  </div>
+                ) : (
+                  "—"
+                ),
+            },
+            {
               key: "roles",
               header: "Roles",
               render: (u) => (
@@ -494,7 +518,26 @@ export default function UsersAdminPage() {
                     ?.label ?? "Not set"}
                 </dd>
               </div>
+              <div>
+                <dt className="text-xs text-muted-foreground">Reporting Manager</dt>
+                <dd className="font-medium">
+                  {editing.manager
+                    ? `${editing.manager.firstName} ${editing.manager.lastName}`
+                    : "Not set"}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-xs text-muted-foreground">Departments Managed</dt>
+                <dd className="font-medium">
+                  {editing.managedDepartments?.length
+                    ? editing.managedDepartments.map((dept) => dept.name).join(", ")
+                    : "None"}
+                </dd>
+              </div>
             </dl>
+            <p className="mt-3 text-xs text-muted-foreground">
+              Reporting manager syncs from the department head when a department is assigned or its manager changes.
+            </p>
           </div>
         )}
         <FormField
@@ -635,6 +678,7 @@ export default function UsersAdminPage() {
               }}
               options={lookupOptions.departments}
               error={fieldErrors.departmentId}
+              helperText="Assigning a department automatically sets the reporting manager from that department's head."
             />
             <FormSelect
               label="Designation"
