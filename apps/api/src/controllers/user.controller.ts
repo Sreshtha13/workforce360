@@ -38,6 +38,18 @@ export class UserController {
       });
     }
   };
+
+  getNextEmployeeId = async (_req: Request, res: Response): Promise<void> => {
+    try {
+      const employeeId = await this.userService.getNextEmployeeId();
+      sendSuccess(res, { employeeId });
+    } catch (error) {
+      sendError(res, 500, {
+        code: "NEXT_EMPLOYEE_ID_FAILED",
+        message: error instanceof Error ? error.message : "Failed to generate employee ID",
+      });
+    }
+  };
   
   createUser = async (req: Request, res: Response): Promise<void> => {
     try {

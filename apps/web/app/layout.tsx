@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Source_Sans_3, Source_Serif_4 } from "next/font/google";
 import { QueryProvider } from "@/components/providers/query-provider";
 import { ThemeProvider } from "@/components/providers/theme-provider";
+import { ToastProvider } from "@/components/providers/toast-provider";
 import { AuthProvider } from "@/lib/auth-context";
 import { cn } from "@/lib/utils";
 import "./globals.css";
@@ -37,9 +38,11 @@ export default function RootLayout({
     >
       <body className="min-h-screen antialiased" suppressHydrationWarning>
         <ThemeProvider>
-          <QueryProvider>
-            <AuthProvider>{children}</AuthProvider>
-          </QueryProvider>
+          <ToastProvider>
+            <QueryProvider>
+              <AuthProvider>{children}</AuthProvider>
+            </QueryProvider>
+          </ToastProvider>
         </ThemeProvider>
       </body>
     </html>

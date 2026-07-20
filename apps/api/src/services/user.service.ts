@@ -1,5 +1,6 @@
 import { UserRepository } from "../repositories/user.repository";
 import { hashPassword } from "../lib/password";
+import { getNextEmployeeId } from "../lib/employee-id";
 import type { CreateUserInput, UpdateUserInput } from "../repositories/user.repository";
 
 export class UserService {
@@ -24,9 +25,18 @@ export class UserService {
     }
     return user;
   }
+
+  async getNextEmployeeId(): Promise<string> {
+    const latest = await this.userRepo.findLatestEmployeeId();
+    return getNextEmployeeId(latest);
+  }
   
   async createUser(data: CreateUserInput & { password?: string }) {
     const { password, ...userData } = data;
+
+    if (!userData.employeeId) {
+      userData.employeeId = await this.getNextEmployeeId();
+    }
     
     let passwordHash: string | undefined;
     if (password) {

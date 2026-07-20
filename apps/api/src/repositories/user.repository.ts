@@ -1,5 +1,6 @@
 import { prisma } from "../lib/prisma";
 import type { User, UserRole } from "@prisma/client";
+import { findHighestEmployeeId } from "../lib/employee-id";
 
 export type CreateUserInput = {
   email: string;
@@ -141,5 +142,18 @@ export class UserRepository {
         },
       },
     });
+  }
+
+  /** Returns the highest existing EMP### employee id, or null if none exist */
+  async findLatestEmployeeId(): Promise<string | null> {
+    const users = await prisma.user.findMany({
+      where: {
+        deletedAt: null,
+        employeeId: { not: null },
+      },
+      select: { employeeId: true },
+    });
+
+    return findHighestEmployeeId(users.map((u) => u.employeeId));
   }
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import { type ReactNode } from "react";
+import { Loader2 } from "lucide-react";
 import {
   Sheet,
   SheetContent,
@@ -10,7 +11,7 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
-import { glass } from "@/lib/design-system";
+import { glass, iconSize } from "@/lib/design-system";
 import { cn } from "@/lib/utils";
 
 type FormSheetProps = {
@@ -48,6 +49,7 @@ export function FormSheet({
         </SheetHeader>
         <form
           className="flex flex-1 flex-col gap-5 overflow-y-auto px-1 py-4"
+          noValidate
           onSubmit={(e) => {
             e.preventDefault();
             onSubmit();
@@ -67,9 +69,16 @@ export function FormSheet({
               type="submit"
               variant={destructive ? "destructive" : "default"}
               disabled={loading}
-              className="min-w-[100px]"
+              className="min-w-[120px]"
             >
-              {loading ? "Saving..." : submitLabel}
+              {loading ? (
+                <>
+                  <Loader2 className={cn(iconSize.md, "animate-spin")} aria-hidden />
+                  Saving...
+                </>
+              ) : (
+                submitLabel
+              )}
             </Button>
           </SheetFooter>
         </form>

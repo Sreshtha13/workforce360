@@ -146,6 +146,9 @@ export const apiClient = {
   users: {
     list: (params?: { departmentId?: string; status?: string; search?: string }) =>
       request<any[]>(`/api/users${buildQuery(params)}`),
+
+    getNextEmployeeId: () =>
+      request<{ employeeId: string }>("/api/users/next-employee-id"),
     
     get: (id: string) =>
       request<any>(`/api/users/${id}`),

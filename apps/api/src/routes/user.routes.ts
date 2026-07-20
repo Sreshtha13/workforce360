@@ -50,6 +50,29 @@ router.get("/", requireAuth, requirePermission("user.read"), userController.getU
 
 /**
  * @swagger
+ * /api/users/next-employee-id:
+ *   get:
+ *     summary: Get the next auto-generated employee ID
+ *     tags: [Users]
+ *     security:
+ *       - cookieAuth: []
+ *     responses:
+ *       200:
+ *         description: Next employee ID (e.g. EMP002)
+ *       401:
+ *         description: Not authenticated
+ *       403:
+ *         description: Insufficient permissions (requires user.create)
+ */
+router.get(
+  "/next-employee-id",
+  requireAuth,
+  requirePermission("user.create"),
+  userController.getNextEmployeeId,
+);
+
+/**
+ * @swagger
  * /api/users/{id}:
  *   get:
  *     summary: Get user by ID

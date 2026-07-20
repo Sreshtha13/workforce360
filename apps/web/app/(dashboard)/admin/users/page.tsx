@@ -1,9 +1,16 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { UserPlus } from "lucide-react";
 import { apiClient, ApiClientError } from "@/lib/api-client";
 import { useAuth } from "@/lib/auth-context";
+import {
+  getApiErrorMessage,
+  parseApiFieldErrors,
+  scrollToFirstFieldError,
+} from "@/lib/form-validation";
+import { validateUserForm, type UserFormValues } from "@/lib/user-form-validation";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import {
   AlertBanner,
@@ -14,9 +21,11 @@ import {
 import { DataTable } from "@/components/admin/data-table";
 import { FormSheet } from "@/components/admin/form-sheet";
 import { FormField, FormSelect } from "@/components/admin/form-fields";
+import { useToast } from "@/components/providers/toast-provider";
+import { SearchBar } from "@/components/design-system/search-bar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { Skeleton } from "@/components/ui/skeleton";
 
 type UserRow = {
   id: string;
@@ -28,10 +37,15 @@ type UserRow = {
   employeeId?: string;
   department?: { id: string; name: string };
   designation?: { id: string; name: string };
+  office?: { id: string; name: string };
+  employeeType?: { id: string; name: string };
+  employmentStatus?: { id: string; name: string };
   userRoles: { role: { id: string; name: string } }[];
 };
 
-const emptyForm = {
+type LookupOption = { value: string; label: string };
+
+const emptyForm: UserFormValues = {
   email: "",
   password: "",
   firstName: "",
@@ -48,6 +62,7 @@ const emptyForm = {
 
 export default function UsersAdminPage() {
   const { hasPermission } = useAuth();
+  const { toast } = useToast();
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
   const [sheetOpen, setSheetOpen] = useState(false);
@@ -55,8 +70,10 @@ export default function UsersAdminPage() {
   const [editing, setEditing] = useState<UserRow | null>(null);
   const [roleTarget, setRoleTarget] = useState<UserRow | null>(null);
   const [selectedRoleId, setSelectedRoleId] = useState("");
-  const [form, setForm] = useState(emptyForm);
+  const [form, setForm] = useState<UserFormValues>(emptyForm);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [feedback, setFeedback] = useState<{ type: "success" | "error"; message: string } | null>(null);
+  const [loadingEmployeeId, setLoadingEmployeeId] = useState(false);
 
   const canCreate = hasPermission("user.create");
   const canUpdate = hasPermission("user.update");
@@ -97,11 +114,11 @@ export default function UsersAdminPage() {
   const saveMutation = useMutation({
     mutationFn: async () => {
       const payload = {
-        email: form.email,
-        firstName: form.firstName,
-        lastName: form.lastName,
-        phone: form.phone || undefined,
-        employeeId: form.employeeId || undefined,
+        email: form.email.trim(),
+        firstName: form.firstName.trim(),
+        lastName: form.lastName.trim(),
+        phone: form.phone.trim() || undefined,
+        employeeId: form.employeeId.trim() || undefined,
         status: form.status,
         departmentId: form.departmentId || undefined,
         designationId: form.designationId || undefined,
@@ -114,9 +131,6 @@ export default function UsersAdminPage() {
       if (editing) {
         return apiClient.users.update(editing.id, payload);
       }
-      if (!form.password) {
-        throw new Error("Password is required for new users");
-      }
       return apiClient.users.create(payload);
     },
     onSuccess: () => {
@@ -124,13 +138,28 @@ export default function UsersAdminPage() {
       setSheetOpen(false);
       setEditing(null);
       setForm(emptyForm);
-      setFeedback({ type: "success", message: editing ? "User updated" : "User created" });
+      setFieldErrors({});
+      setFeedback({
+        type: "success",
+        message: editing ? "User updated successfully" : "User signed up successfully",
+      });
+      toast({
+        variant: "success",
+        message: editing ? "User updated successfully" : "User signed up successfully",
+      });
     },
     onError: (err) => {
-      setFeedback({
-        type: "error",
-        message: err instanceof ApiClientError ? err.message : "Save failed",
-      });
+      const message = getApiErrorMessage(err, "Save failed");
+      const apiFieldErrors =
+        err instanceof ApiClientError ? parseApiFieldErrors(err.details) : {};
+
+      if (Object.keys(apiFieldErrors).length > 0) {
+        setFieldErrors((prev) => ({ ...prev, ...apiFieldErrors }));
+        scrollToFirstFieldError(apiFieldErrors);
+      }
+
+      toast({ variant: "error", message });
+      setFeedback({ type: "error", message });
     },
   });
 
@@ -139,12 +168,12 @@ export default function UsersAdminPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["users"] });
       setFeedback({ type: "success", message: "User deleted" });
+      toast({ variant: "success", message: "User deleted" });
     },
     onError: (err) => {
-      setFeedback({
-        type: "error",
-        message: err instanceof ApiClientError ? err.message : "Delete failed",
-      });
+      const message = getApiErrorMessage(err, "Delete failed");
+      toast({ variant: "error", message });
+      setFeedback({ type: "error", message });
     },
   });
 
@@ -159,12 +188,12 @@ export default function UsersAdminPage() {
       setRoleTarget(null);
       setSelectedRoleId("");
       setFeedback({ type: "success", message: "Role assigned" });
+      toast({ variant: "success", message: "Role assigned" });
     },
     onError: (err) => {
-      setFeedback({
-        type: "error",
-        message: err instanceof ApiClientError ? err.message : "Assign role failed",
-      });
+      const message = getApiErrorMessage(err, "Assign role failed");
+      toast({ variant: "error", message });
+      setFeedback({ type: "error", message });
     },
   });
 
@@ -174,36 +203,56 @@ export default function UsersAdminPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["users"] });
       setFeedback({ type: "success", message: "Role removed" });
+      toast({ variant: "success", message: "Role removed" });
     },
     onError: (err) => {
-      setFeedback({
-        type: "error",
-        message: err instanceof ApiClientError ? err.message : "Remove role failed",
-      });
+      const message = getApiErrorMessage(err, "Remove role failed");
+      toast({ variant: "error", message });
+      setFeedback({ type: "error", message });
     },
   });
 
   const lookupOptions = useMemo(() => {
     const l = lookupsQuery.data;
     if (!l) return null;
+    const toOptions = (items: { id: string; name: string }[]): LookupOption[] =>
+      items.map((item) => ({ value: item.id, label: item.name }));
+
     return {
-      departments: l.departments.map((d: any) => ({ value: d.id, label: d.name })),
-      designations: l.designations.map((d: any) => ({ value: d.id, label: d.name })),
-      offices: l.offices.map((o: any) => ({ value: o.id, label: o.name })),
-      employeeTypes: l.employeeTypes.map((t: any) => ({ value: t.id, label: t.name })),
-      statuses: l.statuses.map((s: any) => ({ value: s.id, label: s.name })),
-      roles: l.roles.map((r: any) => ({ value: r.id, label: r.name })),
+      departments: toOptions(l.departments),
+      designations: toOptions(l.designations),
+      offices: toOptions(l.offices),
+      employeeTypes: toOptions(l.employeeTypes),
+      statuses: toOptions(l.statuses),
+      roles: toOptions(l.roles),
     };
   }, [lookupsQuery.data]);
 
-  const openCreate = () => {
+  const prefetchNextEmployeeId = async () => {
+    setLoadingEmployeeId(true);
+    try {
+      const res = await apiClient.users.getNextEmployeeId();
+      const employeeId = res.data?.employeeId ?? "";
+      setForm((prev) => ({ ...prev, employeeId }));
+    } catch (err) {
+      const message = getApiErrorMessage(err, "Failed to generate employee ID");
+      toast({ variant: "error", message });
+    } finally {
+      setLoadingEmployeeId(false);
+    }
+  };
+
+  const openCreate = async () => {
     setEditing(null);
     setForm(emptyForm);
+    setFieldErrors({});
     setSheetOpen(true);
+    await prefetchNextEmployeeId();
   };
 
   const openEdit = (user: UserRow) => {
     setEditing(user);
+    setFieldErrors({});
     setForm({
       email: user.email,
       password: "",
@@ -214,9 +263,9 @@ export default function UsersAdminPage() {
       status: user.status,
       departmentId: user.department?.id ?? "",
       designationId: user.designation?.id ?? "",
-      officeId: "",
-      employeeTypeId: "",
-      employmentStatusId: "",
+      officeId: user.office?.id ?? "",
+      employeeTypeId: user.employeeType?.id ?? "",
+      employmentStatusId: user.employmentStatus?.id ?? "",
     });
     setSheetOpen(true);
   };
@@ -227,7 +276,35 @@ export default function UsersAdminPage() {
     setRoleSheetOpen(true);
   };
 
-  if (usersQuery.isLoading) return <LoadingState message="Loading users..." />;
+  const clearFieldError = (name: string) => {
+    setFieldErrors((prev) => {
+      if (!prev[name]) return prev;
+      const next = { ...prev };
+      delete next[name];
+      return next;
+    });
+  };
+
+  const handleSubmit = () => {
+    const errors = validateUserForm(form, { isEdit: !!editing });
+    setFieldErrors(errors);
+
+    if (Object.keys(errors).length > 0) {
+      scrollToFirstFieldError(errors);
+      toast({ variant: "error", message: "Please fix the highlighted fields" });
+      return;
+    }
+
+    saveMutation.mutate();
+  };
+
+  useEffect(() => {
+    if (!sheetOpen) {
+      setFieldErrors({});
+    }
+  }, [sheetOpen]);
+
+  if (usersQuery.isLoading) return <LoadingState message="Loading users..." variant="table" />;
   if (usersQuery.isError) {
     return (
       <ErrorState
@@ -248,15 +325,19 @@ export default function UsersAdminPage() {
       <AdminPageHeader
         title="User Management"
         description="Create users, manage status, and assign roles."
-        actionLabel={canCreate ? "Add User" : undefined}
-        onAction={canCreate ? openCreate : undefined}
       >
-        <Input
+        <SearchBar
           placeholder="Search users..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="w-full sm:w-64"
+          containerClassName="w-full sm:w-64"
         />
+        {canCreate && (
+          <Button onClick={() => void openCreate()} className="gap-1.5">
+            <UserPlus className="size-4" aria-hidden />
+            Signup
+          </Button>
+        )}
       </AdminPageHeader>
 
       {feedback && (
@@ -270,9 +351,9 @@ export default function UsersAdminPage() {
       {users.length === 0 ? (
         <EmptyState
           title="No users found"
-          description="Create your first user or adjust your search."
-          actionLabel={canCreate ? "Add User" : undefined}
-          onAction={canCreate ? openCreate : undefined}
+          description="Sign up your first user or adjust your search."
+          actionLabel={canCreate ? "Signup" : undefined}
+          onAction={canCreate ? () => void openCreate() : undefined}
         />
       ) : (
         <DataTable
@@ -372,36 +453,190 @@ export default function UsersAdminPage() {
       <FormSheet
         open={sheetOpen}
         onOpenChange={setSheetOpen}
-        title={editing ? "Edit User" : "Create User"}
-        description="User data is saved via the backend API only."
-        onSubmit={() => saveMutation.mutate()}
-        loading={saveMutation.isPending}
+        title={editing ? "Edit User" : "Signup User"}
+        description={
+          editing
+            ? "Update user details via the backend API."
+            : "Employee ID is auto-generated from the latest record."
+        }
+        onSubmit={handleSubmit}
+        loading={saveMutation.isPending || (!editing && loadingEmployeeId)}
+        submitLabel={editing ? "Save Changes" : "Signup"}
       >
-        <FormField label="Email" name="email" type="email" value={form.email} onChange={(v) => setForm({ ...form, email: v })} required disabled={!!editing} />
+        <FormField
+          label="Email"
+          name="email"
+          type="email"
+          value={form.email}
+          onChange={(v) => {
+            clearFieldError("email");
+            setForm({ ...form, email: v });
+          }}
+          required
+          disabled={!!editing}
+          error={fieldErrors.email}
+        />
         {!editing && (
-          <FormField label="Password" name="password" type="password" value={form.password} onChange={(v) => setForm({ ...form, password: v })} required />
+          <FormField
+            label="Password"
+            name="password"
+            type="password"
+            value={form.password}
+            onChange={(v) => {
+              clearFieldError("password");
+              setForm({ ...form, password: v });
+            }}
+            required
+            error={fieldErrors.password}
+          />
         )}
         {editing && (
-          <FormField label="New Password (optional)" name="password" type="password" value={form.password} onChange={(v) => setForm({ ...form, password: v })} />
+          <FormField
+            label="New Password (optional)"
+            name="password"
+            type="password"
+            value={form.password}
+            onChange={(v) => {
+              clearFieldError("password");
+              setForm({ ...form, password: v });
+            }}
+            error={fieldErrors.password}
+            helperText="Leave blank to keep the current password."
+          />
         )}
         <div className="grid gap-4 sm:grid-cols-2">
-          <FormField label="First name" name="firstName" value={form.firstName} onChange={(v) => setForm({ ...form, firstName: v })} required />
-          <FormField label="Last name" name="lastName" value={form.lastName} onChange={(v) => setForm({ ...form, lastName: v })} required />
+          <FormField
+            label="First name"
+            name="firstName"
+            value={form.firstName}
+            onChange={(v) => {
+              clearFieldError("firstName");
+              setForm({ ...form, firstName: v });
+            }}
+            required
+            error={fieldErrors.firstName}
+          />
+          <FormField
+            label="Last name"
+            name="lastName"
+            value={form.lastName}
+            onChange={(v) => {
+              clearFieldError("lastName");
+              setForm({ ...form, lastName: v });
+            }}
+            required
+            error={fieldErrors.lastName}
+          />
         </div>
-        <FormField label="Phone" name="phone" value={form.phone} onChange={(v) => setForm({ ...form, phone: v })} />
-        <FormField label="Employee ID" name="employeeId" value={form.employeeId} onChange={(v) => setForm({ ...form, employeeId: v })} />
-        <FormSelect label="Status" name="status" value={form.status} onChange={(v) => setForm({ ...form, status: v })} options={[
-          { value: "active", label: "Active" },
-          { value: "inactive", label: "Inactive" },
-          { value: "suspended", label: "Suspended" },
-        ]} />
+        <FormField
+          label="Phone"
+          name="phone"
+          value={form.phone}
+          onChange={(v) => {
+            clearFieldError("phone");
+            setForm({ ...form, phone: v });
+          }}
+          error={fieldErrors.phone}
+        />
+        {loadingEmployeeId && !editing ? (
+          <div className="space-y-2">
+            <p className="text-sm font-medium">
+              Employee ID<span className="ml-0.5 text-destructive">*</span>
+            </p>
+            <Skeleton className="h-9 w-full rounded-lg" />
+            <p className="text-xs text-muted-foreground">Generating from the latest employee ID...</p>
+          </div>
+        ) : (
+          <FormField
+            label="Employee ID"
+            name="employeeId"
+            value={form.employeeId}
+            onChange={(v) => {
+              clearFieldError("employeeId");
+              setForm({ ...form, employeeId: v });
+            }}
+            required={!editing}
+            disabled
+            error={fieldErrors.employeeId}
+            helperText={
+              editing
+                ? "Employee ID cannot be changed after signup."
+                : "Auto-generated from the latest employee ID."
+            }
+          />
+        )}
+        <FormSelect
+          label="Status"
+          name="status"
+          value={form.status}
+          onChange={(v) => {
+            clearFieldError("status");
+            setForm({ ...form, status: v });
+          }}
+          options={[
+            { value: "active", label: "Active" },
+            { value: "inactive", label: "Inactive" },
+            { value: "suspended", label: "Suspended" },
+          ]}
+          error={fieldErrors.status}
+        />
         {lookupOptions && (
           <>
-            <FormSelect label="Department" name="departmentId" value={form.departmentId} onChange={(v) => setForm({ ...form, departmentId: v })} options={lookupOptions.departments} />
-            <FormSelect label="Designation" name="designationId" value={form.designationId} onChange={(v) => setForm({ ...form, designationId: v })} options={lookupOptions.designations} />
-            <FormSelect label="Office" name="officeId" value={form.officeId} onChange={(v) => setForm({ ...form, officeId: v })} options={lookupOptions.offices} />
-            <FormSelect label="Employee type" name="employeeTypeId" value={form.employeeTypeId} onChange={(v) => setForm({ ...form, employeeTypeId: v })} options={lookupOptions.employeeTypes} />
-            <FormSelect label="Employment status" name="employmentStatusId" value={form.employmentStatusId} onChange={(v) => setForm({ ...form, employmentStatusId: v })} options={lookupOptions.statuses} />
+            <FormSelect
+              label="Department"
+              name="departmentId"
+              value={form.departmentId}
+              onChange={(v) => {
+                clearFieldError("departmentId");
+                setForm({ ...form, departmentId: v });
+              }}
+              options={lookupOptions.departments}
+              error={fieldErrors.departmentId}
+            />
+            <FormSelect
+              label="Designation"
+              name="designationId"
+              value={form.designationId}
+              onChange={(v) => {
+                clearFieldError("designationId");
+                setForm({ ...form, designationId: v });
+              }}
+              options={lookupOptions.designations}
+              error={fieldErrors.designationId}
+            />
+            <FormSelect
+              label="Office"
+              name="officeId"
+              value={form.officeId}
+              onChange={(v) => {
+                clearFieldError("officeId");
+                setForm({ ...form, officeId: v });
+              }}
+              options={lookupOptions.offices}
+              error={fieldErrors.officeId}
+            />
+            <FormSelect
+              label="Employee type"
+              name="employeeTypeId"
+              value={form.employeeTypeId}
+              onChange={(v) => {
+                clearFieldError("employeeTypeId");
+                setForm({ ...form, employeeTypeId: v });
+              }}
+              options={lookupOptions.employeeTypes}
+              error={fieldErrors.employeeTypeId}
+            />
+            <FormSelect
+              label="Employment status"
+              name="employmentStatusId"
+              value={form.employmentStatusId}
+              onChange={(v) => {
+                clearFieldError("employmentStatusId");
+                setForm({ ...form, employmentStatusId: v });
+              }}
+              options={lookupOptions.statuses}
+              error={fieldErrors.employmentStatusId}
+            />
           </>
         )}
       </FormSheet>
