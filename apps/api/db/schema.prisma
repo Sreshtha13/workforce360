@@ -181,6 +181,7 @@ model EmployeeType {
 
 model EmploymentStatus {
   id          String    @id @default(cuid())
+  /// Employment type label: Full Time, Part Time, Contract, Intern, Probation, Consultant
   name        String    @unique
   code        String?   @unique
   description String?
@@ -206,6 +207,7 @@ model User {
   lastName           String    @map("last_name")
   phone              String?
   avatar             String?
+  /// Account lifecycle: active | inactive | blocked | deleted
   status             String    @default("active")
   employeeId         String?   @unique @map("employee_id")
   dateOfBirth        DateTime? @map("date_of_birth")

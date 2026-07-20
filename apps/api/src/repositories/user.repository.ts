@@ -9,13 +9,14 @@ export type CreateUserInput = {
   lastName: string;
   phone?: string;
   employeeId?: string;
+  status?: string;
   dateOfBirth?: Date;
   dateOfJoining?: Date;
   departmentId?: string;
   designationId?: string;
   officeId?: string;
   employeeTypeId?: string;
-  employmentStatusId?: string;
+  employmentStatusId?: string | null;
   managerId?: string;
 };
 

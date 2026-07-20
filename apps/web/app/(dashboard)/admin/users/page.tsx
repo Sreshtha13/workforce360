@@ -10,6 +10,13 @@ import {
   parseApiFieldErrors,
   scrollToFirstFieldError,
 } from "@/lib/form-validation";
+import {
+  ACCOUNT_STATUS_HELPER,
+  accountStatusBadgeVariant,
+  EMPLOYMENT_STATUS_HELPER,
+  USER_ACCOUNT_STATUSES,
+  USER_ACCOUNT_STATUS_LABELS,
+} from "@/lib/user-status";
 import { validateUserForm, type UserFormValues } from "@/lib/user-form-validation";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import {
@@ -91,7 +98,7 @@ export default function UsersAdminPage() {
   const lookupsQuery = useQuery({
     queryKey: ["user-form-lookups"],
     queryFn: async () => {
-      const [departments, designations, offices, employeeTypes, statuses, roles] =
+      const [departments, designations, offices, employeeTypes, employmentStatuses, roles] =
         await Promise.all([
           apiClient.organization.departments.list(),
           apiClient.organization.designations.list(),
@@ -105,7 +112,7 @@ export default function UsersAdminPage() {
         designations: designations.data ?? [],
         offices: offices.data ?? [],
         employeeTypes: employeeTypes.data ?? [],
-        statuses: statuses.data ?? [],
+        employmentStatuses: employmentStatuses.data ?? [],
         roles: roles.data ?? [],
       };
     },
@@ -113,7 +120,7 @@ export default function UsersAdminPage() {
 
   const saveMutation = useMutation({
     mutationFn: async () => {
-      const payload = {
+      const payload: Record<string, unknown> = {
         email: form.email.trim(),
         firstName: form.firstName.trim(),
         lastName: form.lastName.trim(),
@@ -124,13 +131,15 @@ export default function UsersAdminPage() {
         designationId: form.designationId || undefined,
         officeId: form.officeId || undefined,
         employeeTypeId: form.employeeTypeId || undefined,
-        employmentStatusId: form.employmentStatusId || undefined,
         ...(form.password ? { password: form.password } : {}),
       };
 
       if (editing) {
+        payload.employmentStatusId = form.employmentStatusId || null;
         return apiClient.users.update(editing.id, payload);
       }
+
+      payload.employmentStatusId = form.employmentStatusId || undefined;
       return apiClient.users.create(payload);
     },
     onSuccess: () => {
@@ -223,7 +232,7 @@ export default function UsersAdminPage() {
       designations: toOptions(l.designations),
       offices: toOptions(l.offices),
       employeeTypes: toOptions(l.employeeTypes),
-      statuses: toOptions(l.statuses),
+      employmentStatuses: toOptions(l.employmentStatuses),
       roles: toOptions(l.roles),
     };
   }, [lookupsQuery.data]);
@@ -324,7 +333,7 @@ export default function UsersAdminPage() {
     <div className="space-y-6">
       <AdminPageHeader
         title="User Management"
-        description="Create users, manage status, and assign roles."
+        description="Create users, manage account status, employment status, and roles."
       >
         <SearchBar
           placeholder="Search users..."
@@ -398,21 +407,24 @@ export default function UsersAdminPage() {
               ),
             },
             {
-              key: "status",
-              header: "Status",
+              key: "accountStatus",
+              header: "Account Status",
               render: (u) => (
-                <Badge
-                  variant={
-                    u.status === "active"
-                      ? "success"
-                      : u.status === "suspended"
-                        ? "destructive"
-                        : "warning"
-                  }
-                >
-                  {u.status}
+                <Badge variant={accountStatusBadgeVariant(u.status)}>
+                  {USER_ACCOUNT_STATUS_LABELS[u.status as keyof typeof USER_ACCOUNT_STATUS_LABELS] ??
+                    u.status}
                 </Badge>
               ),
+            },
+            {
+              key: "employmentStatus",
+              header: "Employment Status",
+              render: (u) =>
+                u.employmentStatus?.name ? (
+                  <Badge variant="outline">{u.employmentStatus.name}</Badge>
+                ) : (
+                  "—"
+                ),
             },
             {
               key: "actions",
@@ -456,13 +468,35 @@ export default function UsersAdminPage() {
         title={editing ? "Edit User" : "Signup User"}
         description={
           editing
-            ? "Update user details via the backend API."
-            : "Employee ID is auto-generated from the latest record."
+            ? "Update account status (login access) and employment status (work type) separately."
+            : "Employee ID is auto-generated. Set account status and employment type before signup."
         }
         onSubmit={handleSubmit}
         loading={saveMutation.isPending || (!editing && loadingEmployeeId)}
         submitLabel={editing ? "Save Changes" : "Signup"}
       >
+        {editing && (
+          <div className="rounded-xl border border-white/15 bg-white/30 p-4 text-sm dark:bg-white/5">
+            <p className="font-medium">Current assignment</p>
+            <dl className="mt-2 grid gap-2 sm:grid-cols-2">
+              <div>
+                <dt className="text-xs text-muted-foreground">Account Status</dt>
+                <dd className="font-medium">
+                  {USER_ACCOUNT_STATUS_LABELS[
+                    form.status as keyof typeof USER_ACCOUNT_STATUS_LABELS
+                  ] ?? form.status}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-xs text-muted-foreground">Employment Status</dt>
+                <dd className="font-medium">
+                  {lookupOptions?.employmentStatuses.find((o) => o.value === form.employmentStatusId)
+                    ?.label ?? "Not set"}
+                </dd>
+              </div>
+            </dl>
+          </div>
+        )}
         <FormField
           label="Email"
           name="email"
@@ -566,22 +600,31 @@ export default function UsersAdminPage() {
           />
         )}
         <FormSelect
-          label="Status"
+          label="Account Status"
           name="status"
           value={form.status}
           onChange={(v) => {
             clearFieldError("status");
             setForm({ ...form, status: v });
           }}
-          options={[
-            { value: "active", label: "Active" },
-            { value: "inactive", label: "Inactive" },
-            { value: "suspended", label: "Suspended" },
-          ]}
+          options={[...USER_ACCOUNT_STATUSES]}
           error={fieldErrors.status}
+          helperText={ACCOUNT_STATUS_HELPER}
         />
         {lookupOptions && (
           <>
+            <FormSelect
+              label="Employment Status"
+              name="employmentStatusId"
+              value={form.employmentStatusId}
+              onChange={(v) => {
+                clearFieldError("employmentStatusId");
+                setForm({ ...form, employmentStatusId: v });
+              }}
+              options={lookupOptions.employmentStatuses}
+              error={fieldErrors.employmentStatusId}
+              helperText={EMPLOYMENT_STATUS_HELPER}
+            />
             <FormSelect
               label="Department"
               name="departmentId"
@@ -625,17 +668,6 @@ export default function UsersAdminPage() {
               }}
               options={lookupOptions.employeeTypes}
               error={fieldErrors.employeeTypeId}
-            />
-            <FormSelect
-              label="Employment status"
-              name="employmentStatusId"
-              value={form.employmentStatusId}
-              onChange={(v) => {
-                clearFieldError("employmentStatusId");
-                setForm({ ...form, employmentStatusId: v });
-              }}
-              options={lookupOptions.statuses}
-              error={fieldErrors.employmentStatusId}
             />
           </>
         )}

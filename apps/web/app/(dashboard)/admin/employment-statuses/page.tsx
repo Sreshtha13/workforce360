@@ -43,7 +43,7 @@ export default function EmploymentStatusesPage() {
 
   return (
     <div className="space-y-6">
-      <AdminPageHeader title="Employment Statuses" description="Active, on leave, notice period, etc." actionLabel={canCreate ? "Add Status" : undefined} onAction={canCreate ? () => { setEditing(null); setForm(emptyForm); setOpen(true); } : undefined} />
+      <AdminPageHeader title="Employment Statuses" description="Employment types: Full Time, Part Time, Contract, Intern, Probation, Consultant." actionLabel={canCreate ? "Add Employment Status" : undefined} onAction={canCreate ? () => { setEditing(null); setForm(emptyForm); setOpen(true); } : undefined} />
       {feedback && <AlertBanner variant={feedback.type === "error" ? "error" : "success"} message={feedback.message} onDismiss={() => setFeedback(null)} />}
       {rows.length === 0 ? <EmptyState title="No employment statuses" actionLabel={canCreate ? "Create" : undefined} onAction={canCreate ? () => setOpen(true) : undefined} /> : (
         <DataTable data={rows} rowKey={(r) => r.id} columns={[

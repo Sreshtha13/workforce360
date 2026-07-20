@@ -31,7 +31,7 @@ const userController = new UserController();
  *         name: status
  *         schema:
  *           type: string
- *           enum: [active, inactive, suspended]
+ *           enum: [active, inactive, blocked, deleted]
  *         description: Filter by user status
  *       - in: query
  *         name: search

@@ -1,4 +1,7 @@
 import { z } from "zod";
+import { USER_ACCOUNT_STATUSES } from "../constants/user-status";
+
+const userAccountStatusSchema = z.enum(USER_ACCOUNT_STATUSES);
 
 export const createUserSchema = z.object({
   email: z.string().email("Invalid email address"),
@@ -7,13 +10,14 @@ export const createUserSchema = z.object({
   lastName: z.string().min(1, "Last name is required").max(255),
   phone: z.string().max(50).optional(),
   employeeId: z.string().max(50).optional(),
+  status: userAccountStatusSchema.optional().default("active"),
   dateOfBirth: z.string().datetime().optional(),
   dateOfJoining: z.string().datetime().optional(),
   departmentId: z.string().optional(),
   designationId: z.string().optional(),
   officeId: z.string().optional(),
   employeeTypeId: z.string().optional(),
-  employmentStatusId: z.string().optional(),
+  employmentStatusId: z.string().nullable().optional(),
   managerId: z.string().optional(),
 });
 
@@ -21,7 +25,8 @@ export const updateUserSchema = createUserSchema
   .partial()
   .extend({
     password: z.string().min(8, "Password must be at least 8 characters").optional(),
-    status: z.enum(["active", "inactive", "suspended"]).optional(),
+    employmentStatusId: z.string().nullable().optional(),
+    status: userAccountStatusSchema.optional(),
   })
   .refine(
     (data) => Object.keys(data).length > 0,

@@ -185,11 +185,12 @@ async function main() {
   console.log("✅ Employee types created");
   
   const employmentStatuses = [
-    { name: "Active", code: "active" },
-    { name: "On Leave", code: "on_leave" },
-    { name: "Notice Period", code: "notice_period" },
-    { name: "Terminated", code: "terminated" },
-    { name: "Resigned", code: "resigned" },
+    { name: "Full Time", code: "full_time" },
+    { name: "Part Time", code: "part_time" },
+    { name: "Contract", code: "contract" },
+    { name: "Intern", code: "intern" },
+    { name: "Probation", code: "probation" },
+    { name: "Consultant", code: "consultant" },
   ];
   
   for (const status of employmentStatuses) {
