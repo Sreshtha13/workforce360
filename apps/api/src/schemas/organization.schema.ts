@@ -45,6 +45,11 @@ export const createDesignationSchema = z.object({
     .int("Level must be a whole number")
     .min(DESIGNATION_LEVEL_MIN, "Level must be at least L1")
     .max(DESIGNATION_LEVEL_MAX, "Level must be at most L5"),
+  headcount: z
+    .number()
+    .int("Headcount must be a whole number")
+    .min(1, "Headcount must be at least 1")
+    .optional(),
   description: z.string().optional(),
 });
 

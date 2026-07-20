@@ -129,6 +129,8 @@ model Designation {
   name         String
   code         String?   @unique
   level        Int
+  /// Approved position capacity for this title (vacant = headcount − assigned users).
+  headcount    Int       @default(1)
   description  String?
   isActive     Boolean   @default(true) @map("is_active")
   createdAt    DateTime  @default(now()) @map("created_at")

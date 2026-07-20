@@ -18,6 +18,13 @@ import { FormField, FormSelect, FormTextarea } from "@/components/admin/form-fie
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 
+type DepartmentMetrics = {
+  totalEmployees: number;
+  managers: number;
+  openPositions: number;
+  usersCount: number;
+};
+
 type Department = {
   id: string;
   name: string;
@@ -26,7 +33,7 @@ type Department = {
   isActive: boolean;
   manager?: { id: string; firstName: string; lastName: string };
   parent?: { id: string; name: string };
-  _count?: { teams: number; users: number };
+  metrics: DepartmentMetrics;
 };
 
 const emptyForm = {
@@ -129,10 +136,10 @@ export default function DepartmentsPage() {
   const departments = query.data ?? [];
   const deptOptions =
     lookupsQuery.data?.departments
-      .filter((d: Department) => d.id !== editing?.id)
-      .map((d: Department) => ({ value: d.id, label: d.name })) ?? [];
+      .filter((d: { id: string }) => d.id !== editing?.id)
+      .map((d: { id: string; name: string }) => ({ value: d.id, label: d.name })) ?? [];
   const userOptions =
-    lookupsQuery.data?.users.map((u: any) => ({
+    lookupsQuery.data?.users.map((u: { id: string; firstName: string; lastName: string }) => ({
       value: u.id,
       label: `${u.firstName} ${u.lastName}`,
     })) ?? [];
@@ -141,7 +148,7 @@ export default function DepartmentsPage() {
     <div className="space-y-6">
       <AdminPageHeader
         title="Departments"
-        description="Manage organizational departments and reporting structure."
+        description="Organizational departments with live workforce metrics."
         actionLabel={canCreate ? "Add Department" : undefined}
         onAction={canCreate ? () => { setEditing(null); setForm(emptyForm); setSheetOpen(true); } : undefined}
       />
@@ -157,11 +164,30 @@ export default function DepartmentsPage() {
           data={departments}
           rowKey={(d) => d.id}
           columns={[
-            { key: "name", header: "Name", render: (d) => <div><p className="font-medium">{d.name}</p>{d.description && <p className="text-xs text-muted-foreground">{d.description}</p>}</div> },
-            { key: "code", header: "Code", render: (d) => d.code ?? "—" },
-            { key: "manager", header: "Manager", render: (d) => d.manager ? `${d.manager.firstName} ${d.manager.lastName}` : "—" },
-            { key: "teams", header: "Teams", render: (d) => d._count?.teams ?? 0 },
-            { key: "status", header: "Status", render: (d) => <Badge variant={d.isActive ? "success" : "warning"}>{d.isActive ? "Active" : "Inactive"}</Badge> },
+            {
+              key: "name",
+              header: "Department",
+              render: (d) => (
+                <div>
+                  <p className="font-medium">{d.name}</p>
+                  {d.code && <p className="text-xs text-muted-foreground">{d.code}</p>}
+                </div>
+              ),
+            },
+            { key: "totalEmployees", header: "Total Employees", render: (d) => d.metrics.totalEmployees },
+            { key: "managers", header: "Managers", render: (d) => d.metrics.managers },
+            { key: "openPositions", header: "Open Positions", render: (d) => d.metrics.openPositions },
+            { key: "usersCount", header: "Users Count", render: (d) => d.metrics.usersCount },
+            {
+              key: "departmentHead",
+              header: "Department Head",
+              render: (d) => (d.manager ? `${d.manager.firstName} ${d.manager.lastName}` : "—"),
+            },
+            {
+              key: "status",
+              header: "Status",
+              render: (d) => <Badge variant={d.isActive ? "success" : "warning"}>{d.isActive ? "Active" : "Inactive"}</Badge>,
+            },
             {
               key: "actions",
               header: "Actions",
@@ -190,7 +216,7 @@ export default function DepartmentsPage() {
         <FormField label="Code" name="code" value={form.code} onChange={(v) => setForm({ ...form, code: v })} />
         <FormTextarea label="Description" name="description" value={form.description} onChange={(v) => setForm({ ...form, description: v })} />
         <FormSelect label="Parent department" name="parentId" value={form.parentId} onChange={(v) => setForm({ ...form, parentId: v })} options={deptOptions} />
-        <FormSelect label="Manager" name="managerId" value={form.managerId} onChange={(v) => setForm({ ...form, managerId: v })} options={userOptions} />
+        <FormSelect label="Department head" name="managerId" value={form.managerId} onChange={(v) => setForm({ ...form, managerId: v })} options={userOptions} />
       </FormSheet>
     </div>
   );

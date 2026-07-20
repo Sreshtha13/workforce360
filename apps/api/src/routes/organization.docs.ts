@@ -312,6 +312,7 @@
  *               name: { type: string, example: Software Engineer }
  *               code: { type: string, example: SE }
  *               level: { type: integer, minimum: 1, maximum: 5, example: 1, description: "Hierarchy level (1=L1 … 5=L5)" }
+ *               headcount: { type: integer, minimum: 1, example: 1, description: "Approved position capacity" }
  *               description: { type: string }
  *     responses:
  *       201:
@@ -358,6 +359,7 @@
  *               name: { type: string }
  *               code: { type: string }
  *               level: { type: integer, minimum: 1, maximum: 5 }
+ *               headcount: { type: integer, minimum: 1 }
  *               description: { type: string }
  *     responses:
  *       200:

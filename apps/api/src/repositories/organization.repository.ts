@@ -1,4 +1,9 @@
 import { prisma } from "../lib/prisma";
+import {
+  activeEmployeeFilter,
+  buildDesignationMetrics,
+  getDepartmentMetricsByIds,
+} from "../lib/organization-metrics";
 import type { Department, Team, Designation, Office, EmployeeType, EmploymentStatus } from "@prisma/client";
 
 export type CreateDepartmentData = {
@@ -23,6 +28,7 @@ export type CreateDesignationData = {
   name: string;
   code?: string;
   level: number;
+  headcount?: number;
   description?: string;
 };
 
@@ -54,15 +60,26 @@ export type CreateEmploymentStatusData = {
 
 export class OrganizationRepository {
   async findAllDepartments(companyId?: string) {
-    return prisma.department.findMany({
+    const departments = await prisma.department.findMany({
       where: { deletedAt: null, ...(companyId && { companyId }) },
       include: {
         manager: { select: { id: true, firstName: true, lastName: true, email: true } },
         parent: { select: { id: true, name: true } },
-        _count: { select: { children: true, teams: true, users: true } },
       },
       orderBy: { createdAt: "desc" },
     });
+
+    const metricsByDepartment = await getDepartmentMetricsByIds(departments.map((department) => department.id));
+
+    return departments.map((department) => ({
+      ...department,
+      metrics: metricsByDepartment.get(department.id) ?? {
+        totalEmployees: 0,
+        managers: 0,
+        openPositions: 0,
+        usersCount: 0,
+      },
+    }));
   }
   
   async findDepartmentById(id: string) {
@@ -136,32 +153,54 @@ export class OrganizationRepository {
   }
   
   async findAllDesignations(departmentId?: string) {
-    return prisma.designation.findMany({
+    const designations = await prisma.designation.findMany({
       where: { deletedAt: null, ...(departmentId && { departmentId }) },
       include: {
         department: { select: { id: true, name: true } },
         _count: {
           select: {
-            users: { where: { deletedAt: null } },
+            users: { where: activeEmployeeFilter },
           },
         },
       },
       orderBy: [{ department: { name: "asc" } }, { level: "asc" }, { name: "asc" }],
     });
+
+    return designations.map((designation) => ({
+      ...designation,
+      metrics: buildDesignationMetrics(
+        designation.headcount,
+        designation._count.users,
+        designation.isActive,
+      ),
+    }));
   }
 
   async findDesignationById(id: string) {
-    return prisma.designation.findUnique({
+    const designation = await prisma.designation.findUnique({
       where: { id, deletedAt: null },
       include: {
         department: { select: { id: true, name: true } },
         _count: {
           select: {
-            users: { where: { deletedAt: null } },
+            users: { where: activeEmployeeFilter },
           },
         },
       },
     });
+
+    if (!designation) {
+      return null;
+    }
+
+    return {
+      ...designation,
+      metrics: buildDesignationMetrics(
+        designation.headcount,
+        designation._count.users,
+        designation.isActive,
+      ),
+    };
   }
   
   async createDesignation(data: CreateDesignationData): Promise<Designation> {

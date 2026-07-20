@@ -12,16 +12,21 @@ import { FormField, FormSelect, FormTextarea } from "@/components/admin/form-fie
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 
+type DesignationMetrics = {
+  usersAssigned: number;
+  vacantPositions: number;
+};
+
 type Designation = {
   id: string;
   name: string;
   code?: string;
   level: number;
+  headcount: number;
   description?: string;
   isActive: boolean;
-  createdAt: string;
   department?: { id: string; name: string };
-  _count?: { users: number };
+  metrics: DesignationMetrics;
 };
 
 const HIERARCHY_LEVELS = [
@@ -32,18 +37,10 @@ const HIERARCHY_LEVELS = [
   { value: "5", label: "L5" },
 ];
 
-const emptyForm = { departmentId: "", name: "", code: "", level: "", description: "" };
+const emptyForm = { departmentId: "", name: "", code: "", level: "", headcount: "1", description: "" };
 
 function formatLevel(level?: number | null): string {
   return level != null ? `L${level}` : "—";
-}
-
-function formatCreatedDate(value: string): string {
-  return new Date(value).toLocaleDateString("en-US", {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-  });
 }
 
 export default function DesignationsPage() {
@@ -74,6 +71,7 @@ export default function DesignationsPage() {
         name: form.name,
         code: form.code || undefined,
         level: Number(form.level),
+        headcount: Number(form.headcount),
         description: form.description || undefined,
       };
       return editing
@@ -82,6 +80,7 @@ export default function DesignationsPage() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["designations"] });
+      qc.invalidateQueries({ queryKey: ["departments"] });
       setOpen(false);
       setEditing(null);
       setForm(emptyForm);
@@ -94,6 +93,7 @@ export default function DesignationsPage() {
     mutationFn: (id: string) => apiClient.organization.designations.delete(id),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["designations"] });
+      qc.invalidateQueries({ queryKey: ["departments"] });
       setFeedback({ type: "success", message: "Deleted" });
     },
   });
@@ -121,6 +121,7 @@ export default function DesignationsPage() {
       name: row.name,
       code: row.code ?? "",
       level: row.level?.toString() ?? "",
+      headcount: row.headcount?.toString() ?? "1",
       description: row.description ?? "",
     });
     setOpen(true);
@@ -130,7 +131,7 @@ export default function DesignationsPage() {
     <div className="space-y-6">
       <AdminPageHeader
         title="Designations"
-        description="Job titles scoped to departments with hierarchy levels (L1–L5)."
+        description="Job titles with hierarchy levels and live assignment metrics."
         actionLabel={canCreate ? "Add Designation" : undefined}
         onAction={canCreate ? openCreate : undefined}
       />
@@ -144,16 +145,16 @@ export default function DesignationsPage() {
           data={rows}
           rowKey={(r) => r.id}
           columns={[
-            { key: "name", header: "Name", render: (r) => r.name },
+            { key: "name", header: "Designation", render: (r) => r.name },
             { key: "department", header: "Department", render: (r) => r.department?.name ?? "—" },
-            { key: "level", header: "Level", render: (r) => formatLevel(r.level) },
-            { key: "usersCount", header: "Users Count", render: (r) => r._count?.users ?? 0 },
+            { key: "level", header: "Hierarchy Level", render: (r) => formatLevel(r.level) },
+            { key: "usersAssigned", header: "Users Assigned", render: (r) => r.metrics.usersAssigned },
+            { key: "vacantPositions", header: "Vacant Positions", render: (r) => r.metrics.vacantPositions },
             {
               key: "status",
               header: "Status",
               render: (r) => <Badge variant={r.isActive ? "success" : "warning"}>{r.isActive ? "Active" : "Inactive"}</Badge>,
             },
-            { key: "createdAt", header: "Created Date", render: (r) => formatCreatedDate(r.createdAt) },
             {
               key: "actions",
               header: "Actions",
@@ -196,6 +197,15 @@ export default function DesignationsPage() {
           options={HIERARCHY_LEVELS}
           required
           placeholder="Select level"
+        />
+        <FormField
+          label="Approved headcount"
+          name="headcount"
+          type="number"
+          value={form.headcount}
+          onChange={(v) => setForm({ ...form, headcount: v })}
+          required
+          helperText="Planned position capacity. Vacant positions = headcount − users assigned."
         />
         <FormTextarea label="Description" name="description" value={form.description} onChange={(v) => setForm({ ...form, description: v })} />
       </FormSheet>
