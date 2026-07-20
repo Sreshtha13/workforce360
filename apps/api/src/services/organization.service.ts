@@ -298,9 +298,23 @@ export class OrganizationService {
     }
     return employeeType;
   }
+
+  private mapEmployeeTypeWriteError(error: unknown): Error {
+    if (error instanceof Prisma.PrismaClientKnownRequestError) {
+      if (error.code === "P2002") {
+        return new Error("An employee type with this code already exists");
+      }
+    }
+
+    return error instanceof Error ? error : new Error("Failed to save employee type");
+  }
   
   async createEmployeeType(data: CreateEmployeeTypeData) {
-    return this.orgRepo.createEmployeeType(data);
+    try {
+      return await this.orgRepo.createEmployeeType(data);
+    } catch (error) {
+      throw this.mapEmployeeTypeWriteError(error);
+    }
   }
   
   async updateEmployeeType(id: string, data: Partial<CreateEmployeeTypeData>) {
@@ -308,7 +322,12 @@ export class OrganizationService {
     if (!existing) {
       throw new Error("Employee type not found");
     }
-    return this.orgRepo.updateEmployeeType(id, data);
+
+    try {
+      return await this.orgRepo.updateEmployeeType(id, data);
+    } catch (error) {
+      throw this.mapEmployeeTypeWriteError(error);
+    }
   }
   
   async deleteEmployeeType(id: string) {

@@ -71,9 +71,15 @@ export const createOfficeSchema = z.object({
 
 export const updateOfficeSchema = createOfficeSchema.partial();
 
+const employeeTypeCodeSchema = z
+  .string()
+  .min(1)
+  .max(10)
+  .transform((value) => value.trim().toUpperCase());
+
 export const createEmployeeTypeSchema = z.object({
   name: z.string().min(1).max(255),
-  code: z.string().max(50).optional(),
+  code: employeeTypeCodeSchema,
   description: z.string().optional(),
 });
 

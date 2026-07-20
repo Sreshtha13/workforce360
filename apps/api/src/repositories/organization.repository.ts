@@ -48,7 +48,7 @@ export type CreateOfficeData = {
 
 export type CreateEmployeeTypeData = {
   name: string;
-  code?: string;
+  code: string;
   description?: string;
 };
 

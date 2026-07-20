@@ -219,11 +219,10 @@ async function main() {
   console.log("✅ Role permissions assigned");
   
   const employeeTypes = [
-    { name: "Full-Time", code: "full_time" },
-    { name: "Part-Time", code: "part_time" },
-    { name: "Contract", code: "contract" },
-    { name: "Intern", code: "intern" },
-    { name: "Consultant", code: "consultant" },
+    { name: "Full Time", code: "FT" },
+    { name: "Part Time", code: "PT" },
+    { name: "Contract", code: "CNT" },
+    { name: "Intern", code: "INT" },
   ];
   
   for (const type of employeeTypes) {

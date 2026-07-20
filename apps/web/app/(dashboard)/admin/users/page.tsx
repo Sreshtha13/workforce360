@@ -18,6 +18,7 @@ import {
   USER_ACCOUNT_STATUS_LABELS,
 } from "@/lib/user-status";
 import { validateUserForm, type UserFormValues } from "@/lib/user-form-validation";
+import { formatEmployeeType } from "@/lib/employee-type";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import {
   AlertBanner,
@@ -45,7 +46,7 @@ type UserRow = {
   department?: { id: string; name: string; managerId?: string | null };
   designation?: { id: string; name: string };
   office?: { id: string; name: string };
-  employeeType?: { id: string; name: string };
+  employeeType?: { id: string; name: string; code: string };
   employmentStatus?: { id: string; name: string };
   manager?: { id: string; firstName: string; lastName: string; email: string };
   managedDepartments?: { id: string; name: string }[];
@@ -233,7 +234,10 @@ export default function UsersAdminPage() {
       departments: toOptions(l.departments),
       designations: toOptions(l.designations),
       offices: toOptions(l.offices),
-      employeeTypes: toOptions(l.employeeTypes),
+      employeeTypes: l.employeeTypes.map((item) => ({
+        value: item.id,
+        label: formatEmployeeType(item),
+      })),
       employmentStatuses: toOptions(l.employmentStatuses),
       roles: toOptions(l.roles),
     };
@@ -441,6 +445,16 @@ export default function UsersAdminPage() {
               ),
             },
             {
+              key: "employeeType",
+              header: "Employee Type",
+              render: (u) =>
+                u.employeeType ? (
+                  <Badge variant="outline">{formatEmployeeType(u.employeeType)}</Badge>
+                ) : (
+                  "—"
+                ),
+            },
+            {
               key: "employmentStatus",
               header: "Employment Status",
               render: (u) =>
@@ -509,6 +523,13 @@ export default function UsersAdminPage() {
                   {USER_ACCOUNT_STATUS_LABELS[
                     form.status as keyof typeof USER_ACCOUNT_STATUS_LABELS
                   ] ?? form.status}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-xs text-muted-foreground">Employee Type</dt>
+                <dd className="font-medium">
+                  {lookupOptions?.employeeTypes.find((o) => o.value === form.employeeTypeId)?.label ??
+                    (editing.employeeType ? formatEmployeeType(editing.employeeType) : "Not set")}
                 </dd>
               </div>
               <div>

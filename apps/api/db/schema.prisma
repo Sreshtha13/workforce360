@@ -173,7 +173,7 @@ model Office {
 model EmployeeType {
   id          String    @id @default(cuid())
   name        String    @unique
-  code        String?   @unique
+  code        String    @unique
   description String?
   isActive    Boolean   @default(true) @map("is_active")
   createdAt   DateTime  @default(now()) @map("created_at")

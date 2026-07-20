@@ -57,7 +57,7 @@ export class UserRepository {
         department: { select: { id: true, name: true, managerId: true } },
         designation: { select: { id: true, name: true } },
         office: { select: { id: true, name: true } },
-        employeeType: { select: { id: true, name: true } },
+        employeeType: { select: { id: true, name: true, code: true } },
         employmentStatus: { select: { id: true, name: true } },
         manager: { select: { id: true, firstName: true, lastName: true, email: true } },
         managedDepartments: {
