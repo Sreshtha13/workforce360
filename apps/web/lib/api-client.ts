@@ -1,4 +1,18 @@
 import type { ApiResponse, HealthCheckData } from "@/types/api";
+import type {
+  AssignPermissionInput,
+  CreatePermissionInput,
+  CreateRoleInput,
+  DuplicateRoleInput,
+  MessageResponse,
+  Permission,
+  Role,
+  RolePermission,
+  SetRolePermissionsInput,
+  UpdatePermissionInput,
+  UpdateRoleInput,
+} from "@/types/rbac";
+import type { AuthUser } from "@/types/auth";
 
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:4000";
@@ -128,7 +142,7 @@ export const apiClient = {
         method: "POST",
       }),
     
-    getMe: () => requestSession<any>("/api/auth/me"),
+    getMe: () => requestSession<AuthUser>("/api/auth/me"),
     
     requestPasswordReset: (email: string) =>
       request<{ message: string }>("/api/auth/password/request-reset", {
@@ -188,47 +202,79 @@ export const apiClient = {
   
   roles: {
     list: () =>
-      request<any[]>("/api/roles"),
+      request<Role[]>("/api/roles"),
     
     get: (id: string) =>
-      request<any>(`/api/roles/${id}`),
+      request<Role>(`/api/roles/${id}`),
     
-    create: (data: any) =>
-      request<any>("/api/roles", {
+    create: (data: CreateRoleInput) =>
+      request<Role>("/api/roles", {
         method: "POST",
         body: JSON.stringify(data),
       }),
     
-    update: (id: string, data: any) =>
-      request<any>(`/api/roles/${id}`, {
+    update: (id: string, data: UpdateRoleInput) =>
+      request<Role>(`/api/roles/${id}`, {
         method: "PUT",
         body: JSON.stringify(data),
       }),
     
     delete: (id: string) =>
-      request<{ message: string }>(`/api/roles/${id}`, {
+      request<MessageResponse>(`/api/roles/${id}`, {
         method: "DELETE",
       }),
     
     getPermissions: (id: string) =>
-      request<any[]>(`/api/roles/${id}/permissions`),
+      request<RolePermission[]>(`/api/roles/${id}/permissions`),
     
     assignPermission: (id: string, permissionId: string) =>
-      request<any>(`/api/roles/${id}/permissions`, {
+      request<RolePermission>(`/api/roles/${id}/permissions`, {
         method: "POST",
-        body: JSON.stringify({ permissionId }),
+        body: JSON.stringify({ permissionId } satisfies AssignPermissionInput),
       }),
     
     removePermission: (id: string, permissionId: string) =>
-      request<{ message: string }>(`/api/roles/${id}/permissions`, {
+      request<MessageResponse>(`/api/roles/${id}/permissions`, {
         method: "DELETE",
-        body: JSON.stringify({ permissionId }),
+        body: JSON.stringify({ permissionId } satisfies AssignPermissionInput),
+      }),
+
+    setPermissions: (id: string, permissionIds: string[]) =>
+      request<RolePermission[]>(`/api/roles/${id}/permissions/bulk`, {
+        method: "PUT",
+        body: JSON.stringify({ permissionIds } satisfies SetRolePermissionsInput),
+      }),
+
+    duplicate: (id: string, data?: DuplicateRoleInput) =>
+      request<Role>(`/api/roles/${id}/duplicate`, {
+        method: "POST",
+        body: JSON.stringify(data ?? {}),
       }),
   },
   
   permissions: {
     list: () =>
-      request<any[]>("/api/roles/permissions/all"),
+      request<Permission[]>("/api/roles/permissions/all"),
+
+    get: (id: string) =>
+      request<Permission>(`/api/roles/permissions/${id}`),
+
+    create: (data: CreatePermissionInput) =>
+      request<Permission>("/api/roles/permissions", {
+        method: "POST",
+        body: JSON.stringify(data),
+      }),
+
+    update: (id: string, data: UpdatePermissionInput) =>
+      request<Permission>(`/api/roles/permissions/${id}`, {
+        method: "PUT",
+        body: JSON.stringify(data),
+      }),
+
+    delete: (id: string) =>
+      request<MessageResponse>(`/api/roles/permissions/${id}`, {
+        method: "DELETE",
+      }),
   },
   
   organization: {

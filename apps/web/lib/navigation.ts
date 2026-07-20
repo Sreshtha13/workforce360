@@ -2,6 +2,7 @@ import type { LucideIcon } from "lucide-react";
 import {
   Building2,
   Briefcase,
+  KeyRound,
   LayoutDashboard,
   MapPin,
   Shield,
@@ -41,7 +42,13 @@ export const adminNav: NavItem[] = [
     label: "Roles",
     href: "/admin/roles",
     icon: Shield,
-    permissions: ["role.create", "role.update", "role.delete"],
+    permissions: ["role.read"],
+  },
+  {
+    label: "Permissions",
+    href: "/admin/permissions",
+    icon: KeyRound,
+    permissions: ["permission.read"],
   },
   {
     label: "Departments",

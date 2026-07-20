@@ -6,14 +6,25 @@ import { requirePermission } from "../middleware/rbac";
 import {
   createRoleSchema,
   updateRoleSchema,
+  duplicateRoleSchema,
   createPermissionSchema,
   updatePermissionSchema,
   assignPermissionSchema,
   removePermissionSchema,
+  setRolePermissionsSchema,
 } from "../schemas/role.schema";
 
 const router = Router();
 const roleController = new RoleController();
+
+const canReadRoles = requirePermission("role.read", "role.create", "role.update", "role.delete");
+const canReadPermissions = requirePermission(
+  "permission.read",
+  "permission.create",
+  "permission.update",
+  "permission.delete",
+  "role.update",
+);
 
 /**
  * @swagger
@@ -29,31 +40,36 @@ const roleController = new RoleController();
  *       401:
  *         description: Not authenticated
  */
-router.get("/", requireAuth, roleController.getRoles);
+router.get("/", requireAuth, canReadRoles, roleController.getRoles);
 
-/**
- * @swagger
- * /api/roles/{id}:
- *   get:
- *     summary: Get role by ID
- *     tags: [Roles]
- *     security:
- *       - cookieAuth: []
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: string
- *     responses:
- *       200:
- *         description: Role details with permissions
- *       401:
- *         description: Not authenticated
- *       404:
- *         description: Role not found
- */
-router.get("/:id", requireAuth, roleController.getRoleById);
+router.get("/permissions/all", requireAuth, canReadPermissions, roleController.getPermissions);
+
+router.post(
+  "/permissions",
+  requireAuth,
+  requirePermission("permission.create"),
+  validate(createPermissionSchema),
+  roleController.createPermission,
+);
+
+router.get("/permissions/:id", requireAuth, canReadPermissions, roleController.getPermissionById);
+
+router.put(
+  "/permissions/:id",
+  requireAuth,
+  requirePermission("permission.update"),
+  validate(updatePermissionSchema),
+  roleController.updatePermission,
+);
+
+router.delete(
+  "/permissions/:id",
+  requireAuth,
+  requirePermission("permission.delete"),
+  roleController.deletePermission,
+);
+
+router.get("/:id", requireAuth, canReadRoles, roleController.getRoleById);
 
 /**
  * @swagger
@@ -155,30 +171,27 @@ router.delete(
   roleController.deleteRole,
 );
 
-/**
- * @swagger
- * /api/roles/{id}/permissions:
- *   get:
- *     summary: Get role's permissions
- *     tags: [Roles]
- *     security:
- *       - cookieAuth: []
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: string
- *     responses:
- *       200:
- *         description: List of role's permissions
- *       401:
- *         description: Not authenticated
- */
+router.post(
+  "/:id/duplicate",
+  requireAuth,
+  requirePermission("role.create"),
+  validate(duplicateRoleSchema),
+  roleController.duplicateRole,
+);
+
 router.get(
   "/:id/permissions",
   requireAuth,
+  canReadRoles,
   roleController.getRolePermissions,
+);
+
+router.put(
+  "/:id/permissions/bulk",
+  requireAuth,
+  requirePermission("role.update"),
+  validate(setRolePermissionsSchema),
+  roleController.setRolePermissions,
 );
 
 /**
@@ -261,153 +274,6 @@ router.delete(
   requirePermission("role.update"),
   validate(removePermissionSchema),
   roleController.removePermissionFromRole,
-);
-
-/**
- * @swagger
- * /api/roles/permissions/all:
- *   get:
- *     summary: List all permissions
- *     tags: [Roles]
- *     security:
- *       - cookieAuth: []
- *     responses:
- *       200:
- *         description: List of all available permissions
- *       401:
- *         description: Not authenticated
- */
-router.get("/permissions/all", requireAuth, roleController.getPermissions);
-
-/**
- * @swagger
- * /api/roles/permissions/{id}:
- *   get:
- *     summary: Get permission by ID
- *     tags: [Roles]
- *     security:
- *       - cookieAuth: []
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: string
- *     responses:
- *       200:
- *         description: Permission details
- *       401:
- *         description: Not authenticated
- *       404:
- *         description: Permission not found
- */
-router.get("/permissions/:id", requireAuth, roleController.getPermissionById);
-
-/**
- * @swagger
- * /api/roles/permissions:
- *   post:
- *     summary: Create new permission
- *     tags: [Roles]
- *     security:
- *       - cookieAuth: []
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - name
- *               - code
- *               - resource
- *               - action
- *             properties:
- *               name:
- *                 type: string
- *                 example: Read Projects
- *               code:
- *                 type: string
- *                 example: project.read
- *               resource:
- *                 type: string
- *                 example: project
- *               action:
- *                 type: string
- *                 example: read
- *     responses:
- *       201:
- *         description: Permission created successfully
- *       401:
- *         description: Not authenticated
- *       403:
- *         description: Insufficient permissions (requires permission.create)
- */
-router.post(
-  "/permissions",
-  requireAuth,
-  requirePermission("permission.create"),
-  validate(createPermissionSchema),
-  roleController.createPermission,
-);
-
-/**
- * @swagger
- * /api/roles/permissions/{id}:
- *   put:
- *     summary: Update permission
- *     tags: [Roles]
- *     security:
- *       - cookieAuth: []
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: string
- *     responses:
- *       200:
- *         description: Permission updated successfully
- *       401:
- *         description: Not authenticated
- *       403:
- *         description: Insufficient permissions (requires permission.update)
- */
-router.put(
-  "/permissions/:id",
-  requireAuth,
-  requirePermission("permission.update"),
-  validate(updatePermissionSchema),
-  roleController.updatePermission,
-);
-
-/**
- * @swagger
- * /api/roles/permissions/{id}:
- *   delete:
- *     summary: Delete permission
- *     tags: [Roles]
- *     security:
- *       - cookieAuth: []
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: string
- *     responses:
- *       200:
- *         description: Permission deleted successfully
- *       401:
- *         description: Not authenticated
- *       403:
- *         description: Insufficient permissions (requires permission.delete)
- */
-router.delete(
-  "/permissions/:id",
-  requireAuth,
-  requirePermission("permission.delete"),
-  roleController.deletePermission,
 );
 
 export { router as roleRouter };

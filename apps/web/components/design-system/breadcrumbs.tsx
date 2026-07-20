@@ -13,6 +13,7 @@ const routeLabels: Record<string, string> = {
   admin: "Administration",
   users: "Users",
   roles: "Roles",
+  permissions: "Permissions",
   departments: "Departments",
   teams: "Teams",
   designations: "Designations",

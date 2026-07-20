@@ -115,4 +115,52 @@ export class RoleService {
   async getRolePermissions(roleId: string) {
     return this.roleRepo.getRolePermissions(roleId);
   }
+
+  async setRolePermissions(roleId: string, permissionIds: string[]) {
+    const role = await this.roleRepo.findRoleById(roleId);
+    if (!role) {
+      throw new Error("Role not found");
+    }
+
+    if (role.isSystem) {
+      throw new Error("Cannot modify permissions on system role");
+    }
+
+    if (permissionIds.length > 0) {
+      const all = await this.roleRepo.findAllPermissions();
+      const validIds = new Set(all.map((p) => p.id));
+      for (const id of permissionIds) {
+        if (!validIds.has(id)) {
+          throw new Error(`Invalid permission ID: ${id}`);
+        }
+      }
+    }
+
+    await this.roleRepo.setRolePermissions(roleId, permissionIds);
+    return this.roleRepo.getRolePermissions(roleId);
+  }
+
+  async duplicateRole(id: string, data?: { name?: string; code?: string }) {
+    const source = await this.roleRepo.findRoleById(id);
+    if (!source) {
+      throw new Error("Role not found");
+    }
+
+    const baseName = data?.name ?? `${source.name} (Copy)`;
+    const baseCode = data?.code ?? (source.code ? `${source.code}_copy` : undefined);
+
+    const newRole = await this.roleRepo.createRole({
+      name: baseName,
+      code: baseCode,
+      description: source.description ?? undefined,
+      isSystem: false,
+    });
+
+    const permissionIds = source.rolePermissions.map((rp) => rp.permissionId);
+    if (permissionIds.length > 0) {
+      await this.roleRepo.setRolePermissions(newRole.id, permissionIds);
+    }
+
+    return this.roleRepo.findRoleById(newRole.id);
+  }
 }

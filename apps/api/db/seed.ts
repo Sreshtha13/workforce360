@@ -24,6 +24,30 @@ async function main() {
   });
   
   console.log("✅ Company created");
+
+  function permissionMeta(resource: string): { module: string; feature: string } {
+    const orgResources = new Set([
+      "department",
+      "team",
+      "designation",
+      "office",
+      "employee_type",
+      "employment_status",
+    ]);
+    const adminResources = new Set(["user", "role", "permission"]);
+    const label = resource
+      .split("_")
+      .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+      .join(" ");
+
+    if (orgResources.has(resource)) {
+      return { module: "Organization", feature: label };
+    }
+    if (adminResources.has(resource)) {
+      return { module: "Administration", feature: label };
+    }
+    return { module: "General", feature: label };
+  }
   
   const permissions = [
     { name: "Read Users", code: "user.read", resource: "user", action: "read" },
@@ -75,10 +99,18 @@ async function main() {
   
   const createdPermissions = [];
   for (const perm of permissions) {
+    const meta = permissionMeta(perm.resource);
     const created = await prisma.permission.upsert({
       where: { code: perm.code },
-      update: {},
-      create: perm,
+      update: {
+        module: meta.module,
+        feature: meta.feature,
+      },
+      create: {
+        ...perm,
+        module: meta.module,
+        feature: meta.feature,
+      },
     });
     createdPermissions.push(created);
   }
@@ -159,6 +191,26 @@ async function main() {
       update: {},
       create: {
         roleId: hrRole.id,
+        permissionId: permission.id,
+      },
+    });
+  }
+
+  const adminPermissions = createdPermissions.filter((p) => {
+    if (p.resource === "role" || p.resource === "permission") {
+      return p.action === "read";
+    }
+    return true;
+  });
+
+  await prisma.rolePermission.deleteMany({
+    where: { roleId: adminRole.id },
+  });
+
+  for (const permission of adminPermissions) {
+    await prisma.rolePermission.create({
+      data: {
+        roleId: adminRole.id,
         permissionId: permission.id,
       },
     });

@@ -10,14 +10,9 @@ import {
 import { useRouter } from "next/navigation";
 import { apiClient, ApiClientError } from "./api-client";
 
-export type AuthUser = {
-  id: string;
-  email: string;
-  firstName: string;
-  lastName: string;
-  roles: { id: string; name: string; code?: string }[];
-  permissions: string[];
-};
+import type { AuthUser } from "@/types/auth";
+
+export type { AuthUser };
 
 type AuthContextType = {
   user: AuthUser | null;

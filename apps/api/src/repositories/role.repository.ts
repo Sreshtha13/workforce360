@@ -11,6 +11,8 @@ export type CreateRoleInput = {
 export type CreatePermissionInput = {
   name: string;
   code: string;
+  module: string;
+  feature?: string;
   resource: string;
   action: string;
   description?: string;
@@ -63,7 +65,7 @@ export class RoleRepository {
   async findAllPermissions() {
     return prisma.permission.findMany({
       where: { deletedAt: null },
-      orderBy: [{ resource: "asc" }, { action: "asc" }],
+      orderBy: [{ module: "asc" }, { feature: "asc" }, { action: "asc" }],
     });
   }
   
@@ -104,6 +106,18 @@ export class RoleRepository {
     return prisma.rolePermission.findMany({
       where: { roleId },
       include: { permission: true },
+    });
+  }
+
+  async setRolePermissions(roleId: string, permissionIds: string[]): Promise<void> {
+    await prisma.$transaction(async (tx) => {
+      await tx.rolePermission.deleteMany({ where: { roleId } });
+      if (permissionIds.length > 0) {
+        await tx.rolePermission.createMany({
+          data: permissionIds.map((permissionId) => ({ roleId, permissionId })),
+          skipDuplicates: true,
+        });
+      }
     });
   }
 }

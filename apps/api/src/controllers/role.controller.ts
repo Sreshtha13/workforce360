@@ -177,4 +177,31 @@ export class RoleController {
       });
     }
   };
+
+  setRolePermissions = async (req: Request, res: Response): Promise<void> => {
+    try {
+      const { id } = req.params;
+      const { permissionIds } = req.body as { permissionIds: string[] };
+      const permissions = await this.roleService.setRolePermissions(id, permissionIds);
+      sendSuccess(res, permissions);
+    } catch (error) {
+      sendError(res, 400, {
+        code: "SET_ROLE_PERMISSIONS_FAILED",
+        message: error instanceof Error ? error.message : "Failed to update role permissions",
+      });
+    }
+  };
+
+  duplicateRole = async (req: Request, res: Response): Promise<void> => {
+    try {
+      const { id } = req.params;
+      const role = await this.roleService.duplicateRole(id, req.body);
+      sendSuccess(res, role, 201);
+    } catch (error) {
+      sendError(res, 400, {
+        code: "DUPLICATE_ROLE_FAILED",
+        message: error instanceof Error ? error.message : "Failed to duplicate role",
+      });
+    }
+  };
 }

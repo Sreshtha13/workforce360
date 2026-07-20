@@ -326,6 +326,10 @@ model Permission {
   id          String    @id @default(cuid())
   name        String    @unique
   code        String    @unique
+  /// Top-level category: Administration, Organization, etc.
+  module      String    @default("General")
+  /// Human-readable feature label within the module
+  feature     String?
   resource    String
   action      String
   description String?
@@ -338,6 +342,7 @@ model Permission {
 
   @@index([resource])
   @@index([action])
+  @@index([module])
   @@map("permissions")
 }
 
