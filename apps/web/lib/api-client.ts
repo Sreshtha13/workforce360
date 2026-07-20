@@ -1,4 +1,34 @@
 import type { ApiResponse, HealthCheckData } from "@/types/api";
+import type {
+  AuthUser,
+  CreateDepartmentInput,
+  CreateDesignationInput,
+  CreateEmployeeTypeInput,
+  CreateEmploymentStatusInput,
+  CreateOfficeInput,
+  CreateRoleInput,
+  CreateTeamInput,
+  CreateUserInput,
+  Department,
+  Designation,
+  EmployeeType,
+  EmploymentStatus,
+  LoginResponse,
+  Office,
+  Permission,
+  Role,
+  RolePermission,
+  Team,
+  UpdateDepartmentInput,
+  UpdateDesignationInput,
+  UpdateEmployeeTypeInput,
+  UpdateEmploymentStatusInput,
+  UpdateOfficeInput,
+  UpdateRoleInput,
+  UpdateTeamInput,
+  UpdateUserInput,
+  User,
+} from "@/types/entities";
 
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:4000";
@@ -113,7 +143,7 @@ export const apiClient = {
   
   auth: {
     login: (email: string, password: string) =>
-      request<{ user: any; accessToken: string; refreshToken: string }>("/api/auth/login", {
+      request<LoginResponse>("/api/auth/login", {
         method: "POST",
         body: JSON.stringify({ email, password }),
       }),
@@ -128,7 +158,7 @@ export const apiClient = {
         method: "POST",
       }),
     
-    getMe: () => requestSession<any>("/api/auth/me"),
+    getMe: () => requestSession<AuthUser>("/api/auth/me"),
     
     requestPasswordReset: (email: string) =>
       request<{ message: string }>("/api/auth/password/request-reset", {
@@ -145,19 +175,19 @@ export const apiClient = {
   
   users: {
     list: (params?: { departmentId?: string; status?: string; search?: string }) =>
-      request<any[]>(`/api/users${buildQuery(params)}`),
+      request<User[]>(`/api/users${buildQuery(params)}`),
     
     get: (id: string) =>
-      request<any>(`/api/users/${id}`),
+      request<User>(`/api/users/${id}`),
     
-    create: (data: any) =>
-      request<any>("/api/users", {
+    create: (data: CreateUserInput) =>
+      request<User>("/api/users", {
         method: "POST",
         body: JSON.stringify(data),
       }),
     
-    update: (id: string, data: any) =>
-      request<any>(`/api/users/${id}`, {
+    update: (id: string, data: UpdateUserInput) =>
+      request<User>(`/api/users/${id}`, {
         method: "PUT",
         body: JSON.stringify(data),
       }),
@@ -168,7 +198,7 @@ export const apiClient = {
       }),
     
     assignRole: (id: string, roleId: string) =>
-      request<any>(`/api/users/${id}/roles`, {
+      request<User>(`/api/users/${id}/roles`, {
         method: "POST",
         body: JSON.stringify({ roleId }),
       }),
@@ -180,24 +210,24 @@ export const apiClient = {
       }),
     
     getRoles: (id: string) =>
-      request<any[]>(`/api/users/${id}/roles`),
+      request<Role[]>(`/api/users/${id}/roles`),
   },
   
   roles: {
     list: () =>
-      request<any[]>("/api/roles"),
+      request<Role[]>("/api/roles"),
     
     get: (id: string) =>
-      request<any>(`/api/roles/${id}`),
+      request<Role>(`/api/roles/${id}`),
     
-    create: (data: any) =>
-      request<any>("/api/roles", {
+    create: (data: CreateRoleInput) =>
+      request<Role>("/api/roles", {
         method: "POST",
         body: JSON.stringify(data),
       }),
     
-    update: (id: string, data: any) =>
-      request<any>(`/api/roles/${id}`, {
+    update: (id: string, data: UpdateRoleInput) =>
+      request<Role>(`/api/roles/${id}`, {
         method: "PUT",
         body: JSON.stringify(data),
       }),
@@ -208,10 +238,10 @@ export const apiClient = {
       }),
     
     getPermissions: (id: string) =>
-      request<any[]>(`/api/roles/${id}/permissions`),
+      request<RolePermission[]>(`/api/roles/${id}/permissions`),
     
     assignPermission: (id: string, permissionId: string) =>
-      request<any>(`/api/roles/${id}/permissions`, {
+      request<RolePermission>(`/api/roles/${id}/permissions`, {
         method: "POST",
         body: JSON.stringify({ permissionId }),
       }),
@@ -225,22 +255,22 @@ export const apiClient = {
   
   permissions: {
     list: () =>
-      request<any[]>("/api/roles/permissions/all"),
+      request<Permission[]>("/api/roles/permissions/all"),
   },
   
   organization: {
     departments: {
       list: (companyId?: string) =>
-        request<any[]>(`/api/organization/departments${companyId ? `?companyId=${companyId}` : ""}`),
+        request<Department[]>(`/api/organization/departments${companyId ? `?companyId=${companyId}` : ""}`),
       get: (id: string) =>
-        request<any>(`/api/organization/departments/${id}`),
-      create: (data: any) =>
-        request<any>("/api/organization/departments", {
+        request<Department>(`/api/organization/departments/${id}`),
+      create: (data: CreateDepartmentInput) =>
+        request<Department>("/api/organization/departments", {
           method: "POST",
           body: JSON.stringify(data),
         }),
-      update: (id: string, data: any) =>
-        request<any>(`/api/organization/departments/${id}`, {
+      update: (id: string, data: UpdateDepartmentInput) =>
+        request<Department>(`/api/organization/departments/${id}`, {
           method: "PUT",
           body: JSON.stringify(data),
         }),
@@ -252,16 +282,16 @@ export const apiClient = {
     
     teams: {
       list: (departmentId?: string) =>
-        request<any[]>(`/api/organization/teams${departmentId ? `?departmentId=${departmentId}` : ""}`),
+        request<Team[]>(`/api/organization/teams${departmentId ? `?departmentId=${departmentId}` : ""}`),
       get: (id: string) =>
-        request<any>(`/api/organization/teams/${id}`),
-      create: (data: any) =>
-        request<any>("/api/organization/teams", {
+        request<Team>(`/api/organization/teams/${id}`),
+      create: (data: CreateTeamInput) =>
+        request<Team>("/api/organization/teams", {
           method: "POST",
           body: JSON.stringify(data),
         }),
-      update: (id: string, data: any) =>
-        request<any>(`/api/organization/teams/${id}`, {
+      update: (id: string, data: UpdateTeamInput) =>
+        request<Team>(`/api/organization/teams/${id}`, {
           method: "PUT",
           body: JSON.stringify(data),
         }),
@@ -273,16 +303,16 @@ export const apiClient = {
     
     designations: {
       list: () =>
-        request<any[]>("/api/organization/designations"),
+        request<Designation[]>("/api/organization/designations"),
       get: (id: string) =>
-        request<any>(`/api/organization/designations/${id}`),
-      create: (data: any) =>
-        request<any>("/api/organization/designations", {
+        request<Designation>(`/api/organization/designations/${id}`),
+      create: (data: CreateDesignationInput) =>
+        request<Designation>("/api/organization/designations", {
           method: "POST",
           body: JSON.stringify(data),
         }),
-      update: (id: string, data: any) =>
-        request<any>(`/api/organization/designations/${id}`, {
+      update: (id: string, data: UpdateDesignationInput) =>
+        request<Designation>(`/api/organization/designations/${id}`, {
           method: "PUT",
           body: JSON.stringify(data),
         }),
@@ -294,16 +324,16 @@ export const apiClient = {
     
     offices: {
       list: (companyId?: string) =>
-        request<any[]>(`/api/organization/offices${companyId ? `?companyId=${companyId}` : ""}`),
+        request<Office[]>(`/api/organization/offices${companyId ? `?companyId=${companyId}` : ""}`),
       get: (id: string) =>
-        request<any>(`/api/organization/offices/${id}`),
-      create: (data: any) =>
-        request<any>("/api/organization/offices", {
+        request<Office>(`/api/organization/offices/${id}`),
+      create: (data: CreateOfficeInput) =>
+        request<Office>("/api/organization/offices", {
           method: "POST",
           body: JSON.stringify(data),
         }),
-      update: (id: string, data: any) =>
-        request<any>(`/api/organization/offices/${id}`, {
+      update: (id: string, data: UpdateOfficeInput) =>
+        request<Office>(`/api/organization/offices/${id}`, {
           method: "PUT",
           body: JSON.stringify(data),
         }),
@@ -315,16 +345,16 @@ export const apiClient = {
     
     employeeTypes: {
       list: () =>
-        request<any[]>("/api/organization/employee-types"),
+        request<EmployeeType[]>("/api/organization/employee-types"),
       get: (id: string) =>
-        request<any>(`/api/organization/employee-types/${id}`),
-      create: (data: any) =>
-        request<any>("/api/organization/employee-types", {
+        request<EmployeeType>(`/api/organization/employee-types/${id}`),
+      create: (data: CreateEmployeeTypeInput) =>
+        request<EmployeeType>("/api/organization/employee-types", {
           method: "POST",
           body: JSON.stringify(data),
         }),
-      update: (id: string, data: any) =>
-        request<any>(`/api/organization/employee-types/${id}`, {
+      update: (id: string, data: UpdateEmployeeTypeInput) =>
+        request<EmployeeType>(`/api/organization/employee-types/${id}`, {
           method: "PUT",
           body: JSON.stringify(data),
         }),
@@ -336,16 +366,16 @@ export const apiClient = {
     
     employmentStatuses: {
       list: () =>
-        request<any[]>("/api/organization/employment-statuses"),
+        request<EmploymentStatus[]>("/api/organization/employment-statuses"),
       get: (id: string) =>
-        request<any>(`/api/organization/employment-statuses/${id}`),
-      create: (data: any) =>
-        request<any>("/api/organization/employment-statuses", {
+        request<EmploymentStatus>(`/api/organization/employment-statuses/${id}`),
+      create: (data: CreateEmploymentStatusInput) =>
+        request<EmploymentStatus>("/api/organization/employment-statuses", {
           method: "POST",
           body: JSON.stringify(data),
         }),
-      update: (id: string, data: any) =>
-        request<any>(`/api/organization/employment-statuses/${id}`, {
+      update: (id: string, data: UpdateEmploymentStatusInput) =>
+        request<EmploymentStatus>(`/api/organization/employment-statuses/${id}`, {
           method: "PUT",
           body: JSON.stringify(data),
         }),

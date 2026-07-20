@@ -11,17 +11,9 @@ import { FormSheet } from "@/components/admin/form-sheet";
 import { FormField, FormSelect, FormTextarea } from "@/components/admin/form-fields";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import type { Department, Team, UserSummary } from "@/types/entities";
 
-type Team = {
-  id: string;
-  name: string;
-  code?: string;
-  description?: string;
-  isActive: boolean;
-  department?: { id: string; name: string };
-  lead?: { firstName: string; lastName: string };
-  _count?: { members: number };
-};
+type TeamRow = Team;
 
 const emptyForm = { departmentId: "", name: "", code: "", description: "", leadId: "" };
 
@@ -29,7 +21,7 @@ export default function TeamsPage() {
   const { hasPermission } = useAuth();
   const queryClient = useQueryClient();
   const [sheetOpen, setSheetOpen] = useState(false);
-  const [editing, setEditing] = useState<Team | null>(null);
+  const [editing, setEditing] = useState<TeamRow | null>(null);
   const [form, setForm] = useState(emptyForm);
   const [feedback, setFeedback] = useState<{ type: "success" | "error"; message: string } | null>(null);
 
@@ -86,9 +78,9 @@ export default function TeamsPage() {
   if (query.isLoading) return <LoadingState />;
   if (query.isError) return <ErrorState message="Failed to load teams" onRetry={() => query.refetch()} />;
 
-  const teams = (query.data ?? []) as Team[];
-  const deptOptions = lookupsQuery.data?.departments.map((d: any) => ({ value: d.id, label: d.name })) ?? [];
-  const userOptions = lookupsQuery.data?.users.map((u: any) => ({ value: u.id, label: `${u.firstName} ${u.lastName}` })) ?? [];
+  const teams = (query.data ?? []) as TeamRow[];
+  const deptOptions = lookupsQuery.data?.departments.map((d: Department) => ({ value: d.id, label: d.name })) ?? [];
+  const userOptions = lookupsQuery.data?.users.map((u: UserSummary) => ({ value: u.id, label: `${u.firstName} ${u.lastName}` })) ?? [];
 
   return (
     <div className="space-y-6">

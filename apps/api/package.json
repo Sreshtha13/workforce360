@@ -10,6 +10,10 @@
     "start": "node dist/index.js",
     "lint": "eslint \"src/**/*.ts\"",
     "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:ci": "vitest run --reporter=verbose --reporter=github-actions",
+    "test:coverage": "vitest run --coverage",
     "db:generate": "node scripts/with-env.mjs prisma generate --schema=db/schema.prisma",
     "db:migrate": "node scripts/with-env.mjs prisma migrate dev --schema=db/schema.prisma",
     "db:migrate:deploy": "node scripts/with-env.mjs prisma migrate deploy --schema=db/schema.prisma",
@@ -38,13 +42,17 @@
     "@types/express": "^4.17.23",
     "@types/jsonwebtoken": "^9.0.7",
     "@types/node": "^20.19.1",
+    "@types/supertest": "^7.2.1",
     "@types/swagger-jsdoc": "^6.0.4",
     "@types/swagger-ui-express": "^4.1.8",
     "@typescript-eslint/eslint-plugin": "^8.35.0",
     "@typescript-eslint/parser": "^8.35.0",
+    "@vitest/coverage-v8": "^4.1.10",
     "eslint": "^8.57.1",
     "prisma": "^6.10.1",
+    "supertest": "^7.2.2",
     "tsx": "^4.20.3",
-    "typescript": "^5.8.3"
+    "typescript": "^7.0.2",
+    "vitest": "^4.1.10"
   }
 }

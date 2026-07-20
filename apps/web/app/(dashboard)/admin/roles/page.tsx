@@ -21,6 +21,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
+import type { RolePermission } from "@/types/entities";
 
 type RoleRow = {
   id: string;
@@ -165,7 +166,7 @@ export default function RolesAdminPage() {
             )}
             {permissionsQuery.data && (
               <ul className="space-y-2">
-                {permissionsQuery.data.map((rp: any) => (
+                {permissionsQuery.data.map((rp: RolePermission) => (
                   <li
                     key={rp.id}
                     className="rounded-md border border-border bg-muted/30 px-3 py-2 text-sm"

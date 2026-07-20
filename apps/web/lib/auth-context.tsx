@@ -9,15 +9,9 @@ import {
 } from "react";
 import { useRouter } from "next/navigation";
 import { apiClient, ApiClientError } from "./api-client";
+import type { AuthUser } from "@/types/entities";
 
-export type AuthUser = {
-  id: string;
-  email: string;
-  firstName: string;
-  lastName: string;
-  roles: { id: string; name: string; code?: string }[];
-  permissions: string[];
-};
+export type { AuthUser };
 
 type AuthContextType = {
   user: AuthUser | null;

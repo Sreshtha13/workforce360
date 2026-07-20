@@ -19,6 +19,11 @@
     "typecheck": "npm run typecheck -w web && npm run typecheck -w api",
     "typecheck:web": "npm run typecheck -w web",
     "typecheck:api": "npm run typecheck -w api",
+    "test": "npm run test -w api && npm run test -w web",
+    "test:ci": "npm run test:ci -w api && npm run test:ci -w web",
+    "test:api": "npm run test -w api",
+    "test:web": "npm run test -w web",
+    "test:coverage": "npm run test:coverage -w api && npm run test:coverage -w web",
     "db:generate": "npm run db:generate -w api",
     "db:migrate": "npm run db:migrate -w api"
   },
