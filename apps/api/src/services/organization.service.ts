@@ -1,3 +1,4 @@
+import { Prisma } from "@prisma/client";
 import { OrganizationRepository } from "../repositories/organization.repository";
 import { departmentManagerService } from "./department-manager.service";
 import { prisma } from "../lib/prisma";
@@ -106,8 +107,55 @@ export class OrganizationService {
     return team;
   }
   
+  private async validateTeamDepartmentAndLead(
+    departmentId: string,
+    leadId?: string | null,
+  ): Promise<void> {
+    const department = await this.orgRepo.findDepartmentById(departmentId);
+    if (!department) {
+      throw new Error("Department not found");
+    }
+
+    if (!leadId) {
+      return;
+    }
+
+    const lead = await prisma.user.findFirst({
+      where: { id: leadId, deletedAt: null, status: "active" },
+      select: { id: true, departmentId: true },
+    });
+
+    if (!lead) {
+      throw new Error("Team lead must be an active employee");
+    }
+
+    if (lead.departmentId !== departmentId) {
+      throw new Error("Team lead must belong to the selected department");
+    }
+  }
+
+  private mapTeamWriteError(error: unknown): Error {
+    if (error instanceof Prisma.PrismaClientKnownRequestError) {
+      if (error.code === "P2002") {
+        return new Error("A team with this code already exists in the selected department");
+      }
+      if (error.code === "P2003") {
+        return new Error("Invalid department or team lead reference");
+      }
+    }
+
+    return error instanceof Error ? error : new Error("Failed to save team");
+  }
+
   async createTeam(data: CreateTeamData) {
-    return this.orgRepo.createTeam(data);
+    await this.validateTeamDepartmentAndLead(data.departmentId, data.leadId);
+
+    try {
+      const team = await this.orgRepo.createTeam(data);
+      return this.orgRepo.findTeamById(team.id);
+    } catch (error) {
+      throw this.mapTeamWriteError(error);
+    }
   }
   
   async updateTeam(id: string, data: Partial<CreateTeamData>) {
@@ -115,7 +163,19 @@ export class OrganizationService {
     if (!existing) {
       throw new Error("Team not found");
     }
-    return this.orgRepo.updateTeam(id, data);
+
+    const departmentId = data.departmentId ?? existing.departmentId;
+    const leadId =
+      data.leadId !== undefined ? data.leadId ?? null : existing.leadId;
+
+    await this.validateTeamDepartmentAndLead(departmentId, leadId);
+
+    try {
+      await this.orgRepo.updateTeam(id, data);
+      return this.orgRepo.findTeamById(id);
+    } catch (error) {
+      throw this.mapTeamWriteError(error);
+    }
   }
   
   async deleteTeam(id: string) {

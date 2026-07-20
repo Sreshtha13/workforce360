@@ -11,15 +11,27 @@ export const createDepartmentSchema = z.object({
 
 export const updateDepartmentSchema = createDepartmentSchema.partial();
 
+const optionalTeamLeadId = z.preprocess(
+  (value) => (value === "" || value === null || value === undefined ? undefined : value),
+  z.string().min(1).optional(),
+);
+
+const nullableTeamLeadId = z.preprocess(
+  (value) => (value === "" ? null : value === undefined ? undefined : value),
+  z.string().min(1).nullable().optional(),
+);
+
 export const createTeamSchema = z.object({
-  departmentId: z.string().min(1),
-  name: z.string().min(1).max(255),
+  departmentId: z.string().min(1, "Department is required"),
+  name: z.string().min(1, "Team name is required").max(255),
   code: z.string().max(50).optional(),
   description: z.string().optional(),
-  leadId: z.string().optional(),
+  leadId: optionalTeamLeadId,
 });
 
-export const updateTeamSchema = createTeamSchema.partial();
+export const updateTeamSchema = createTeamSchema.partial().extend({
+  leadId: nullableTeamLeadId,
+});
 
 export const createDesignationSchema = z.object({
   name: z.string().min(1).max(255),

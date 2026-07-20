@@ -19,7 +19,7 @@ type Team = {
   description?: string;
   isActive: boolean;
   department?: { id: string; name: string };
-  lead?: { firstName: string; lastName: string };
+  lead?: { id: string; firstName: string; lastName: string };
   _count?: { members: number };
 };
 
@@ -36,21 +36,28 @@ export default function TeamsPage() {
   const canCreate = hasPermission("team.create");
   const canUpdate = hasPermission("team.update");
   const canDelete = hasPermission("team.delete");
+  const canReadUsers = hasPermission("user.read");
 
   const query = useQuery({
     queryKey: ["teams"],
     queryFn: async () => (await apiClient.organization.teams.list()).data ?? [],
   });
 
-  const lookupsQuery = useQuery({
-    queryKey: ["team-lookups"],
-    queryFn: async () => {
-      const [departments, users] = await Promise.all([
-        apiClient.organization.departments.list(),
-        apiClient.users.list(),
-      ]);
-      return { departments: departments.data ?? [], users: users.data ?? [] };
-    },
+  const departmentsQuery = useQuery({
+    queryKey: ["team-departments"],
+    queryFn: async () => (await apiClient.organization.departments.list()).data ?? [],
+  });
+
+  const employeesQuery = useQuery({
+    queryKey: ["team-department-employees", form.departmentId],
+    queryFn: async () =>
+      (
+        await apiClient.users.list({
+          departmentId: form.departmentId,
+          status: "active",
+        })
+      ).data ?? [],
+    enabled: sheetOpen && !!form.departmentId && canReadUsers,
   });
 
   const saveMutation = useMutation({
@@ -60,7 +67,7 @@ export default function TeamsPage() {
         name: form.name,
         code: form.code || undefined,
         description: form.description || undefined,
-        leadId: form.leadId || undefined,
+        leadId: form.leadId || (editing ? null : undefined),
       };
       if (editing) return apiClient.organization.teams.update(editing.id, payload);
       return apiClient.organization.teams.create(payload);
@@ -87,15 +94,60 @@ export default function TeamsPage() {
   if (query.isError) return <ErrorState message="Failed to load teams" onRetry={() => query.refetch()} />;
 
   const teams = (query.data ?? []) as Team[];
-  const deptOptions = lookupsQuery.data?.departments.map((d: any) => ({ value: d.id, label: d.name })) ?? [];
-  const userOptions = lookupsQuery.data?.users.map((u: any) => ({ value: u.id, label: `${u.firstName} ${u.lastName}` })) ?? [];
+  const deptOptions =
+    departmentsQuery.data?.map((d: { id: string; name: string }) => ({
+      value: d.id,
+      label: d.name,
+    })) ?? [];
+  const employeeOptions =
+    employeesQuery.data?.map((u: { id: string; firstName: string; lastName: string }) => ({
+      value: u.id,
+      label: `${u.firstName} ${u.lastName}`,
+    })) ?? [];
+
+  const handleDepartmentChange = (departmentId: string) => {
+    setForm((prev) => ({ ...prev, departmentId, leadId: "" }));
+  };
+
+  const openCreateSheet = () => {
+    setEditing(null);
+    setForm(emptyForm);
+    setSheetOpen(true);
+  };
+
+  const openEditSheet = (team: Team) => {
+    setEditing(team);
+    setForm({
+      departmentId: team.department?.id ?? "",
+      name: team.name,
+      code: team.code ?? "",
+      description: team.description ?? "",
+      leadId: team.lead?.id ?? "",
+    });
+    setSheetOpen(true);
+  };
 
   return (
     <div className="space-y-6">
-      <AdminPageHeader title="Teams" description="Teams belong to departments." actionLabel={canCreate ? "Add Team" : undefined} onAction={canCreate ? () => { setEditing(null); setForm(emptyForm); setSheetOpen(true); } : undefined} />
-      {feedback && <AlertBanner variant={feedback.type === "error" ? "error" : "success"} message={feedback.message} onDismiss={() => setFeedback(null)} />}
+      <AdminPageHeader
+        title="Teams"
+        description="Teams belong to departments."
+        actionLabel={canCreate ? "Add Team" : undefined}
+        onAction={canCreate ? openCreateSheet : undefined}
+      />
+      {feedback && (
+        <AlertBanner
+          variant={feedback.type === "error" ? "error" : "success"}
+          message={feedback.message}
+          onDismiss={() => setFeedback(null)}
+        />
+      )}
       {teams.length === 0 ? (
-        <EmptyState title="No teams yet" actionLabel={canCreate ? "Create Team" : undefined} onAction={canCreate ? () => setSheetOpen(true) : undefined} />
+        <EmptyState
+          title="No teams yet"
+          actionLabel={canCreate ? "Create Team" : undefined}
+          onAction={canCreate ? openCreateSheet : undefined}
+        />
       ) : (
         <DataTable
           data={teams}
@@ -103,29 +155,83 @@ export default function TeamsPage() {
           columns={[
             { key: "name", header: "Team", render: (t) => t.name },
             { key: "dept", header: "Department", render: (t) => t.department?.name ?? "—" },
-            { key: "lead", header: "Lead", render: (t) => t.lead ? `${t.lead.firstName} ${t.lead.lastName}` : "—" },
+            { key: "lead", header: "Lead", render: (t) => (t.lead ? `${t.lead.firstName} ${t.lead.lastName}` : "—") },
             { key: "members", header: "Members", render: (t) => t._count?.members ?? 0 },
-            { key: "status", header: "Status", render: (t) => <Badge variant={t.isActive ? "success" : "warning"}>{t.isActive ? "Active" : "Inactive"}</Badge> },
+            {
+              key: "status",
+              header: "Status",
+              render: (t) => (
+                <Badge variant={t.isActive ? "success" : "warning"}>{t.isActive ? "Active" : "Inactive"}</Badge>
+              ),
+            },
             {
               key: "actions",
               header: "Actions",
               className: "text-right",
               render: (t) => (
                 <div className="flex justify-end gap-2">
-                  {canUpdate && <Button variant="outline" size="sm" onClick={() => { setEditing(t); setForm({ departmentId: t.department?.id ?? "", name: t.name, code: t.code ?? "", description: t.description ?? "", leadId: "" }); setSheetOpen(true); }}>Edit</Button>}
-                  {canDelete && <Button variant="destructive" size="sm" onClick={() => confirm(`Delete ${t.name}?`) && deleteMutation.mutate(t.id)}>Delete</Button>}
+                  {canUpdate && (
+                    <Button variant="outline" size="sm" onClick={() => openEditSheet(t)}>
+                      Edit
+                    </Button>
+                  )}
+                  {canDelete && (
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      onClick={() => confirm(`Delete ${t.name}?`) && deleteMutation.mutate(t.id)}
+                    >
+                      Delete
+                    </Button>
+                  )}
                 </div>
               ),
             },
           ]}
         />
       )}
-      <FormSheet open={sheetOpen} onOpenChange={setSheetOpen} title={editing ? "Edit Team" : "Create Team"} onSubmit={() => saveMutation.mutate()} loading={saveMutation.isPending}>
-        <FormSelect label="Department" name="departmentId" value={form.departmentId} onChange={(v) => setForm({ ...form, departmentId: v })} options={deptOptions} required />
+      <FormSheet
+        open={sheetOpen}
+        onOpenChange={setSheetOpen}
+        title={editing ? "Edit Team" : "Create Team"}
+        onSubmit={() => saveMutation.mutate()}
+        loading={saveMutation.isPending}
+      >
+        <FormSelect
+          label="Department"
+          name="departmentId"
+          value={form.departmentId}
+          onChange={handleDepartmentChange}
+          options={deptOptions}
+          required
+          helperText={departmentsQuery.isError ? "Failed to load departments" : undefined}
+        />
         <FormField label="Name" name="name" value={form.name} onChange={(v) => setForm({ ...form, name: v })} required />
         <FormField label="Code" name="code" value={form.code} onChange={(v) => setForm({ ...form, code: v })} />
-        <FormTextarea label="Description" name="description" value={form.description} onChange={(v) => setForm({ ...form, description: v })} />
-        <FormSelect label="Team lead" name="leadId" value={form.leadId} onChange={(v) => setForm({ ...form, leadId: v })} options={userOptions} />
+        <FormTextarea
+          label="Description"
+          name="description"
+          value={form.description}
+          onChange={(v) => setForm({ ...form, description: v })}
+        />
+        <FormSelect
+          label="Team lead"
+          name="leadId"
+          value={form.leadId}
+          onChange={(v) => setForm({ ...form, leadId: v })}
+          options={employeeOptions}
+          disabled={!form.departmentId || !canReadUsers}
+          placeholder={!form.departmentId ? "Select a department first" : "Select employee (optional)"}
+          helperText={
+            !canReadUsers
+              ? "You need user.read permission to assign a team lead"
+              : form.departmentId && employeesQuery.isLoading
+                ? "Loading employees..."
+                : form.departmentId && employeeOptions.length === 0
+                  ? "No active employees in this department"
+                  : undefined
+          }
+        />
       </FormSheet>
     </div>
   );

@@ -104,9 +104,10 @@ export class OrganizationController {
       const team = await this.orgService.createTeam(req.body);
       sendSuccess(res, team, 201);
     } catch (error) {
-      sendError(res, 400, {
-        code: "CREATE_TEAM_FAILED",
-        message: error instanceof Error ? error.message : "Failed to create team",
+      const message = error instanceof Error ? error.message : "Failed to create team";
+      sendError(res, message === "Department not found" ? 404 : 400, {
+        code: this.teamErrorCode(message, "CREATE_TEAM_FAILED"),
+        message,
       });
     }
   };
@@ -117,12 +118,24 @@ export class OrganizationController {
       const team = await this.orgService.updateTeam(id, req.body);
       sendSuccess(res, team);
     } catch (error) {
-      sendError(res, 400, {
-        code: "UPDATE_TEAM_FAILED",
-        message: error instanceof Error ? error.message : "Failed to update team",
+      const message = error instanceof Error ? error.message : "Failed to update team";
+      const status =
+        message === "Team not found" || message === "Department not found" ? 404 : 400;
+      sendError(res, status, {
+        code: this.teamErrorCode(message, "UPDATE_TEAM_FAILED"),
+        message,
       });
     }
   };
+
+  private teamErrorCode(message: string, fallback: string): string {
+    if (message === "Department not found") return "DEPARTMENT_NOT_FOUND";
+    if (message === "Team not found") return "TEAM_NOT_FOUND";
+    if (message.startsWith("Team lead must")) return "INVALID_TEAM_LEAD";
+    if (message.includes("code already exists")) return "DUPLICATE_TEAM_CODE";
+    if (message.includes("Invalid department or team lead")) return "INVALID_TEAM_REFERENCE";
+    return fallback;
+  }
   
   deleteTeam = async (req: Request, res: Response): Promise<void> => {
     try {

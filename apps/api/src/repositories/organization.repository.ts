@@ -15,7 +15,7 @@ export type CreateTeamData = {
   name: string;
   code?: string;
   description?: string;
-  leadId?: string;
+  leadId?: string | null;
 };
 
 export type CreateDesignationData = {
