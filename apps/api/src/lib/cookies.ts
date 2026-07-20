@@ -11,3 +11,13 @@ export function authCookieOptions(maxAgeMs: number): CookieOptions {
     maxAge: maxAgeMs,
   };
 }
+
+/** Mirror set options when clearing cookies so browsers reliably remove them. */
+export function clearAuthCookieOptions(): CookieOptions {
+  return {
+    httpOnly: true,
+    secure: env.COOKIE_SECURE,
+    sameSite: env.NODE_ENV === "production" ? "strict" : "lax",
+    path: "/",
+  };
+}

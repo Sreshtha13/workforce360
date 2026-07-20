@@ -39,7 +39,7 @@ const authController = new AuthController();
  *                 example: Admin@123
  *     responses:
  *       200:
- *         description: Login successful
+ *         description: Login successful — sets httpOnly access and refresh cookies (sliding session)
  *         content:
  *           application/json:
  *             schema:
@@ -59,10 +59,6 @@ const authController = new AuthController();
  *                           type: string
  *                         lastName:
  *                           type: string
- *                     accessToken:
- *                       type: string
- *                     refreshToken:
- *                       type: string
  *       401:
  *         description: Invalid credentials
  */
@@ -98,15 +94,20 @@ router.post("/google", validate(googleLoginSchema), authController.googleLogin);
  * @swagger
  * /api/auth/refresh:
  *   post:
- *     summary: Refresh access token
+ *     summary: Refresh session (sliding)
+ *     description: |
+ *       Validates the httpOnly refresh token cookie, then issues a **new access token
+ *       and a new refresh token** (rotation). Each successful refresh extends the
+ *       session by the configured refresh TTL (default 30 days). Tokens are set as
+ *       httpOnly cookies — they are not returned in the response body.
  *     tags: [Authentication]
  *     responses:
  *       200:
- *         description: Token refreshed successfully
+ *         description: Session refreshed; new cookies set
  *       401:
- *         description: Invalid or expired refresh token
+ *         description: Refresh token expired, revoked, or invalid
  */
-router.post("/refresh", authController.refreshToken);
+router.post("/refresh", validate(refreshTokenSchema.partial()), authController.refreshToken);
 
 /**
  * @swagger

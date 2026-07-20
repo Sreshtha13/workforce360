@@ -16,7 +16,7 @@ const envSchema = z.object({
   JWT_ACCESS_SECRET: z.string().min(32).optional(),
   JWT_REFRESH_SECRET: z.string().min(32).optional(),
   JWT_ACCESS_EXPIRES_IN: z.string().default("15m"),
-  JWT_REFRESH_EXPIRES_IN: z.string().default("7d"),
+  JWT_REFRESH_EXPIRES_IN: z.string().default("30d"),
   COOKIE_SECURE: z
     .enum(["true", "false"])
     .default("false")

@@ -1,5 +1,6 @@
 import { UserRepository } from "../repositories/user.repository";
 import { departmentManagerService } from "./department-manager.service";
+import { authService } from "./auth.service";
 import { hashPassword } from "../lib/password";
 import { getNextEmployeeId } from "../lib/employee-id";
 import type { CreateUserInput, UpdateUserInput } from "../repositories/user.repository";
@@ -107,11 +108,26 @@ export class UserService {
     if (password) {
       passwordHash = await hashPassword(password);
     }
-    
-    return this.userRepo.updateUser(id, {
+
+    const updated = await this.userRepo.updateUser(id, {
       ...userData,
       ...(passwordHash && { passwordHash }),
     });
+
+    if (passwordHash) {
+      await authService.invalidateUserSessions(id);
+    }
+
+    return updated;
+  }
+
+  async revokeUserSessions(userId: string) {
+    const existing = await this.userRepo.findUserById(userId);
+    if (!existing) {
+      throw new Error("User not found");
+    }
+
+    await authService.invalidateUserSessions(userId);
   }
   
   async deleteUser(id: string) {

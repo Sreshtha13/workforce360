@@ -17,6 +17,11 @@ import type { AuthUser } from "@/types/auth";
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:4000";
 
+const AUTH_REFRESH_PATH = "/api/auth/refresh";
+const AUTH_LOGIN_PATH = "/api/auth/login";
+
+let refreshInFlight: Promise<boolean> | null = null;
+
 function buildQuery(params?: Record<string, string | undefined>): string {
   if (!params) return "";
   const search = new URLSearchParams();
@@ -39,9 +44,42 @@ export class ApiClientError extends Error {
   }
 }
 
+/** Attempt a sliding-session refresh; deduplicated across concurrent 401s. */
+async function tryRefreshSession(): Promise<boolean> {
+  if (!refreshInFlight) {
+    refreshInFlight = (async () => {
+      try {
+        const response = await fetch(`${API_BASE_URL}${AUTH_REFRESH_PATH}`, {
+          method: "POST",
+          headers: { Accept: "application/json", "Content-Type": "application/json" },
+          credentials: "include",
+          cache: "no-store",
+        });
+        return response.ok;
+      } catch {
+        return false;
+      } finally {
+        refreshInFlight = null;
+      }
+    })();
+  }
+
+  return refreshInFlight;
+}
+
+function shouldAttemptRefresh(path: string, retried: boolean): boolean {
+  return (
+    !retried &&
+    path !== AUTH_REFRESH_PATH &&
+    path !== AUTH_LOGIN_PATH &&
+    path !== "/api/auth/logout"
+  );
+}
+
 async function request<T>(
   path: string,
   init?: RequestInit,
+  retried = false,
 ): Promise<ApiResponse<T>> {
   const url = `${API_BASE_URL}${path}`;
 
@@ -55,6 +93,13 @@ async function request<T>(
     credentials: "include",
     cache: "no-store",
   });
+
+  if (response.status === 401 && shouldAttemptRefresh(path, retried)) {
+    const refreshed = await tryRefreshSession();
+    if (refreshed) {
+      return request<T>(path, init, true);
+    }
+  }
 
   let body: ApiResponse<T>;
   try {
@@ -79,8 +124,11 @@ async function request<T>(
   return body;
 }
 
-/** Session probe — 401 means logged out, not an application error. */
-async function requestSession<T>(path: string): Promise<ApiResponse<T> | null> {
+/** Session probe — tries refresh on 401 before treating the user as logged out. */
+async function requestSession<T>(
+  path: string,
+  retried = false,
+): Promise<ApiResponse<T> | null> {
   const url = `${API_BASE_URL}${path}`;
 
   const response = await fetch(url, {
@@ -88,6 +136,14 @@ async function requestSession<T>(path: string): Promise<ApiResponse<T> | null> {
     credentials: "include",
     cache: "no-store",
   });
+
+  if (response.status === 401 && shouldAttemptRefresh(path, retried)) {
+    const refreshed = await tryRefreshSession();
+    if (refreshed) {
+      return requestSession<T>(path, true);
+    }
+    return null;
+  }
 
   if (response.status === 401) {
     return null;
@@ -127,7 +183,7 @@ export const apiClient = {
   
   auth: {
     login: (email: string, password: string) =>
-      request<{ user: any; accessToken: string; refreshToken: string }>("/api/auth/login", {
+      request<{ user: AuthUser }>("/api/auth/login", {
         method: "POST",
         body: JSON.stringify({ email, password }),
       }),
@@ -138,7 +194,7 @@ export const apiClient = {
       }),
     
     refreshToken: () =>
-      request<{ accessToken: string }>("/api/auth/refresh", {
+      request<{ message: string }>("/api/auth/refresh", {
         method: "POST",
       }),
     
@@ -182,6 +238,11 @@ export const apiClient = {
     delete: (id: string) =>
       request<{ message: string }>(`/api/users/${id}`, {
         method: "DELETE",
+      }),
+
+    revokeSessions: (id: string) =>
+      request<{ message: string }>(`/api/users/${id}/revoke-sessions`, {
+        method: "POST",
       }),
     
     assignRole: (id: string, roleId: string) =>

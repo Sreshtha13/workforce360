@@ -1,6 +1,7 @@
 import type { Request, Response } from "express";
 import { AuthService } from "../services/auth.service";
-import { authCookieOptions } from "../lib/cookies";
+import { authCookieOptions, clearAuthCookieOptions } from "../lib/cookies";
+import { getAccessTokenMaxAgeMs, getRefreshTokenMaxAgeMs } from "../lib/token-expiry";
 import { sendSuccess, sendError } from "../lib/response";
 import type {
   LoginInput,
@@ -16,6 +17,28 @@ export class AuthController {
   constructor() {
     this.authService = new AuthService();
   }
+
+  private setSessionCookies(
+    res: Response,
+    tokens: { accessToken: string; refreshToken: string },
+  ): void {
+    res.cookie(
+      "accessToken",
+      tokens.accessToken,
+      authCookieOptions(getAccessTokenMaxAgeMs()),
+    );
+    res.cookie(
+      "refreshToken",
+      tokens.refreshToken,
+      authCookieOptions(getRefreshTokenMaxAgeMs()),
+    );
+  }
+
+  private clearSessionCookies(res: Response): void {
+    const options = clearAuthCookieOptions();
+    res.clearCookie("accessToken", options);
+    res.clearCookie("refreshToken", options);
+  }
   
   login = async (req: Request, res: Response): Promise<void> => {
     try {
@@ -30,14 +53,9 @@ export class AuthController {
         userAgent,
       );
       
-      res.cookie("accessToken", result.accessToken, authCookieOptions(15 * 60 * 1000));
-      res.cookie("refreshToken", result.refreshToken, authCookieOptions(7 * 24 * 60 * 60 * 1000));
+      this.setSessionCookies(res, result);
       
-      sendSuccess(res, {
-        user: result.user,
-        accessToken: result.accessToken,
-        refreshToken: result.refreshToken,
-      });
+      sendSuccess(res, { user: result.user });
     } catch (error) {
       sendError(res, 401, {
         code: "LOGIN_FAILED",
@@ -58,14 +76,9 @@ export class AuthController {
         userAgent,
       );
       
-      res.cookie("accessToken", result.accessToken, authCookieOptions(15 * 60 * 1000));
-      res.cookie("refreshToken", result.refreshToken, authCookieOptions(7 * 24 * 60 * 60 * 1000));
+      this.setSessionCookies(res, result);
       
-      sendSuccess(res, {
-        user: result.user,
-        accessToken: result.accessToken,
-        refreshToken: result.refreshToken,
-      });
+      sendSuccess(res, { user: result.user });
     } catch (error) {
       sendError(res, 401, {
         code: "GOOGLE_LOGIN_FAILED",
@@ -87,14 +100,13 @@ export class AuthController {
         return;
       }
       
-      const result = await this.authService.refreshAccessToken(refreshToken);
+      const result = await this.authService.refreshSession(refreshToken);
       
-      res.cookie("accessToken", result.accessToken, authCookieOptions(15 * 60 * 1000));
+      this.setSessionCookies(res, result);
       
-      sendSuccess(res, {
-        accessToken: result.accessToken,
-      });
+      sendSuccess(res, { message: "Session refreshed" });
     } catch (error) {
+      this.clearSessionCookies(res);
       sendError(res, 401, {
         code: "REFRESH_FAILED",
         message: error instanceof Error ? error.message : "Token refresh failed",
@@ -110,8 +122,7 @@ export class AuthController {
         await this.authService.logout(refreshToken);
       }
       
-      res.clearCookie("accessToken", { path: "/" });
-      res.clearCookie("refreshToken", { path: "/" });
+      this.clearSessionCookies(res);
       
       sendSuccess(res, { message: "Logged out successfully" });
     } catch (error) {

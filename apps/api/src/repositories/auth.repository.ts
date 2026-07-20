@@ -1,4 +1,5 @@
 import { prisma } from "../lib/prisma";
+import { hashRefreshToken } from "../lib/refresh-token-hash";
 import type { User, RefreshToken, LoginHistory, PasswordReset } from "@prisma/client";
 
 export type CreateUserData = {
@@ -68,22 +69,33 @@ export class AuthRepository {
       data: { passwordHash },
     });
   }
+
+  async incrementSessionVersion(userId: string): Promise<User> {
+    return prisma.user.update({
+      where: { id: userId },
+      data: { sessionVersion: { increment: 1 } },
+    });
+  }
   
   async createRefreshToken(data: CreateRefreshTokenData): Promise<RefreshToken> {
     return prisma.refreshToken.create({
-      data,
+      data: {
+        userId: data.userId,
+        token: hashRefreshToken(data.token),
+        expiresAt: data.expiresAt,
+      },
     });
   }
   
   async findRefreshToken(token: string): Promise<RefreshToken | null> {
     return prisma.refreshToken.findUnique({
-      where: { token },
+      where: { token: hashRefreshToken(token) },
     });
   }
   
   async revokeRefreshToken(token: string): Promise<RefreshToken> {
     return prisma.refreshToken.update({
-      where: { token },
+      where: { token: hashRefreshToken(token) },
       data: {
         isRevoked: true,
         revokedAt: new Date(),
@@ -99,6 +111,32 @@ export class AuthRepository {
         revokedAt: new Date(),
       },
     });
+  }
+
+  async rotateRefreshToken(
+    oldToken: string,
+    newToken: string,
+    userId: string,
+    expiresAt: Date,
+  ): Promise<void> {
+    const oldTokenHash = hashRefreshToken(oldToken);
+
+    await prisma.$transaction([
+      prisma.refreshToken.update({
+        where: { token: oldTokenHash },
+        data: {
+          isRevoked: true,
+          revokedAt: new Date(),
+        },
+      }),
+      prisma.refreshToken.create({
+        data: {
+          userId,
+          token: hashRefreshToken(newToken),
+          expiresAt,
+        },
+      }),
+    ]);
   }
   
   async createLoginHistory(data: CreateLoginHistoryData): Promise<LoginHistory> {

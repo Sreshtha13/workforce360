@@ -132,4 +132,17 @@ export class UserController {
       });
     }
   };
+
+  revokeSessions = async (req: Request, res: Response): Promise<void> => {
+    try {
+      const { id } = req.params;
+      await this.userService.revokeUserSessions(id);
+      sendSuccess(res, { message: "All user sessions revoked" });
+    } catch (error) {
+      sendError(res, 404, {
+        code: "REVOKE_SESSIONS_FAILED",
+        message: error instanceof Error ? error.message : "Failed to revoke sessions",
+      });
+    }
+  };
 }

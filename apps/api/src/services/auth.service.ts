@@ -2,6 +2,7 @@ import crypto from "crypto";
 import { AuthRepository } from "../repositories/auth.repository";
 import { hashPassword, verifyPassword, validatePasswordPolicy } from "../lib/password";
 import { signAccessToken, signRefreshToken, verifyRefreshToken } from "../lib/jwt";
+import { getRefreshTokenExpiresAt } from "../lib/token-expiry";
 import { verifyGoogleToken } from "../lib/google-oauth";
 
 export class AuthService {
@@ -9,6 +10,26 @@ export class AuthService {
   
   constructor() {
     this.authRepo = new AuthRepository();
+  }
+
+  private async issueSession(user: { id: string; email: string; sessionVersion: number }) {
+    const accessToken = signAccessToken(user.id, user.email, user.sessionVersion);
+    const refreshToken = signRefreshToken(user.id, user.email, user.sessionVersion);
+    const expiresAt = getRefreshTokenExpiresAt();
+
+    await this.authRepo.createRefreshToken({
+      userId: user.id,
+      token: refreshToken,
+      expiresAt,
+    });
+
+    return { accessToken, refreshToken };
+  }
+
+  /** Revoke all refresh tokens and invalidate outstanding access tokens. */
+  async invalidateUserSessions(userId: string): Promise<void> {
+    await this.authRepo.revokeAllUserRefreshTokens(userId);
+    await this.authRepo.incrementSessionVersion(userId);
   }
   
   async login(
@@ -62,18 +83,8 @@ export class AuthService {
       status: "success",
       method: "email_password",
     });
-    
-    const accessToken = signAccessToken(user.id, user.email);
-    const refreshToken = signRefreshToken(user.id, user.email);
-    
-    const expiresAt = new Date();
-    expiresAt.setDate(expiresAt.getDate() + 7);
-    
-    await this.authRepo.createRefreshToken({
-      userId: user.id,
-      token: refreshToken,
-      expiresAt,
-    });
+
+    const tokens = await this.issueSession(user);
     
     return {
       user: {
@@ -82,8 +93,7 @@ export class AuthService {
         firstName: user.firstName,
         lastName: user.lastName,
       },
-      accessToken,
-      refreshToken,
+      ...tokens,
     };
   }
   
@@ -134,18 +144,8 @@ export class AuthService {
       status: "success",
       method: "google_oauth",
     });
-    
-    const accessToken = signAccessToken(user.id, user.email);
-    const refreshToken = signRefreshToken(user.id, user.email);
-    
-    const expiresAt = new Date();
-    expiresAt.setDate(expiresAt.getDate() + 7);
-    
-    await this.authRepo.createRefreshToken({
-      userId: user.id,
-      token: refreshToken,
-      expiresAt,
-    });
+
+    const tokens = await this.issueSession(user);
     
     return {
       user: {
@@ -154,35 +154,59 @@ export class AuthService {
         firstName: user.firstName,
         lastName: user.lastName,
       },
-      accessToken,
-      refreshToken,
+      ...tokens,
     };
   }
   
-  async refreshAccessToken(refreshToken: string) {
+  async refreshSession(refreshToken: string) {
     const tokenRecord = await this.authRepo.findRefreshToken(refreshToken);
-    
-    if (!tokenRecord || tokenRecord.isRevoked || tokenRecord.expiresAt < new Date()) {
+
+    if (!tokenRecord) {
       throw new Error("Invalid or expired refresh token");
     }
-    
+
+    if (tokenRecord.isRevoked) {
+      await this.invalidateUserSessions(tokenRecord.userId);
+      throw new Error("Invalid or expired refresh token");
+    }
+
+    if (tokenRecord.expiresAt < new Date()) {
+      throw new Error("Invalid or expired refresh token");
+    }
+
     const payload = verifyRefreshToken(refreshToken);
-    
     const user = await this.authRepo.findUserById(payload.userId);
-    
+
     if (!user || user.status !== "active") {
       throw new Error("Invalid user or account inactive");
     }
-    
-    const accessToken = signAccessToken(user.id, user.email);
-    
-    return { accessToken };
+
+    if ((payload.sessionVersion ?? 0) !== user.sessionVersion) {
+      throw new Error("Invalid or expired refresh token");
+    }
+
+    const newAccessToken = signAccessToken(user.id, user.email, user.sessionVersion);
+    const newRefreshToken = signRefreshToken(user.id, user.email, user.sessionVersion);
+    const expiresAt = getRefreshTokenExpiresAt();
+
+    await this.authRepo.rotateRefreshToken(
+      refreshToken,
+      newRefreshToken,
+      user.id,
+      expiresAt,
+    );
+
+    return {
+      accessToken: newAccessToken,
+      refreshToken: newRefreshToken,
+    };
   }
   
   async logout(refreshToken: string) {
     try {
       await this.authRepo.revokeRefreshToken(refreshToken);
-    } catch (error) {
+    } catch {
+      // Idempotent logout — cookie may already be cleared or token rotated.
     }
   }
   
@@ -222,7 +246,7 @@ export class AuthService {
     
     await this.authRepo.updatePassword(passwordReset.userId, passwordHash);
     await this.authRepo.markPasswordResetAsUsed(token);
-    await this.authRepo.revokeAllUserRefreshTokens(passwordReset.userId);
+    await this.invalidateUserSessions(passwordReset.userId);
   }
   
   async getMe(userId: string) {
@@ -257,3 +281,5 @@ export class AuthService {
     };
   }
 }
+
+export const authService = new AuthService();

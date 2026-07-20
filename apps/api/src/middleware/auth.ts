@@ -29,6 +29,7 @@ export async function requireAuth(
         email: true,
         status: true,
         deletedAt: true,
+        sessionVersion: true,
         userRoles: {
           where: { deletedAt: null },
           include: {
@@ -50,6 +51,14 @@ export async function requireAuth(
       sendError(res, 401, {
         code: "UNAUTHORIZED",
         message: "Invalid user or account inactive",
+      });
+      return;
+    }
+
+    if ((payload.sessionVersion ?? 0) !== user.sessionVersion) {
+      sendError(res, 401, {
+        code: "SESSION_EXPIRED",
+        message: "Session expired. Please sign in again.",
       });
       return;
     }

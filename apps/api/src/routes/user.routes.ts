@@ -333,4 +333,38 @@ router.delete(
   userController.removeRole,
 );
 
+/**
+ * @swagger
+ * /api/users/{id}/revoke-sessions:
+ *   post:
+ *     summary: Force logout — revoke all sessions for a user
+ *     description: |
+ *       Invalidates all refresh tokens and bumps the user's session version so
+ *       outstanding access tokens stop working immediately. Requires admin action.
+ *     tags: [Users]
+ *     security:
+ *       - cookieAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: All sessions revoked
+ *       401:
+ *         description: Not authenticated
+ *       403:
+ *         description: Requires user.update
+ *       404:
+ *         description: User not found
+ */
+router.post(
+  "/:id/revoke-sessions",
+  requireAuth,
+  requirePermission("user.update"),
+  userController.revokeSessions,
+);
+
 export { router as userRouter };

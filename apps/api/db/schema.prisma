@@ -222,6 +222,8 @@ model User {
   emailVerifiedAt    DateTime? @map("email_verified_at")
   googleId           String?   @unique @map("google_id")
   lastLoginAt        DateTime? @map("last_login_at")
+  /// Bumped to invalidate all JWTs (password change, admin force logout, token reuse).
+  sessionVersion     Int       @default(0) @map("session_version")
   createdAt          DateTime  @default(now()) @map("created_at")
   updatedAt          DateTime  @updatedAt @map("updated_at")
   deletedAt          DateTime? @map("deleted_at")
