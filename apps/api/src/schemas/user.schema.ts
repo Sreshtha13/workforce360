@@ -41,6 +41,16 @@ export const removeRoleSchema = z.object({
   roleId: z.string().min(1, "Role ID is required"),
 });
 
+export const listUsersQuerySchema = z.object({
+  departmentId: z.string().optional(),
+  status: z.enum(USER_ACCOUNT_STATUSES).optional(),
+  search: z.string().optional(),
+  includeDeleted: z
+    .enum(["true", "false"])
+    .optional()
+    .transform((value) => value === "true"),
+});
+
 export type CreateUserInput = z.infer<typeof createUserSchema>;
 export type UpdateUserInput = z.infer<typeof updateUserSchema>;
 export type AssignRoleInput = z.infer<typeof assignRoleSchema>;

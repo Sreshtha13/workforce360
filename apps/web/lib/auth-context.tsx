@@ -11,6 +11,7 @@ import { useRouter } from "next/navigation";
 import { apiClient, ApiClientError } from "./api-client";
 
 import type { AuthUser } from "@/types/auth";
+import { isSuperAdmin as checkIsSuperAdmin } from "./super-admin";
 
 export type { AuthUser };
 
@@ -22,6 +23,7 @@ type AuthContextType = {
   refetch: () => Promise<void>;
   hasPermission: (permission: string) => boolean;
   hasAnyPermission: (...permissions: string[]) => boolean;
+  isSuperAdmin: boolean;
 };
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -76,6 +78,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const hasAnyPermission = (...permissions: string[]) =>
     permissions.some((p) => hasPermission(p));
 
+  const isSuperAdmin = checkIsSuperAdmin(user);
+
   const refetch = async () => {
     setLoading(true);
     await fetchUser();
@@ -91,6 +95,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         refetch,
         hasPermission,
         hasAnyPermission,
+        isSuperAdmin,
       }}
     >
       {children}

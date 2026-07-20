@@ -43,6 +43,7 @@ type UserRow = {
   phone?: string;
   status: string;
   employeeId?: string;
+  deletedAt?: string | null;
   department?: { id: string; name: string; managerId?: string | null };
   designation?: { id: string; name: string };
   office?: { id: string; name: string };
@@ -71,10 +72,11 @@ const emptyForm: UserFormValues = {
 };
 
 export default function UsersAdminPage() {
-  const { hasPermission } = useAuth();
+  const { hasPermission, isSuperAdmin } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
+  const [showDeleted, setShowDeleted] = useState(false);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [roleSheetOpen, setRoleSheetOpen] = useState(false);
   const [editing, setEditing] = useState<UserRow | null>(null);
@@ -91,9 +93,12 @@ export default function UsersAdminPage() {
   const canAssignRole = hasPermission("user.assign_role");
 
   const usersQuery = useQuery({
-    queryKey: ["users", search],
+    queryKey: ["users", search, showDeleted],
     queryFn: async () => {
-      const res = await apiClient.users.list(search ? { search } : undefined);
+      const res = await apiClient.users.list({
+        ...(search ? { search } : {}),
+        ...(showDeleted && isSuperAdmin ? { includeDeleted: true } : {}),
+      });
       return res.data ?? [];
     },
   });
@@ -334,6 +339,7 @@ export default function UsersAdminPage() {
   }
 
   const users = (usersQuery.data ?? []) as UserRow[];
+  const isDeletedUser = (user: UserRow) => Boolean(user.deletedAt) || user.status === "deleted";
 
   return (
     <div className="space-y-6">
@@ -347,6 +353,17 @@ export default function UsersAdminPage() {
           onChange={(e) => setSearch(e.target.value)}
           containerClassName="w-full sm:w-64"
         />
+        {isSuperAdmin && (
+          <label className="flex items-center gap-2 text-sm text-muted-foreground">
+            <input
+              type="checkbox"
+              checked={showDeleted}
+              onChange={(e) => setShowDeleted(e.target.checked)}
+              className="size-4 rounded border border-input"
+            />
+            Show deleted users
+          </label>
+        )}
         {canCreate && (
           <Button onClick={() => void openCreate()} className="gap-1.5">
             <UserPlus className="size-4" aria-hidden />
@@ -379,10 +396,15 @@ export default function UsersAdminPage() {
               key: "name",
               header: "User",
               render: (u) => (
-                <div>
-                  <p className="font-medium">
-                    {u.firstName} {u.lastName}
-                  </p>
+                <div className={isDeletedUser(u) ? "opacity-60" : undefined}>
+                  <div className="flex items-center gap-2">
+                    <p className="font-medium">
+                      {u.firstName} {u.lastName}
+                    </p>
+                    {isDeletedUser(u) && (
+                      <Badge variant="warning">Deleted</Badge>
+                    )}
+                  </div>
                   <p className="text-xs text-muted-foreground">{u.email}</p>
                 </div>
               ),
@@ -468,33 +490,36 @@ export default function UsersAdminPage() {
               key: "actions",
               header: "Actions",
               className: "text-right",
-              render: (u) => (
-                <div className="flex justify-end gap-2">
-                  {canAssignRole && (
-                    <Button variant="outline" size="sm" onClick={() => openAssignRole(u)}>
-                      Roles
-                    </Button>
-                  )}
-                  {canUpdate && (
-                    <Button variant="outline" size="sm" onClick={() => openEdit(u)}>
-                      Edit
-                    </Button>
-                  )}
-                  {canDelete && (
-                    <Button
-                      variant="destructive"
-                      size="sm"
-                      onClick={() => {
-                        if (confirm(`Delete ${u.firstName} ${u.lastName}?`)) {
-                          deleteMutation.mutate(u.id);
-                        }
-                      }}
-                    >
-                      Delete
-                    </Button>
-                  )}
-                </div>
-              ),
+              render: (u) =>
+                isDeletedUser(u) ? (
+                  <span className="text-xs text-muted-foreground">Archived</span>
+                ) : (
+                  <div className="flex justify-end gap-2">
+                    {canAssignRole && (
+                      <Button variant="outline" size="sm" onClick={() => openAssignRole(u)}>
+                        Roles
+                      </Button>
+                    )}
+                    {canUpdate && (
+                      <Button variant="outline" size="sm" onClick={() => openEdit(u)}>
+                        Edit
+                      </Button>
+                    )}
+                    {canDelete && (
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        onClick={() => {
+                          if (confirm(`Delete ${u.firstName} ${u.lastName}?`)) {
+                            deleteMutation.mutate(u.id);
+                          }
+                        }}
+                      >
+                        Delete
+                      </Button>
+                    )}
+                  </div>
+                ),
             },
           ]}
         />

@@ -3,6 +3,7 @@ import { departmentManagerService } from "./department-manager.service";
 import { authService } from "./auth.service";
 import { hashPassword } from "../lib/password";
 import { getNextEmployeeId } from "../lib/employee-id";
+import { userIsSuperAdmin } from "../lib/super-admin";
 import type { CreateUserInput, UpdateUserInput } from "../repositories/user.repository";
 
 export class UserService {
@@ -12,11 +13,21 @@ export class UserService {
     this.userRepo = new UserRepository();
   }
   
-  async getAllUsers(filters?: {
-    departmentId?: string;
-    status?: string;
-    search?: string;
-  }) {
+  async getAllUsers(
+    filters?: {
+      departmentId?: string;
+      status?: string;
+      search?: string;
+      includeDeleted?: boolean;
+    },
+    requesterId?: string,
+  ) {
+    if (filters?.includeDeleted) {
+      if (!requesterId || !(await userIsSuperAdmin(requesterId))) {
+        throw new Error("Only Super Administrators can view deleted users");
+      }
+    }
+
     return this.userRepo.findAllUsers(filters);
   }
   
@@ -137,7 +148,10 @@ export class UserService {
     }
 
     await departmentManagerService.assertUserCanBeDeleted(id);
-    return this.userRepo.deleteUser(id);
+    await this.userRepo.clearUserAssignments(id);
+    const deleted = await this.userRepo.deleteUser(id);
+    await authService.invalidateUserSessions(id);
+    return deleted;
   }
   
   async assignRole(userId: string, roleId: string, assignedBy?: string) {

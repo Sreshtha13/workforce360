@@ -11,17 +11,28 @@ export class UserController {
   
   getUsers = async (req: Request, res: Response): Promise<void> => {
     try {
-      const { departmentId, status, search } = req.query;
-      const users = await this.userService.getAllUsers({
-        departmentId: departmentId as string,
-        status: status as string,
-        search: search as string,
-      });
+      const { departmentId, status, search, includeDeleted } = req.query as {
+        departmentId?: string;
+        status?: string;
+        search?: string;
+        includeDeleted?: boolean;
+      };
+      const users = await this.userService.getAllUsers(
+        {
+          departmentId,
+          status,
+          search,
+          includeDeleted,
+        },
+        req.user?.userId,
+      );
       sendSuccess(res, users);
     } catch (error) {
-      sendError(res, 500, {
-        code: "GET_USERS_FAILED",
-        message: error instanceof Error ? error.message : "Failed to get users",
+      const message = error instanceof Error ? error.message : "Failed to get users";
+      const statusCode = message.includes("Super Administrators") ? 403 : 500;
+      sendError(res, statusCode, {
+        code: statusCode === 403 ? "FORBIDDEN" : "GET_USERS_FAILED",
+        message,
       });
     }
   };

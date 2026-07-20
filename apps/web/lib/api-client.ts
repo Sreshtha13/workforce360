@@ -214,8 +214,20 @@ export const apiClient = {
   },
   
   users: {
-    list: (params?: { departmentId?: string; status?: string; search?: string }) =>
-      request<any[]>(`/api/users${buildQuery(params)}`),
+    list: (params?: {
+      departmentId?: string;
+      status?: string;
+      search?: string;
+      includeDeleted?: boolean;
+    }) =>
+      request<any[]>(
+        `/api/users${buildQuery({
+          departmentId: params?.departmentId,
+          status: params?.status,
+          search: params?.search,
+          includeDeleted: params?.includeDeleted ? "true" : undefined,
+        })}`,
+      ),
 
     getNextEmployeeId: () =>
       request<{ employeeId: string }>("/api/users/next-employee-id"),

@@ -1,4 +1,5 @@
 import { prisma } from "../lib/prisma";
+import { linkedUserFilter } from "../lib/organization-metrics";
 import type { Role, Permission, RolePermission } from "@prisma/client";
 
 export type CreateRoleInput = {
@@ -25,7 +26,12 @@ export class RoleRepository {
       include: {
         _count: {
           select: {
-            userRoles: { where: { deletedAt: null } },
+            userRoles: {
+              where: {
+                deletedAt: null,
+                user: linkedUserFilter,
+              },
+            },
             rolePermissions: true,
           },
         },

@@ -8,6 +8,7 @@ import {
   updateUserSchema,
   assignRoleSchema,
   removeRoleSchema,
+  listUsersQuerySchema,
 } from "../schemas/user.schema";
 
 const router = Router();
@@ -38,6 +39,11 @@ const userController = new UserController();
  *         schema:
  *           type: string
  *         description: Search by name, email, or employee ID
+ *       - in: query
+ *         name: includeDeleted
+ *         schema:
+ *           type: boolean
+ *         description: Include soft-deleted users (Super Administrator only)
  *     responses:
  *       200:
  *         description: List of users
@@ -46,7 +52,13 @@ const userController = new UserController();
  *       403:
  *         description: Insufficient permissions (requires user.read)
  */
-router.get("/", requireAuth, requirePermission("user.read"), userController.getUsers);
+router.get(
+  "/",
+  requireAuth,
+  requirePermission("user.read"),
+  validate(listUsersQuerySchema, "query"),
+  userController.getUsers,
+);
 
 /**
  * @swagger

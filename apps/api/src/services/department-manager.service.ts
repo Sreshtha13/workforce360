@@ -1,4 +1,5 @@
 import { prisma } from "../lib/prisma";
+import { linkedUserFilter } from "../lib/organization-metrics";
 
 const userManagerSelect = {
   id: true,
@@ -34,11 +35,12 @@ export class DepartmentManagerService {
       if (visited.has(currentId)) break;
       visited.add(currentId);
 
-      const current = await prisma.user.findUnique({
-        where: { id: currentId },
+      const current = await prisma.user.findFirst({
+        where: { id: currentId, ...linkedUserFilter },
         select: { managerId: true },
       });
-      currentId = current?.managerId ?? null;
+      if (!current) break;
+      currentId = current.managerId ?? null;
     }
   }
 
@@ -115,8 +117,17 @@ export class DepartmentManagerService {
       return null;
     }
 
-    await this.validateNoReportingCycle(userId, department.managerId);
-    return department.managerId;
+    const manager = await prisma.user.findFirst({
+      where: { id: department.managerId, ...linkedUserFilter, status: "active" },
+      select: { id: true },
+    });
+
+    if (!manager) {
+      return null;
+    }
+
+    await this.validateNoReportingCycle(userId, manager.id);
+    return manager.id;
   }
 
   /** Clear reporting manager when leaving a department whose head was the manager. */

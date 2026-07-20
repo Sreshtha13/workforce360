@@ -1,8 +1,11 @@
 import { prisma } from "../lib/prisma";
 import {
   activeEmployeeFilter,
+  activeUserSummarySelect,
   buildDesignationMetrics,
   getDepartmentMetricsByIds,
+  linkedUserFilter,
+  sanitizeUserReference,
 } from "../lib/organization-metrics";
 import type { Department, Team, Designation, Office, EmployeeType, EmploymentStatus } from "@prisma/client";
 
@@ -63,7 +66,7 @@ export class OrganizationRepository {
     const departments = await prisma.department.findMany({
       where: { deletedAt: null, ...(companyId && { companyId }) },
       include: {
-        manager: { select: { id: true, firstName: true, lastName: true, email: true } },
+        manager: { select: activeUserSummarySelect },
         parent: { select: { id: true, name: true } },
       },
       orderBy: { createdAt: "desc" },
@@ -73,6 +76,7 @@ export class OrganizationRepository {
 
     return departments.map((department) => ({
       ...department,
+      manager: sanitizeUserReference(department.manager),
       metrics: metricsByDepartment.get(department.id) ?? {
         totalEmployees: 0,
         managers: 0,
@@ -83,15 +87,24 @@ export class OrganizationRepository {
   }
   
   async findDepartmentById(id: string) {
-    return prisma.department.findUnique({
+    const department = await prisma.department.findUnique({
       where: { id, deletedAt: null },
       include: {
-        manager: { select: { id: true, firstName: true, lastName: true, email: true } },
+        manager: { select: activeUserSummarySelect },
         parent: { select: { id: true, name: true } },
         children: { where: { deletedAt: null } },
         teams: { where: { deletedAt: null } },
       },
     });
+
+    if (!department) {
+      return null;
+    }
+
+    return {
+      ...department,
+      manager: sanitizeUserReference(department.manager),
+    };
   }
   
   async createDepartment(data: CreateDepartmentData): Promise<Department> {
@@ -110,31 +123,45 @@ export class OrganizationRepository {
   }
   
   async findAllTeams(departmentId?: string) {
-    return prisma.team.findMany({
+    const teams = await prisma.team.findMany({
       where: { deletedAt: null, ...(departmentId && { departmentId }) },
       include: {
         department: { select: { id: true, name: true } },
-        lead: { select: { id: true, firstName: true, lastName: true, email: true } },
-        _count: { select: { members: true } },
+        lead: { select: activeUserSummarySelect },
+        _count: { select: { members: { where: { deletedAt: null, user: linkedUserFilter } } } },
       },
       orderBy: { createdAt: "desc" },
     });
+
+    return teams.map((team) => ({
+      ...team,
+      lead: sanitizeUserReference(team.lead),
+    }));
   }
   
   async findTeamById(id: string) {
-    return prisma.team.findUnique({
+    const team = await prisma.team.findUnique({
       where: { id, deletedAt: null },
       include: {
         department: { select: { id: true, name: true } },
-        lead: { select: { id: true, firstName: true, lastName: true, email: true } },
+        lead: { select: activeUserSummarySelect },
         members: {
-          where: { deletedAt: null },
+          where: { deletedAt: null, user: linkedUserFilter },
           include: {
             user: { select: { id: true, firstName: true, lastName: true, email: true } },
           },
         },
       },
     });
+
+    if (!team) {
+      return null;
+    }
+
+    return {
+      ...team,
+      lead: sanitizeUserReference(team.lead),
+    };
   }
   
   async createTeam(data: CreateTeamData): Promise<Team> {
@@ -222,7 +249,7 @@ export class OrganizationRepository {
     return prisma.office.findMany({
       where: { deletedAt: null, ...(companyId && { companyId }) },
       include: {
-        _count: { select: { users: true } },
+        _count: { select: { users: { where: linkedUserFilter } } },
       },
       orderBy: { createdAt: "desc" },
     });
@@ -253,7 +280,7 @@ export class OrganizationRepository {
     return prisma.employeeType.findMany({
       where: { deletedAt: null },
       include: {
-        _count: { select: { users: true } },
+        _count: { select: { users: { where: linkedUserFilter } } },
       },
       orderBy: { name: "asc" },
     });
@@ -284,7 +311,7 @@ export class OrganizationRepository {
     return prisma.employmentStatus.findMany({
       where: { deletedAt: null },
       include: {
-        _count: { select: { users: true } },
+        _count: { select: { users: { where: linkedUserFilter } } },
       },
       orderBy: { name: "asc" },
     });

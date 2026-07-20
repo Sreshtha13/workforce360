@@ -6,6 +6,34 @@ export const linkedUserFilter = { deletedAt: null } as const;
 /** Active employees only (non-deleted, active status). */
 export const activeEmployeeFilter = { deletedAt: null, status: "active" } as const;
 
+export const activeUserSummarySelect = {
+  id: true,
+  firstName: true,
+  lastName: true,
+  email: true,
+  deletedAt: true,
+} as const;
+
+type UserSummary = {
+  id: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  deletedAt?: Date | null;
+};
+
+/** Hide soft-deleted users from relation payloads shown in UI dropdowns and tables. */
+export function sanitizeUserReference<T extends UserSummary | null | undefined>(
+  user: T,
+): T extends UserSummary ? Omit<UserSummary, "deletedAt"> | null : null {
+  if (!user || user.deletedAt) {
+    return null as T extends UserSummary ? Omit<UserSummary, "deletedAt"> | null : null;
+  }
+
+  const { deletedAt: _deletedAt, ...rest } = user;
+  return rest as T extends UserSummary ? Omit<UserSummary, "deletedAt"> | null : null;
+}
+
 export type DepartmentMetrics = {
   totalEmployees: number;
   managers: number;

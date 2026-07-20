@@ -1,6 +1,10 @@
 import { prisma } from "../lib/prisma";
 import type { User, UserRole } from "@prisma/client";
 import { findHighestEmployeeId } from "../lib/employee-id";
+import {
+  activeUserSummarySelect,
+  sanitizeUserReference,
+} from "../lib/organization-metrics";
 
 export type CreateUserInput = {
   email: string;
@@ -29,10 +33,11 @@ export class UserRepository {
     departmentId?: string;
     status?: string;
     search?: string;
+    includeDeleted?: boolean;
   }) {
-    return prisma.user.findMany({
+    const rows = await prisma.user.findMany({
       where: {
-        deletedAt: null,
+        ...(filters?.includeDeleted ? {} : { deletedAt: null }),
         ...(filters?.departmentId && { departmentId: filters.departmentId }),
         ...(filters?.status && { status: filters.status }),
         ...(filters?.search && {
@@ -54,12 +59,13 @@ export class UserRepository {
         status: true,
         employeeId: true,
         dateOfJoining: true,
+        deletedAt: true,
         department: { select: { id: true, name: true, managerId: true } },
         designation: { select: { id: true, name: true } },
         office: { select: { id: true, name: true } },
         employeeType: { select: { id: true, name: true, code: true } },
         employmentStatus: { select: { id: true, name: true } },
-        manager: { select: { id: true, firstName: true, lastName: true, email: true } },
+        manager: { select: activeUserSummarySelect },
         managedDepartments: {
           where: { deletedAt: null },
           select: { id: true, name: true },
@@ -71,12 +77,17 @@ export class UserRepository {
         createdAt: true,
         updatedAt: true,
       },
-      orderBy: { createdAt: "desc" },
+      orderBy: [{ deletedAt: "asc" }, { createdAt: "desc" }],
     });
+
+    return rows.map((row) => ({
+      ...row,
+      manager: sanitizeUserReference(row.manager),
+    }));
   }
   
   async findUserById(id: string) {
-    return prisma.user.findUnique({
+    const user = await prisma.user.findUnique({
       where: { id, deletedAt: null },
       include: {
         department: true,
@@ -84,7 +95,7 @@ export class UserRepository {
         office: true,
         employeeType: true,
         employmentStatus: true,
-        manager: { select: { id: true, firstName: true, lastName: true, email: true } },
+        manager: { select: activeUserSummarySelect },
         managedDepartments: {
           where: { deletedAt: null },
           select: { id: true, name: true },
@@ -95,6 +106,15 @@ export class UserRepository {
         },
       },
     });
+
+    if (!user) {
+      return null;
+    }
+
+    return {
+      ...user,
+      manager: sanitizeUserReference(user.manager),
+    };
   }
   
   async createUser(data: CreateUserInput): Promise<User> {
@@ -102,14 +122,37 @@ export class UserRepository {
   }
   
   async updateUser(id: string, data: UpdateUserInput): Promise<User> {
-    return prisma.user.update({ where: { id }, data });
+    return prisma.user.update({
+      where: { id, deletedAt: null },
+      data,
+    });
   }
   
   async deleteUser(id: string): Promise<User> {
     return prisma.user.update({
-      where: { id },
-      data: { deletedAt: new Date() },
+      where: { id, deletedAt: null },
+      data: {
+        deletedAt: new Date(),
+        status: "deleted",
+      },
     });
+  }
+
+  async clearUserAssignments(id: string): Promise<void> {
+    await prisma.$transaction([
+      prisma.department.updateMany({
+        where: { managerId: id, deletedAt: null },
+        data: { managerId: null },
+      }),
+      prisma.team.updateMany({
+        where: { leadId: id, deletedAt: null },
+        data: { leadId: null },
+      }),
+      prisma.user.updateMany({
+        where: { managerId: id, deletedAt: null },
+        data: { managerId: null },
+      }),
+    ]);
   }
   
   async assignRole(userId: string, roleId: string, assignedBy?: string): Promise<UserRole> {
