@@ -115,8 +115,28 @@ All domain endpoints live under \`/api/...\`. Use this Swagger UI to browse and 
         description: "Role and permission management",
       },
       {
-        name: "Organization",
-        description: "Organization structure (departments, teams, offices, etc.)",
+        name: "Organization - Departments",
+        description: "Company departments and hierarchy",
+      },
+      {
+        name: "Organization - Teams",
+        description: "Teams within departments",
+      },
+      {
+        name: "Organization - Designations",
+        description: "Job titles and levels by department",
+      },
+      {
+        name: "Organization - Offices",
+        description: "Office locations and branches",
+      },
+      {
+        name: "Organization - Employee Types",
+        description: "Employment classifications (Full-Time, Contract, etc.)",
+      },
+      {
+        name: "Organization - Employment Statuses",
+        description: "Employment lifecycle statuses (Active, On Leave, etc.)",
       },
     ],
   },
