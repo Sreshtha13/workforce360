@@ -152,7 +152,8 @@ export class OrganizationController {
   
   getDesignations = async (req: Request, res: Response): Promise<void> => {
     try {
-      const designations = await this.orgService.getAllDesignations();
+      const { departmentId } = req.query;
+      const designations = await this.orgService.getAllDesignations(departmentId as string | undefined);
       sendSuccess(res, designations);
     } catch (error) {
       sendError(res, 500, {

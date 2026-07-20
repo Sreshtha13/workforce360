@@ -186,10 +186,10 @@ export class OrganizationService {
     return this.orgRepo.deleteTeam(id);
   }
   
-  async getAllDesignations() {
-    return this.orgRepo.findAllDesignations();
+  async getAllDesignations(departmentId?: string) {
+    return this.orgRepo.findAllDesignations(departmentId);
   }
-  
+
   async getDesignationById(id: string) {
     const designation = await this.orgRepo.findDesignationById(id);
     if (!designation) {
@@ -197,17 +197,54 @@ export class OrganizationService {
     }
     return designation;
   }
-  
-  async createDesignation(data: CreateDesignationData) {
-    return this.orgRepo.createDesignation(data);
+
+  private async validateDesignationDepartment(departmentId: string): Promise<void> {
+    const department = await this.orgRepo.findDepartmentById(departmentId);
+    if (!department) {
+      throw new Error("Department not found");
+    }
   }
-  
+
+  private mapDesignationWriteError(error: unknown): Error {
+    if (error instanceof Prisma.PrismaClientKnownRequestError) {
+      if (error.code === "P2002") {
+        return new Error("A designation with this code already exists");
+      }
+      if (error.code === "P2003") {
+        return new Error("Invalid department reference");
+      }
+    }
+
+    return error instanceof Error ? error : new Error("Failed to save designation");
+  }
+
+  async createDesignation(data: CreateDesignationData) {
+    await this.validateDesignationDepartment(data.departmentId);
+
+    try {
+      const designation = await this.orgRepo.createDesignation(data);
+      return this.orgRepo.findDesignationById(designation.id);
+    } catch (error) {
+      throw this.mapDesignationWriteError(error);
+    }
+  }
+
   async updateDesignation(id: string, data: Partial<CreateDesignationData>) {
     const existing = await this.orgRepo.findDesignationById(id);
     if (!existing) {
       throw new Error("Designation not found");
     }
-    return this.orgRepo.updateDesignation(id, data);
+
+    if (data.departmentId) {
+      await this.validateDesignationDepartment(data.departmentId);
+    }
+
+    try {
+      await this.orgRepo.updateDesignation(id, data);
+      return this.orgRepo.findDesignationById(id);
+    } catch (error) {
+      throw this.mapDesignationWriteError(error);
+    }
   }
   
   async deleteDesignation(id: string) {

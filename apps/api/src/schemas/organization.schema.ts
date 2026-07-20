@@ -33,10 +33,18 @@ export const updateTeamSchema = createTeamSchema.partial().extend({
   leadId: nullableTeamLeadId,
 });
 
+export const DESIGNATION_LEVEL_MIN = 1;
+export const DESIGNATION_LEVEL_MAX = 5;
+
 export const createDesignationSchema = z.object({
+  departmentId: z.string().min(1, "Department is required"),
   name: z.string().min(1).max(255),
   code: z.string().max(50).optional(),
-  level: z.number().int().optional(),
+  level: z
+    .number()
+    .int("Level must be a whole number")
+    .min(DESIGNATION_LEVEL_MIN, "Level must be at least L1")
+    .max(DESIGNATION_LEVEL_MAX, "Level must be at most L5"),
   description: z.string().optional(),
 });
 

@@ -382,8 +382,10 @@ export const apiClient = {
     },
     
     designations: {
-      list: () =>
-        request<any[]>("/api/organization/designations"),
+      list: (departmentId?: string) =>
+        request<any[]>(
+          `/api/organization/designations${departmentId ? `?departmentId=${encodeURIComponent(departmentId)}` : ""}`,
+        ),
       get: (id: string) =>
         request<any>(`/api/organization/designations/${id}`),
       create: (data: any) =>

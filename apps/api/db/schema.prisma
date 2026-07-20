@@ -70,8 +70,9 @@ model Department {
   manager     User?        @relation("DepartmentManager", fields: [managerId], references: [id])
   parent      Department?  @relation("DepartmentHierarchy", fields: [parentId], references: [id])
   children    Department[] @relation("DepartmentHierarchy")
-  teams       Team[]
-  users       User[]
+  teams         Team[]
+  users         User[]
+  designations  Designation[]
 
   @@unique([companyId, code])
   @@index([companyId])
@@ -123,18 +124,21 @@ model TeamMember {
 }
 
 model Designation {
-  id          String    @id @default(cuid())
-  name        String
-  code        String?   @unique
-  level       Int?
-  description String?
-  isActive    Boolean   @default(true) @map("is_active")
-  createdAt   DateTime  @default(now()) @map("created_at")
-  updatedAt   DateTime  @updatedAt @map("updated_at")
-  deletedAt   DateTime? @map("deleted_at")
+  id           String    @id @default(cuid())
+  departmentId String    @map("department_id")
+  name         String
+  code         String?   @unique
+  level        Int
+  description  String?
+  isActive     Boolean   @default(true) @map("is_active")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+  deletedAt    DateTime? @map("deleted_at")
 
-  users       User[]
+  department   Department @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+  users        User[]
 
+  @@index([departmentId])
   @@map("designations")
 }
 

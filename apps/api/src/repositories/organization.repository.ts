@@ -19,9 +19,10 @@ export type CreateTeamData = {
 };
 
 export type CreateDesignationData = {
+  departmentId: string;
   name: string;
   code?: string;
-  level?: number;
+  level: number;
   description?: string;
 };
 
@@ -134,19 +135,32 @@ export class OrganizationRepository {
     });
   }
   
-  async findAllDesignations() {
+  async findAllDesignations(departmentId?: string) {
     return prisma.designation.findMany({
-      where: { deletedAt: null },
+      where: { deletedAt: null, ...(departmentId && { departmentId }) },
       include: {
-        _count: { select: { users: true } },
+        department: { select: { id: true, name: true } },
+        _count: {
+          select: {
+            users: { where: { deletedAt: null } },
+          },
+        },
       },
-      orderBy: [{ level: "asc" }, { name: "asc" }],
+      orderBy: [{ department: { name: "asc" } }, { level: "asc" }, { name: "asc" }],
     });
   }
-  
+
   async findDesignationById(id: string) {
     return prisma.designation.findUnique({
       where: { id, deletedAt: null },
+      include: {
+        department: { select: { id: true, name: true } },
+        _count: {
+          select: {
+            users: { where: { deletedAt: null } },
+          },
+        },
+      },
     });
   }
   

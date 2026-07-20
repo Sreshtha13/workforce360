@@ -285,6 +285,12 @@
  *     security:
  *       - cookieAuth: []
  *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: departmentId
+ *         schema:
+ *           type: string
+ *         description: Filter by department ID
  *     responses:
  *       200:
  *         description: List of designations
@@ -300,11 +306,12 @@
  *         application/json:
  *           schema:
  *             type: object
- *             required: [name]
+ *             required: [departmentId, name, level]
  *             properties:
+ *               departmentId: { type: string, example: dept_engineering }
  *               name: { type: string, example: Software Engineer }
  *               code: { type: string, example: SE }
- *               level: { type: integer, example: 3 }
+ *               level: { type: integer, minimum: 1, maximum: 5, example: 1, description: "Hierarchy level (1=L1 … 5=L5)" }
  *               description: { type: string }
  *     responses:
  *       201:
@@ -347,9 +354,10 @@
  *           schema:
  *             type: object
  *             properties:
+ *               departmentId: { type: string }
  *               name: { type: string }
  *               code: { type: string }
- *               level: { type: integer }
+ *               level: { type: integer, minimum: 1, maximum: 5 }
  *               description: { type: string }
  *     responses:
  *       200:
