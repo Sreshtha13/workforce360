@@ -10,6 +10,8 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
+import { glass } from "@/lib/design-system";
+import { cn } from "@/lib/utils";
 
 type FormSheetProps = {
   open: boolean;
@@ -36,20 +38,23 @@ export function FormSheet({
 }: FormSheetProps) {
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="w-full sm:max-w-lg">
-        <SheetHeader>
-          <SheetTitle>{title}</SheetTitle>
+      <SheetContent
+        side="right"
+        className={cn(glass.nav, "w-full border-l-0 sm:max-w-lg")}
+      >
+        <SheetHeader className="border-b border-white/10 pb-4 dark:border-white/5">
+          <SheetTitle className="text-lg">{title}</SheetTitle>
           {description && <SheetDescription>{description}</SheetDescription>}
         </SheetHeader>
         <form
-          className="flex flex-1 flex-col gap-4 overflow-y-auto px-4 pb-4"
+          className="flex flex-1 flex-col gap-5 overflow-y-auto px-1 py-4"
           onSubmit={(e) => {
             e.preventDefault();
             onSubmit();
           }}
         >
           {children}
-          <SheetFooter className="mt-auto flex-row justify-end gap-2 px-0">
+          <SheetFooter className="mt-auto flex-row justify-end gap-2 border-t border-white/10 pt-4 dark:border-white/5">
             <Button
               type="button"
               variant="outline"
@@ -62,6 +67,7 @@ export function FormSheet({
               type="submit"
               variant={destructive ? "destructive" : "default"}
               disabled={loading}
+              className="min-w-[100px]"
             >
               {loading ? "Saving..." : submitLabel}
             </Button>

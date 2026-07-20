@@ -4,11 +4,12 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
 import { apiClient, ApiClientError } from "@/lib/api-client";
+import { AuthLayout } from "@/components/design-system/auth-layout";
+import { LoadingSkeleton } from "@/components/design-system/loading-skeleton";
+import { AlertBanner } from "@/components/admin/admin-states";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { typographyScale } from "@/lib/design-tokens";
-import { cn } from "@/lib/utils";
 
 function ResetPasswordForm() {
   const searchParams = useSearchParams();
@@ -45,25 +46,32 @@ function ResetPasswordForm() {
   };
 
   return (
-    <div className="w-full max-w-md space-y-6 rounded-lg border border-border bg-card p-8 shadow-sm">
-      <div>
-        <h1 className={typographyScale.title.className}>Reset password</h1>
-        <p className={cn(typographyScale.body.className, "mt-2 text-muted-foreground")}>
-          Choose a new password for your account.
-        </p>
-      </div>
-
-      <form onSubmit={handleSubmit} className="space-y-4">
-        {error && <div className="rounded-md bg-red-50 p-3 text-sm text-red-800">{error}</div>}
-        {message && <div className="rounded-md bg-green-50 p-3 text-sm text-green-800">{message}</div>}
+    <AuthLayout title="Reset password" subtitle="Choose a new password for your account.">
+      <form onSubmit={handleSubmit} className="space-y-5">
+        {error && <AlertBanner variant="error" message={error} />}
+        {message && <AlertBanner variant="success" message={message} />}
 
         <div className="space-y-2">
           <Label htmlFor="password">New password</Label>
-          <Input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={8} />
+          <Input
+            id="password"
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+            minLength={8}
+          />
         </div>
         <div className="space-y-2">
           <Label htmlFor="confirm">Confirm password</Label>
-          <Input id="confirm" type="password" value={confirm} onChange={(e) => setConfirm(e.target.value)} required minLength={8} />
+          <Input
+            id="confirm"
+            type="password"
+            value={confirm}
+            onChange={(e) => setConfirm(e.target.value)}
+            required
+            minLength={8}
+          />
         </div>
 
         <Button type="submit" disabled={loading} className="w-full">
@@ -71,19 +79,26 @@ function ResetPasswordForm() {
         </Button>
       </form>
 
-      <Link href="/login" className="text-sm text-brand-600 hover:text-brand-700">
+      <Link
+        href="/login"
+        className="mt-6 inline-block text-sm font-medium text-brand-700 hover:text-brand-600 dark:text-brand-300"
+      >
         Back to login
       </Link>
-    </div>
+    </AuthLayout>
   );
 }
 
 export default function ResetPasswordPage() {
   return (
-    <div className="flex min-h-screen items-center justify-center p-4">
-      <Suspense fallback={<p>Loading...</p>}>
-        <ResetPasswordForm />
-      </Suspense>
-    </div>
+    <Suspense
+      fallback={
+        <div className="auth-canvas flex min-h-screen items-center justify-center p-4">
+          <LoadingSkeleton variant="card" className="w-full max-w-md" />
+        </div>
+      }
+    >
+      <ResetPasswordForm />
+    </Suspense>
   );
 }

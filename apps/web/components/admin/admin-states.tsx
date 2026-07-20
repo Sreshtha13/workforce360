@@ -1,6 +1,9 @@
+import { AlertCircle, CheckCircle2, Info } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { typographyScale } from "@/lib/design-tokens";
+import { statusSurface } from "@/lib/design-system";
 import { Button } from "@/components/ui/button";
+import { EmptyState as DSEmptyState } from "@/components/design-system/empty-state";
+import { LoadingState, LoadingSkeleton } from "@/components/design-system/loading-skeleton";
 
 type AlertBannerProps = {
   variant?: "error" | "success" | "info";
@@ -8,25 +11,35 @@ type AlertBannerProps = {
   onDismiss?: () => void;
 };
 
+const alertStyles = {
+  error: statusSurface.error,
+  success: statusSurface.success,
+  info: statusSurface.info,
+} as const;
+
+const alertIcons = {
+  error: AlertCircle,
+  success: CheckCircle2,
+  info: Info,
+} as const;
+
 export function AlertBanner({
   variant = "info",
   message,
   onDismiss,
 }: AlertBannerProps) {
-  const styles = {
-    error: "bg-red-50 text-red-800 border-red-200",
-    success: "bg-green-50 text-green-800 border-green-200",
-    info: "bg-blue-50 text-blue-800 border-blue-200",
-  };
+  const Icon = alertIcons[variant];
 
   return (
     <div
+      role="alert"
       className={cn(
-        "flex items-start justify-between gap-3 rounded-md border p-3 text-sm",
-        styles[variant],
+        "flex items-start gap-3 rounded-xl p-4 text-sm",
+        alertStyles[variant],
       )}
     >
-      <p>{message}</p>
+      <Icon className="mt-0.5 size-4 shrink-0" aria-hidden />
+      <p className="flex-1 leading-relaxed">{message}</p>
       {onDismiss && (
         <Button variant="ghost" size="xs" onClick={onDismiss}>
           Dismiss
@@ -43,36 +56,11 @@ type EmptyStateProps = {
   onAction?: () => void;
 };
 
-export function EmptyState({
-  title,
-  description,
-  actionLabel,
-  onAction,
-}: EmptyStateProps) {
-  return (
-    <div className="rounded-lg border border-dashed border-border p-12 text-center">
-      <p className={typographyScale.body.className}>{title}</p>
-      {description && (
-        <p className={cn(typographyScale.caption.className, "mt-1 text-muted-foreground")}>
-          {description}
-        </p>
-      )}
-      {actionLabel && onAction && (
-        <Button className="mt-4" onClick={onAction}>
-          {actionLabel}
-        </Button>
-      )}
-    </div>
-  );
+export function EmptyState(props: EmptyStateProps) {
+  return <DSEmptyState {...props} />;
 }
 
-export function LoadingState({ message = "Loading..." }: { message?: string }) {
-  return (
-    <div className="flex min-h-[200px] items-center justify-center rounded-lg border border-border bg-card">
-      <p className={typographyScale.body.className}>{message}</p>
-    </div>
-  );
-}
+export { LoadingState, LoadingSkeleton };
 
 export function ErrorState({
   message,
@@ -82,8 +70,8 @@ export function ErrorState({
   onRetry?: () => void;
 }) {
   return (
-    <div className="rounded-md border border-red-200 bg-red-50 p-4">
-      <p className="text-sm text-red-800">{message}</p>
+    <div className={cn("rounded-xl p-4", statusSurface.error)}>
+      <p className="text-sm leading-relaxed">{message}</p>
       {onRetry && (
         <Button variant="outline" size="sm" className="mt-3" onClick={onRetry}>
           Try again

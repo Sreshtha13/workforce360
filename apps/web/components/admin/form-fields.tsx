@@ -2,6 +2,8 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { typographyScale } from "@/lib/design-tokens";
+import { cn } from "@/lib/utils";
 
 type FormFieldProps = {
   label: string;
@@ -12,6 +14,8 @@ type FormFieldProps = {
   placeholder?: string;
   required?: boolean;
   disabled?: boolean;
+  helperText?: string;
+  error?: string;
 };
 
 export function FormField({
@@ -23,6 +27,8 @@ export function FormField({
   placeholder,
   required,
   disabled,
+  helperText,
+  error,
 }: FormFieldProps) {
   return (
     <div className="space-y-2">
@@ -36,7 +42,19 @@ export function FormField({
         placeholder={placeholder}
         required={required}
         disabled={disabled}
+        aria-invalid={!!error}
+        aria-describedby={error ? `${name}-error` : helperText ? `${name}-helper` : undefined}
       />
+      {helperText && !error && (
+        <p id={`${name}-helper`} className={typographyScale.helper.className}>
+          {helperText}
+        </p>
+      )}
+      {error && (
+        <p id={`${name}-error`} className={cn(typographyScale.helper.className, "text-destructive")}>
+          {error}
+        </p>
+      )}
     </div>
   );
 }
@@ -50,6 +68,7 @@ type FormSelectProps = {
   placeholder?: string;
   required?: boolean;
   disabled?: boolean;
+  helperText?: string;
 };
 
 export function FormSelect({
@@ -61,6 +80,7 @@ export function FormSelect({
   placeholder = "Select...",
   required,
   disabled,
+  helperText,
 }: FormSelectProps) {
   return (
     <div className="space-y-2">
@@ -80,6 +100,9 @@ export function FormSelect({
           </option>
         ))}
       </Select>
+      {helperText && (
+        <p className={typographyScale.helper.className}>{helperText}</p>
+      )}
     </div>
   );
 }
@@ -91,6 +114,7 @@ type FormTextareaProps = {
   onChange: (value: string) => void;
   placeholder?: string;
   rows?: number;
+  helperText?: string;
 };
 
 export function FormTextarea({
@@ -100,6 +124,7 @@ export function FormTextarea({
   onChange,
   placeholder,
   rows = 3,
+  helperText,
 }: FormTextareaProps) {
   return (
     <div className="space-y-2">
@@ -112,6 +137,9 @@ export function FormTextarea({
         placeholder={placeholder}
         rows={rows}
       />
+      {helperText && (
+        <p className={typographyScale.helper.className}>{helperText}</p>
+      )}
     </div>
   );
 }

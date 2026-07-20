@@ -1,4 +1,14 @@
 import { cn } from "@/lib/utils";
+import { glass, motion } from "@/lib/design-system";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { EmptyState } from "@/components/design-system/empty-state";
 
 type Column<T> = {
   key: string;
@@ -12,6 +22,9 @@ type DataTableProps<T> = {
   data: T[];
   rowKey: (row: T) => string;
   emptyMessage?: string;
+  emptyTitle?: string;
+  onEmptyAction?: () => void;
+  emptyActionLabel?: string;
 };
 
 export function DataTable<T>({
@@ -19,42 +32,48 @@ export function DataTable<T>({
   data,
   rowKey,
   emptyMessage = "No records found",
+  emptyTitle = "Nothing here yet",
+  onEmptyAction,
+  emptyActionLabel,
 }: DataTableProps<T>) {
   if (data.length === 0) {
     return (
-      <div className="rounded-lg border border-border bg-card p-8 text-center text-sm text-muted-foreground">
-        {emptyMessage}
-      </div>
+      <EmptyState
+        title={emptyTitle}
+        description={emptyMessage}
+        actionLabel={emptyActionLabel}
+        onAction={onEmptyAction}
+      />
     );
   }
 
   return (
-    <div className="overflow-x-auto rounded-lg border border-border bg-card">
-      <table className="w-full min-w-[640px]">
-        <thead className="border-b border-border bg-muted/50">
-          <tr>
+    <div className={cn(glass.panel, motion.fadeIn, "overflow-hidden p-0")}>
+      <Table>
+        <TableHeader className="sticky top-0 z-10 bg-white/50 backdrop-blur-xl dark:bg-zinc-900/70">
+          <TableRow className="border-white/10 hover:bg-transparent dark:border-white/5">
             {columns.map((col) => (
-              <th
-                key={col.key}
-                className={cn("p-3 text-left text-sm font-medium", col.className)}
-              >
+              <TableHead key={col.key} className={col.className}>
                 {col.header}
-              </th>
+              </TableHead>
             ))}
-          </tr>
-        </thead>
-        <tbody>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
           {data.map((row) => (
-            <tr key={rowKey(row)} className="border-b border-border last:border-0">
+            <TableRow
+              key={rowKey(row)}
+              className="border-white/10 transition-colors dark:border-white/5"
+            >
               {columns.map((col) => (
-                <td key={col.key} className={cn("p-3 align-top text-sm", col.className)}>
+                <TableCell key={col.key} className={col.className}>
                   {col.render(row)}
-                </td>
+                </TableCell>
               ))}
-            </tr>
+            </TableRow>
           ))}
-        </tbody>
-      </table>
+        </TableBody>
+      </Table>
     </div>
   );
 }

@@ -3,6 +3,7 @@
 import { useEffect, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
+import { PageContainer } from "@/components/design-system/page-container";
 import { DashboardShell } from "@/components/layout/dashboard-shell";
 import { LoadingState } from "@/components/admin/admin-states";
 
@@ -18,7 +19,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
 
   if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center p-8">
+      <div className="app-canvas flex min-h-screen items-center justify-center p-8">
         <LoadingState message="Checking session..." />
       </div>
     );
@@ -28,5 +29,9 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
     return null;
   }
 
-  return <DashboardShell>{children}</DashboardShell>;
+  return (
+    <DashboardShell>
+      <PageContainer canvas={false}>{children}</PageContainer>
+    </DashboardShell>
+  );
 }

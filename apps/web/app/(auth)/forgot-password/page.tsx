@@ -3,11 +3,11 @@
 import Link from "next/link";
 import { useState } from "react";
 import { apiClient, ApiClientError } from "@/lib/api-client";
+import { AuthLayout } from "@/components/design-system/auth-layout";
+import { AlertBanner } from "@/components/admin/admin-states";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { typographyScale } from "@/lib/design-tokens";
-import { cn } from "@/lib/utils";
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("");
@@ -31,33 +31,36 @@ export default function ForgotPasswordPage() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center p-4">
-      <div className="w-full max-w-md space-y-6 rounded-lg border border-border bg-card p-8 shadow-sm">
-        <div>
-          <h1 className={typographyScale.title.className}>Forgot password</h1>
-          <p className={cn(typographyScale.body.className, "mt-2 text-muted-foreground")}>
-            Enter your email and we&apos;ll send reset instructions.
-          </p>
+    <AuthLayout
+      title="Forgot password"
+      subtitle="Enter your email and we'll send reset instructions."
+    >
+      <form onSubmit={handleSubmit} className="space-y-5">
+        {error && <AlertBanner variant="error" message={error} />}
+        {message && <AlertBanner variant="success" message={message} />}
+
+        <div className="space-y-2">
+          <Label htmlFor="email">Email</Label>
+          <Input
+            id="email"
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+          />
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          {error && <div className="rounded-md bg-red-50 p-3 text-sm text-red-800">{error}</div>}
-          {message && <div className="rounded-md bg-green-50 p-3 text-sm text-green-800">{message}</div>}
+        <Button type="submit" disabled={loading} className="w-full">
+          {loading ? "Sending..." : "Send reset link"}
+        </Button>
+      </form>
 
-          <div className="space-y-2">
-            <Label htmlFor="email">Email</Label>
-            <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
-          </div>
-
-          <Button type="submit" disabled={loading} className="w-full">
-            {loading ? "Sending..." : "Send reset link"}
-          </Button>
-        </form>
-
-        <Link href="/login" className="text-sm text-brand-600 hover:text-brand-700">
-          Back to login
-        </Link>
-      </div>
-    </div>
+      <Link
+        href="/login"
+        className="mt-6 inline-block text-sm font-medium text-brand-700 hover:text-brand-600 dark:text-brand-300"
+      >
+        Back to login
+      </Link>
+    </AuthLayout>
   );
 }
