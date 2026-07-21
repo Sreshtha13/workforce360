@@ -54,7 +54,11 @@ export default function RolesAdminPage() {
     null,
   );
 
-  const canView = hasPermission("role.read");
+  const canView =
+    hasPermission("role.read") ||
+    hasPermission("role.create") ||
+    hasPermission("role.update") ||
+    hasPermission("role.delete");
   const canCreate = hasPermission("role.create");
   const canUpdate = hasPermission("role.update");
   const canDelete = hasPermission("role.delete");
