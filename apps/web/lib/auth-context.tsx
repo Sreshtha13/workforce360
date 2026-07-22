@@ -9,8 +9,7 @@ import {
 } from "react";
 import { useRouter } from "next/navigation";
 import { apiClient, ApiClientError } from "./api-client";
-
-import type { AuthUser } from "@/types/auth";
+import type { AuthUser } from "@/types/entities";
 import { isSuperAdmin as checkIsSuperAdmin } from "./super-admin";
 
 export type { AuthUser };

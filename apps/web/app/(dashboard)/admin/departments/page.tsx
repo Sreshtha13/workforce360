@@ -17,6 +17,7 @@ import { FormSheet } from "@/components/admin/form-sheet";
 import { FormField, FormSelect, FormTextarea } from "@/components/admin/form-fields";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import type { CreateDepartmentInput, Department, UpdateDepartmentInput, UserSummary } from "@/types/entities";
 
 type DepartmentMetrics = {
   totalEmployees: number;
@@ -25,12 +26,7 @@ type DepartmentMetrics = {
   usersCount: number;
 };
 
-type Department = {
-  id: string;
-  name: string;
-  code?: string;
-  description?: string;
-  isActive: boolean;
+type DepartmentRow = Department & {
   manager?: { id: string; firstName: string; lastName: string };
   parent?: { id: string; name: string };
   metrics: DepartmentMetrics;
@@ -48,7 +44,7 @@ export default function DepartmentsPage() {
   const { hasPermission } = useAuth();
   const queryClient = useQueryClient();
   const [sheetOpen, setSheetOpen] = useState(false);
-  const [editing, setEditing] = useState<Department | null>(null);
+  const [editing, setEditing] = useState<DepartmentRow | null>(null);
   const [form, setForm] = useState(emptyForm);
   const [feedback, setFeedback] = useState<{ type: "success" | "error"; message: string } | null>(null);
 
@@ -60,7 +56,7 @@ export default function DepartmentsPage() {
     queryKey: ["departments"],
     queryFn: async () => {
       const res = await apiClient.organization.departments.list();
-      return (res.data ?? []) as Department[];
+      return (res.data ?? []) as DepartmentRow[];
     },
   });
 
@@ -80,16 +76,16 @@ export default function DepartmentsPage() {
 
   const saveMutation = useMutation({
     mutationFn: async () => {
-      const payload = {
+      const payload: UpdateDepartmentInput = {
         companyId: DEFAULT_COMPANY_ID,
         name: form.name,
         code: form.code || undefined,
         description: form.description || undefined,
-        managerId: form.managerId || null,
-        parentId: form.parentId || null,
+        managerId: form.managerId || undefined,
+        parentId: form.parentId || undefined,
       };
       if (editing) return apiClient.organization.departments.update(editing.id, payload);
-      return apiClient.organization.departments.create(payload);
+      return apiClient.organization.departments.create(payload as CreateDepartmentInput);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["departments"] });
@@ -134,13 +130,13 @@ export default function DepartmentsPage() {
   }
 
   const departments = query.data ?? [];
+  const lookupDepartments = (lookupsQuery.data?.departments ?? []) as DepartmentRow[];
   const deptOptions =
-    lookupsQuery.data?.departments
-      .filter((d: { id: string }) => d.id !== editing?.id)
-      .map((d: { id: string; name: string }) => ({ value: d.id, label: d.name })) ?? [];
+    lookupDepartments
+      .filter((d) => d.id !== editing?.id)
+      .map((d) => ({ value: d.id, label: d.name }));
   const userOptions =
-    lookupsQuery.data?.users.map((u: { id: string; firstName: string; lastName: string }) => ({
-      value: u.id,
+    lookupsQuery.data?.users.map((u: UserSummary) => ({      value: u.id,
       label: `${u.firstName} ${u.lastName}`,
     })) ?? [];
 

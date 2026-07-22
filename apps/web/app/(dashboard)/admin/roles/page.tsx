@@ -391,7 +391,6 @@ export default function RolesAdminPage() {
                 : "Read-only view of permissions assigned to this role."}
             </SheetDescription>
           </SheetHeader>
-
           <div className="flex-1 overflow-y-auto px-1 py-4">
             {allPermissionsQuery.isLoading || rolePermissionsQuery.isLoading ? (
               <LoadingState message="Loading permission matrix..." />

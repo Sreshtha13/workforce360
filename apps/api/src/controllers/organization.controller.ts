@@ -150,7 +150,7 @@ export class OrganizationController {
     }
   };
   
-  getDesignations = async (req: Request, res: Response): Promise<void> => {
+  getDesignations = async (_req: Request, res: Response): Promise<void> => {
     try {
       const { departmentId } = req.query;
       const designations = await this.orgService.getAllDesignations(departmentId as string | undefined);
@@ -278,7 +278,7 @@ export class OrganizationController {
     }
   };
   
-  getEmployeeTypes = async (req: Request, res: Response): Promise<void> => {
+  getEmployeeTypes = async (_req: Request, res: Response): Promise<void> => {
     try {
       const employeeTypes = await this.orgService.getAllEmployeeTypes();
       sendSuccess(res, employeeTypes);
@@ -341,7 +341,7 @@ export class OrganizationController {
     }
   };
   
-  getEmploymentStatuses = async (req: Request, res: Response): Promise<void> => {
+  getEmploymentStatuses = async (_req: Request, res: Response): Promise<void> => {
     try {
       const statuses = await this.orgService.getAllEmploymentStatuses();
       sendSuccess(res, statuses);

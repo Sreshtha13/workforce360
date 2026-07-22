@@ -12,7 +12,30 @@ import type {
   UpdatePermissionInput,
   UpdateRoleInput,
 } from "@/types/rbac";
-import type { AuthUser } from "@/types/auth";
+import type {
+  AuthUser,
+  CreateDepartmentInput,
+  CreateDesignationInput,
+  CreateEmployeeTypeInput,
+  CreateEmploymentStatusInput,
+  CreateOfficeInput,
+  CreateTeamInput,
+  CreateUserInput,
+  Department,
+  Designation,
+  EmployeeType,
+  EmploymentStatus,
+  Office,
+  Team,
+  UpdateDepartmentInput,
+  UpdateDesignationInput,
+  UpdateEmployeeTypeInput,
+  UpdateEmploymentStatusInput,
+  UpdateOfficeInput,
+  UpdateTeamInput,
+  UpdateUserInput,
+  User,
+} from "@/types/entities";
 
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:4000";
@@ -180,39 +203,39 @@ export const apiClient = {
   health: {
     get: () => request<HealthCheckData>("/api/health"),
   },
-  
+
   auth: {
     login: (email: string, password: string) =>
       request<{ user: AuthUser }>("/api/auth/login", {
         method: "POST",
         body: JSON.stringify({ email, password }),
       }),
-    
+
     logout: () =>
       request<{ message: string }>("/api/auth/logout", {
         method: "POST",
       }),
-    
+
     refreshToken: () =>
       request<{ message: string }>("/api/auth/refresh", {
         method: "POST",
       }),
-    
+
     getMe: () => requestSession<AuthUser>("/api/auth/me"),
-    
+
     requestPasswordReset: (email: string) =>
       request<{ message: string }>("/api/auth/password/request-reset", {
         method: "POST",
         body: JSON.stringify({ email }),
       }),
-    
+
     resetPassword: (token: string, password: string) =>
       request<{ message: string }>("/api/auth/password/reset", {
         method: "POST",
         body: JSON.stringify({ token, password }),
       }),
   },
-  
+
   users: {
     list: (params?: {
       departmentId?: string;
@@ -220,7 +243,7 @@ export const apiClient = {
       search?: string;
       includeDeleted?: boolean;
     }) =>
-      request<any[]>(
+      request<User[]>(
         `/api/users${buildQuery({
           departmentId: params?.departmentId,
           status: params?.status,
@@ -231,22 +254,21 @@ export const apiClient = {
 
     getNextEmployeeId: () =>
       request<{ employeeId: string }>("/api/users/next-employee-id"),
-    
-    get: (id: string) =>
-      request<any>(`/api/users/${id}`),
-    
-    create: (data: any) =>
-      request<any>("/api/users", {
+
+    get: (id: string) => request<User>(`/api/users/${id}`),
+
+    create: (data: CreateUserInput) =>
+      request<User>("/api/users", {
         method: "POST",
         body: JSON.stringify(data),
       }),
-    
-    update: (id: string, data: any) =>
-      request<any>(`/api/users/${id}`, {
+
+    update: (id: string, data: UpdateUserInput) =>
+      request<User>(`/api/users/${id}`, {
         method: "PUT",
         body: JSON.stringify(data),
       }),
-    
+
     delete: (id: string) =>
       request<{ message: string }>(`/api/users/${id}`, {
         method: "DELETE",
@@ -256,56 +278,53 @@ export const apiClient = {
       request<{ message: string }>(`/api/users/${id}/revoke-sessions`, {
         method: "POST",
       }),
-    
+
     assignRole: (id: string, roleId: string) =>
-      request<any>(`/api/users/${id}/roles`, {
+      request<User>(`/api/users/${id}/roles`, {
         method: "POST",
         body: JSON.stringify({ roleId }),
       }),
-    
+
     removeRole: (id: string, roleId: string) =>
       request<{ message: string }>(`/api/users/${id}/roles`, {
         method: "DELETE",
         body: JSON.stringify({ roleId }),
       }),
-    
-    getRoles: (id: string) =>
-      request<any[]>(`/api/users/${id}/roles`),
+
+    getRoles: (id: string) => request<Role[]>(`/api/users/${id}/roles`),
   },
-  
+
   roles: {
-    list: () =>
-      request<Role[]>("/api/roles"),
-    
-    get: (id: string) =>
-      request<Role>(`/api/roles/${id}`),
-    
+    list: () => request<Role[]>("/api/roles"),
+
+    get: (id: string) => request<Role>(`/api/roles/${id}`),
+
     create: (data: CreateRoleInput) =>
       request<Role>("/api/roles", {
         method: "POST",
         body: JSON.stringify(data),
       }),
-    
+
     update: (id: string, data: UpdateRoleInput) =>
       request<Role>(`/api/roles/${id}`, {
         method: "PUT",
         body: JSON.stringify(data),
       }),
-    
+
     delete: (id: string) =>
       request<MessageResponse>(`/api/roles/${id}`, {
         method: "DELETE",
       }),
-    
+
     getPermissions: (id: string) =>
       request<RolePermission[]>(`/api/roles/${id}/permissions`),
-    
+
     assignPermission: (id: string, permissionId: string) =>
       request<RolePermission>(`/api/roles/${id}/permissions`, {
         method: "POST",
         body: JSON.stringify({ permissionId } satisfies AssignPermissionInput),
       }),
-    
+
     removePermission: (id: string, permissionId: string) =>
       request<MessageResponse>(`/api/roles/${id}/permissions`, {
         method: "DELETE",
@@ -324,13 +343,11 @@ export const apiClient = {
         body: JSON.stringify(data ?? {}),
       }),
   },
-  
-  permissions: {
-    list: () =>
-      request<Permission[]>("/api/roles/permissions/all"),
 
-    get: (id: string) =>
-      request<Permission>(`/api/roles/permissions/${id}`),
+  permissions: {
+    list: () => request<Permission[]>("/api/roles/permissions/all"),
+
+    get: (id: string) => request<Permission>(`/api/roles/permissions/${id}`),
 
     create: (data: CreatePermissionInput) =>
       request<Permission>("/api/roles/permissions", {
@@ -349,20 +366,21 @@ export const apiClient = {
         method: "DELETE",
       }),
   },
-  
+
   organization: {
     departments: {
       list: (companyId?: string) =>
-        request<any[]>(`/api/organization/departments${companyId ? `?companyId=${companyId}` : ""}`),
-      get: (id: string) =>
-        request<any>(`/api/organization/departments/${id}`),
-      create: (data: any) =>
-        request<any>("/api/organization/departments", {
+        request<Department[]>(
+          `/api/organization/departments${companyId ? `?companyId=${companyId}` : ""}`,
+        ),
+      get: (id: string) => request<Department>(`/api/organization/departments/${id}`),
+      create: (data: CreateDepartmentInput) =>
+        request<Department>("/api/organization/departments", {
           method: "POST",
           body: JSON.stringify(data),
         }),
-      update: (id: string, data: any) =>
-        request<any>(`/api/organization/departments/${id}`, {
+      update: (id: string, data: UpdateDepartmentInput) =>
+        request<Department>(`/api/organization/departments/${id}`, {
           method: "PUT",
           body: JSON.stringify(data),
         }),
@@ -371,19 +389,20 @@ export const apiClient = {
           method: "DELETE",
         }),
     },
-    
+
     teams: {
       list: (departmentId?: string) =>
-        request<any[]>(`/api/organization/teams${departmentId ? `?departmentId=${departmentId}` : ""}`),
-      get: (id: string) =>
-        request<any>(`/api/organization/teams/${id}`),
-      create: (data: any) =>
-        request<any>("/api/organization/teams", {
+        request<Team[]>(
+          `/api/organization/teams${departmentId ? `?departmentId=${departmentId}` : ""}`,
+        ),
+      get: (id: string) => request<Team>(`/api/organization/teams/${id}`),
+      create: (data: CreateTeamInput) =>
+        request<Team>("/api/organization/teams", {
           method: "POST",
           body: JSON.stringify(data),
         }),
-      update: (id: string, data: any) =>
-        request<any>(`/api/organization/teams/${id}`, {
+      update: (id: string, data: UpdateTeamInput) =>
+        request<Team>(`/api/organization/teams/${id}`, {
           method: "PUT",
           body: JSON.stringify(data),
         }),
@@ -392,21 +411,20 @@ export const apiClient = {
           method: "DELETE",
         }),
     },
-    
+
     designations: {
       list: (departmentId?: string) =>
-        request<any[]>(
+        request<Designation[]>(
           `/api/organization/designations${departmentId ? `?departmentId=${encodeURIComponent(departmentId)}` : ""}`,
         ),
-      get: (id: string) =>
-        request<any>(`/api/organization/designations/${id}`),
-      create: (data: any) =>
-        request<any>("/api/organization/designations", {
+      get: (id: string) => request<Designation>(`/api/organization/designations/${id}`),
+      create: (data: CreateDesignationInput) =>
+        request<Designation>("/api/organization/designations", {
           method: "POST",
           body: JSON.stringify(data),
         }),
-      update: (id: string, data: any) =>
-        request<any>(`/api/organization/designations/${id}`, {
+      update: (id: string, data: UpdateDesignationInput) =>
+        request<Designation>(`/api/organization/designations/${id}`, {
           method: "PUT",
           body: JSON.stringify(data),
         }),
@@ -415,19 +433,20 @@ export const apiClient = {
           method: "DELETE",
         }),
     },
-    
+
     offices: {
       list: (companyId?: string) =>
-        request<any[]>(`/api/organization/offices${companyId ? `?companyId=${companyId}` : ""}`),
-      get: (id: string) =>
-        request<any>(`/api/organization/offices/${id}`),
-      create: (data: any) =>
-        request<any>("/api/organization/offices", {
+        request<Office[]>(
+          `/api/organization/offices${companyId ? `?companyId=${companyId}` : ""}`,
+        ),
+      get: (id: string) => request<Office>(`/api/organization/offices/${id}`),
+      create: (data: CreateOfficeInput) =>
+        request<Office>("/api/organization/offices", {
           method: "POST",
           body: JSON.stringify(data),
         }),
-      update: (id: string, data: any) =>
-        request<any>(`/api/organization/offices/${id}`, {
+      update: (id: string, data: UpdateOfficeInput) =>
+        request<Office>(`/api/organization/offices/${id}`, {
           method: "PUT",
           body: JSON.stringify(data),
         }),
@@ -436,19 +455,17 @@ export const apiClient = {
           method: "DELETE",
         }),
     },
-    
+
     employeeTypes: {
-      list: () =>
-        request<any[]>("/api/organization/employee-types"),
-      get: (id: string) =>
-        request<any>(`/api/organization/employee-types/${id}`),
-      create: (data: any) =>
-        request<any>("/api/organization/employee-types", {
+      list: () => request<EmployeeType[]>("/api/organization/employee-types"),
+      get: (id: string) => request<EmployeeType>(`/api/organization/employee-types/${id}`),
+      create: (data: CreateEmployeeTypeInput) =>
+        request<EmployeeType>("/api/organization/employee-types", {
           method: "POST",
           body: JSON.stringify(data),
         }),
-      update: (id: string, data: any) =>
-        request<any>(`/api/organization/employee-types/${id}`, {
+      update: (id: string, data: UpdateEmployeeTypeInput) =>
+        request<EmployeeType>(`/api/organization/employee-types/${id}`, {
           method: "PUT",
           body: JSON.stringify(data),
         }),
@@ -457,19 +474,18 @@ export const apiClient = {
           method: "DELETE",
         }),
     },
-    
+
     employmentStatuses: {
-      list: () =>
-        request<any[]>("/api/organization/employment-statuses"),
+      list: () => request<EmploymentStatus[]>("/api/organization/employment-statuses"),
       get: (id: string) =>
-        request<any>(`/api/organization/employment-statuses/${id}`),
-      create: (data: any) =>
-        request<any>("/api/organization/employment-statuses", {
+        request<EmploymentStatus>(`/api/organization/employment-statuses/${id}`),
+      create: (data: CreateEmploymentStatusInput) =>
+        request<EmploymentStatus>("/api/organization/employment-statuses", {
           method: "POST",
           body: JSON.stringify(data),
         }),
-      update: (id: string, data: any) =>
-        request<any>(`/api/organization/employment-statuses/${id}`, {
+      update: (id: string, data: UpdateEmploymentStatusInput) =>
+        request<EmploymentStatus>(`/api/organization/employment-statuses/${id}`, {
           method: "PUT",
           body: JSON.stringify(data),
         }),

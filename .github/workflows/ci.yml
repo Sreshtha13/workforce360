@@ -4,18 +4,31 @@ on:
   push:
     branches: [main, master]
   pull_request:
+    branches: [main, master]
+
+permissions:
+  contents: read
 
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  NODE_ENV: test
+  CI: true
+  # Prisma generate / API tests — no live DB connection required for unit tests
+  DATABASE_URL: postgresql://ci:ci@localhost:5432/workforce360_ci?schema=public
+  JWT_ACCESS_SECRET: test-jwt-access-secret-minimum-32-characters
+  JWT_REFRESH_SECRET: test-jwt-refresh-secret-minimum-32-characters
+  CORS_ORIGIN: http://localhost:3000
+  NEXT_PUBLIC_API_BASE_URL: http://localhost:4000
+
 jobs:
-  web-lint-typecheck:
-    name: Web — lint + typecheck
+  build-and-test:
+    name: Build and test
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: apps/web
+    timeout-minutes: 20
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -28,44 +41,39 @@ jobs:
           cache-dependency-path: package-lock.json
 
       - name: Install dependencies
-        working-directory: .
-        run: npm ci
-
-      - name: Lint
-        run: npm run lint
-
-      - name: Typecheck
-        run: npm run typecheck
-
-  api-lint-typecheck:
-    name: API — lint + typecheck
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: apps/api
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: "20"
-          cache: npm
-          cache-dependency-path: package-lock.json
-
-      - name: Install dependencies
-        working-directory: .
         run: npm ci
 
       - name: Generate Prisma Client
-        run: npm run db:generate
-        env:
-          # prisma generate does not connect; placeholder satisfies schema parsing
-          DATABASE_URL: postgresql://ci:ci@localhost:5432/ci?schema=public
+        run: npm run db:generate -w api
 
-      - name: Lint
-        run: npm run lint
+      - name: Build API
+        run: npm run build:api
 
-      - name: Typecheck
-        run: npm run typecheck
+      - name: Build web
+        run: npm run build:web
+
+      - name: Run API tests
+        id: api-test
+        run: npm run test:ci -w api
+
+      - name: Run web tests
+        id: web-test
+        run: npm run test:ci -w web
+
+      - name: Test summary
+        if: always()
+        run: |
+          echo "## CI test summary" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Suite | Result |" >> "$GITHUB_STEP_SUMMARY"
+          echo "|-------|--------|" >> "$GITHUB_STEP_SUMMARY"
+          if [ "${{ steps.api-test.outcome }}" = "success" ]; then
+            echo "| API tests | Passed |" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "| API tests | Failed |" >> "$GITHUB_STEP_SUMMARY"
+          fi
+          if [ "${{ steps.web-test.outcome }}" = "success" ]; then
+            echo "| Web tests | Passed |" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "| Web tests | Failed |" >> "$GITHUB_STEP_SUMMARY"
+          fi

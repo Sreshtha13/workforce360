@@ -34,15 +34,10 @@ import { SearchBar } from "@/components/design-system/search-bar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import type { CreateUserInput, UpdateUserInput, User } from "@/types/entities";
 
-type UserRow = {
-  id: string;
-  email: string;
-  firstName: string;
-  lastName: string;
-  phone?: string;
+type UserRow = Omit<User, "status"> & {
   status: string;
-  employeeId?: string;
   deletedAt?: string | null;
   department?: { id: string; name: string; managerId?: string | null };
   designation?: { id: string; name: string };
@@ -51,7 +46,6 @@ type UserRow = {
   employmentStatus?: { id: string; name: string };
   manager?: { id: string; firstName: string; lastName: string; email: string };
   managedDepartments?: { id: string; name: string }[];
-  userRoles: { role: { id: string; name: string } }[];
 };
 
 type LookupOption = { value: string; label: string };
@@ -128,7 +122,7 @@ export default function UsersAdminPage() {
 
   const saveMutation = useMutation({
     mutationFn: async () => {
-      const payload: Record<string, unknown> = {
+      const payload = {
         email: form.email.trim(),
         firstName: form.firstName.trim(),
         lastName: form.lastName.trim(),
@@ -140,15 +134,15 @@ export default function UsersAdminPage() {
         officeId: form.officeId || undefined,
         employeeTypeId: form.employeeTypeId || undefined,
         ...(form.password ? { password: form.password } : {}),
-      };
+      } as CreateUserInput & UpdateUserInput;
 
       if (editing) {
-        payload.employmentStatusId = form.employmentStatusId || null;
-        return apiClient.users.update(editing.id, payload);
+        payload.employmentStatusId = form.employmentStatusId || undefined;
+        return apiClient.users.update(editing.id, payload as UpdateUserInput);
       }
 
       payload.employmentStatusId = form.employmentStatusId || undefined;
-      return apiClient.users.create(payload);
+      return apiClient.users.create(payload as CreateUserInput);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["users"] });
@@ -241,7 +235,7 @@ export default function UsersAdminPage() {
       offices: toOptions(l.offices),
       employeeTypes: l.employeeTypes.map((item) => ({
         value: item.id,
-        label: formatEmployeeType(item),
+        label: formatEmployeeType({ code: item.code ?? "", name: item.name }),
       })),
       employmentStatuses: toOptions(l.employmentStatuses),
       roles: toOptions(l.roles),
