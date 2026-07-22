@@ -17,17 +17,9 @@ import { FormSheet } from "@/components/admin/form-sheet";
 import { FormField, FormSelect, FormTextarea } from "@/components/admin/form-fields";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import type { Department, UserSummary } from "@/types/entities";
 
-type Department = {
-  id: string;
-  name: string;
-  code?: string;
-  description?: string;
-  isActive: boolean;
-  manager?: { firstName: string; lastName: string };
-  parent?: { name: string };
-  _count?: { teams: number; users: number };
-};
+type DepartmentRow = Department;
 
 const emptyForm = {
   name: "",
@@ -41,7 +33,7 @@ export default function DepartmentsPage() {
   const { hasPermission } = useAuth();
   const queryClient = useQueryClient();
   const [sheetOpen, setSheetOpen] = useState(false);
-  const [editing, setEditing] = useState<Department | null>(null);
+  const [editing, setEditing] = useState<DepartmentRow | null>(null);
   const [form, setForm] = useState(emptyForm);
   const [feedback, setFeedback] = useState<{ type: "success" | "error"; message: string } | null>(null);
 
@@ -53,7 +45,7 @@ export default function DepartmentsPage() {
     queryKey: ["departments"],
     queryFn: async () => {
       const res = await apiClient.organization.departments.list();
-      return (res.data ?? []) as Department[];
+      return (res.data ?? []) as DepartmentRow[];
     },
   });
 
@@ -127,10 +119,10 @@ export default function DepartmentsPage() {
   const departments = query.data ?? [];
   const deptOptions =
     lookupsQuery.data?.departments
-      .filter((d: Department) => d.id !== editing?.id)
-      .map((d: Department) => ({ value: d.id, label: d.name })) ?? [];
+      .filter((d: DepartmentRow) => d.id !== editing?.id)
+      .map((d: DepartmentRow) => ({ value: d.id, label: d.name })) ?? [];
   const userOptions =
-    lookupsQuery.data?.users.map((u: any) => ({
+    lookupsQuery.data?.users.map((u: UserSummary) => ({
       value: u.id,
       label: `${u.firstName} ${u.lastName}`,
     })) ?? [];

@@ -9,7 +9,7 @@ export class RoleController {
     this.roleService = new RoleService();
   }
   
-  getRoles = async (req: Request, res: Response): Promise<void> => {
+  getRoles = async (_req: Request, res: Response): Promise<void> => {
     try {
       const roles = await this.roleService.getAllRoles();
       sendSuccess(res, roles);
@@ -72,7 +72,7 @@ export class RoleController {
     }
   };
   
-  getPermissions = async (req: Request, res: Response): Promise<void> => {
+  getPermissions = async (_req: Request, res: Response): Promise<void> => {
     try {
       const permissions = await this.roleService.getAllPermissions();
       sendSuccess(res, permissions);

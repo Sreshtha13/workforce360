@@ -17,19 +17,20 @@ import { FormField, FormSelect } from "@/components/admin/form-fields";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import type {
+  CreateUserInput,
+  Department,
+  Designation,
+  EmployeeType,
+  EmploymentStatus,
+  Office,
+  Role,
+  UpdateUserInput,
+  User,
+} from "@/types/entities";
 
-type UserRow = {
-  id: string;
-  email: string;
-  firstName: string;
-  lastName: string;
-  phone?: string;
-  status: string;
-  employeeId?: string;
-  department?: { id: string; name: string };
-  designation?: { id: string; name: string };
-  userRoles: { role: { id: string; name: string } }[];
-};
+type UserRow = User;
+type UserStatus = NonNullable<UpdateUserInput["status"]>;
 
 const emptyForm = {
   email: "",
@@ -38,7 +39,7 @@ const emptyForm = {
   lastName: "",
   phone: "",
   employeeId: "",
-  status: "active",
+  status: "active" as UserStatus,
   departmentId: "",
   designationId: "",
   officeId: "",
@@ -96,7 +97,7 @@ export default function UsersAdminPage() {
 
   const saveMutation = useMutation({
     mutationFn: async () => {
-      const payload = {
+      const payload: CreateUserInput & UpdateUserInput = {
         email: form.email,
         firstName: form.firstName,
         lastName: form.lastName,
@@ -187,12 +188,12 @@ export default function UsersAdminPage() {
     const l = lookupsQuery.data;
     if (!l) return null;
     return {
-      departments: l.departments.map((d: any) => ({ value: d.id, label: d.name })),
-      designations: l.designations.map((d: any) => ({ value: d.id, label: d.name })),
-      offices: l.offices.map((o: any) => ({ value: o.id, label: o.name })),
-      employeeTypes: l.employeeTypes.map((t: any) => ({ value: t.id, label: t.name })),
-      statuses: l.statuses.map((s: any) => ({ value: s.id, label: s.name })),
-      roles: l.roles.map((r: any) => ({ value: r.id, label: r.name })),
+      departments: l.departments.map((d: Department) => ({ value: d.id, label: d.name })),
+      designations: l.designations.map((d: Designation) => ({ value: d.id, label: d.name })),
+      offices: l.offices.map((o: Office) => ({ value: o.id, label: o.name })),
+      employeeTypes: l.employeeTypes.map((t: EmployeeType) => ({ value: t.id, label: t.name })),
+      statuses: l.statuses.map((s: EmploymentStatus) => ({ value: s.id, label: s.name })),
+      roles: l.roles.map((r: Role) => ({ value: r.id, label: r.name })),
     };
   }, [lookupsQuery.data]);
 
@@ -390,7 +391,7 @@ export default function UsersAdminPage() {
         </div>
         <FormField label="Phone" name="phone" value={form.phone} onChange={(v) => setForm({ ...form, phone: v })} />
         <FormField label="Employee ID" name="employeeId" value={form.employeeId} onChange={(v) => setForm({ ...form, employeeId: v })} />
-        <FormSelect label="Status" name="status" value={form.status} onChange={(v) => setForm({ ...form, status: v })} options={[
+        <FormSelect label="Status" name="status" value={form.status} onChange={(v) => setForm({ ...form, status: v as UserStatus })} options={[
           { value: "active", label: "Active" },
           { value: "inactive", label: "Inactive" },
           { value: "suspended", label: "Suspended" },
