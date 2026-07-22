@@ -5,6 +5,7 @@ import { requireAuth } from "../middleware/auth";
 import {
   loginSchema,
   googleLoginSchema,
+  refreshTokenSchema,
   requestPasswordResetSchema,
   resetPasswordSchema,
 } from "../schemas/auth.schema";
