@@ -73,6 +73,7 @@ model Department {
   teams         Team[]
   users         User[]
   designations  Designation[]
+  jobPostings   JobPosting[]
 
   @@unique([companyId, code])
   @@index([companyId])
@@ -139,6 +140,7 @@ model Designation {
 
   department   Department @relation(fields: [departmentId], references: [id], onDelete: Cascade)
   users        User[]
+  jobPostings  JobPosting[]
 
   @@index([departmentId])
   @@map("designations")
@@ -250,6 +252,14 @@ model User {
   loginHistory       LoginHistory[]
   auditLogs          AuditLog[]
   passwordResets     PasswordReset[]
+
+  candidateProfile   Candidate?
+  employeeMaster     Employee?
+  conductedInterviews Interview[] @relation("InterviewInterviewer")
+  publishedPolicies  CompanyPolicy[] @relation("PolicyPublisher")
+  notifications      Notification[]
+  supportTickets     SupportTicket[]
+  uploadedFiles      StoredFile[] @relation("FileUploader")
 
   @@index([email])
   @@index([departmentId])
@@ -413,4 +423,374 @@ model AuditLog {
   @@index([entityId])
   @@index([timestamp])
   @@map("audit_logs")
+}
+
+// ============================================================================
+// RECRUITMENT & HR (Phase 2)
+// ============================================================================
+
+enum JobPostingStatus {
+  DRAFT
+  PUBLISHED
+  CLOSED
+}
+
+enum CandidatePipelineStatus {
+  APPLIED
+  SCREENING
+  INTERVIEW
+  OFFER
+  HIRED
+  REJECTED
+}
+
+enum InterviewStatus {
+  SCHEDULED
+  COMPLETED
+  CANCELLED
+  NO_SHOW
+}
+
+enum OfferLetterStatus {
+  DRAFT
+  SENT
+  ACCEPTED
+  DECLINED
+  EXPIRED
+}
+
+enum EmployeeLifecycleState {
+  PRE_ONBOARDING
+  ONBOARDING
+  ACTIVE
+  OFFBOARDING
+  TERMINATED
+}
+
+enum PolicyStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+enum AssetStatus {
+  AVAILABLE
+  ASSIGNED
+  MAINTENANCE
+  RETIRED
+}
+
+enum SupportTicketStatus {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+  CLOSED
+}
+
+enum StoredFilePurpose {
+  RESUME
+  POLICY
+  OFFER_LETTER
+  DOCUMENT
+  OTHER
+}
+
+model StoredFile {
+  id           String            @id @default(cuid())
+  storageKey   String            @unique @map("storage_key")
+  originalName String            @map("original_name")
+  mimeType     String            @map("mime_type")
+  sizeBytes    Int               @map("size_bytes")
+  purpose      StoredFilePurpose @default(OTHER)
+  uploadedById String?           @map("uploaded_by_id")
+  entityType   String?           @map("entity_type")
+  entityId     String?           @map("entity_id")
+  createdAt    DateTime          @default(now()) @map("created_at")
+  updatedAt    DateTime          @updatedAt @map("updated_at")
+  deletedAt    DateTime?         @map("deleted_at")
+
+  uploadedBy   User?             @relation("FileUploader", fields: [uploadedById], references: [id])
+  candidateResumes Candidate[]   @relation("CandidateResume")
+  offerLetters OfferLetter[]
+  policies     CompanyPolicy[]
+
+  @@index([uploadedById])
+  @@index([entityType, entityId])
+  @@map("stored_files")
+}
+
+model JobPosting {
+  id              String            @id @default(cuid())
+  title           String
+  slug            String            @unique
+  description     String
+  requirements    String?
+  departmentId    String?           @map("department_id")
+  designationId   String?           @map("designation_id")
+  location        String?
+  employmentType  String?           @map("employment_type")
+  status          JobPostingStatus  @default(DRAFT)
+  publishedAt     DateTime?         @map("published_at")
+  closedAt        DateTime?         @map("closed_at")
+  createdAt       DateTime          @default(now()) @map("created_at")
+  updatedAt       DateTime          @updatedAt @map("updated_at")
+  deletedAt       DateTime?         @map("deleted_at")
+
+  department      Department?       @relation(fields: [departmentId], references: [id])
+  designation     Designation?      @relation(fields: [designationId], references: [id])
+  applications    JobApplication[]
+
+  @@index([status])
+  @@index([departmentId])
+  @@map("job_postings")
+}
+
+model Candidate {
+  id            String                  @id @default(cuid())
+  userId        String?                 @unique @map("user_id")
+  email         String                  @unique
+  firstName     String                  @map("first_name")
+  lastName      String                  @map("last_name")
+  phone         String?
+  linkedInUrl   String?                 @map("linkedin_url")
+  resumeFileId  String?                 @map("resume_file_id")
+  pipelineStatus CandidatePipelineStatus @default(APPLIED) @map("pipeline_status")
+  notes         String?
+  createdAt     DateTime                @default(now()) @map("created_at")
+  updatedAt     DateTime                @updatedAt @map("updated_at")
+  deletedAt     DateTime?               @map("deleted_at")
+
+  user          User?                   @relation(fields: [userId], references: [id])
+  resumeFile    StoredFile?             @relation("CandidateResume", fields: [resumeFileId], references: [id])
+  applications  JobApplication[]
+  employee      Employee?
+
+  @@index([pipelineStatus])
+  @@map("candidates")
+}
+
+model JobApplication {
+  id            String                  @id @default(cuid())
+  candidateId   String                  @map("candidate_id")
+  jobPostingId  String                  @map("job_posting_id")
+  status        CandidatePipelineStatus @default(APPLIED)
+  coverLetter   String?                 @map("cover_letter")
+  appliedAt     DateTime                @default(now()) @map("applied_at")
+  statusNotes   String?                 @map("status_notes")
+  createdAt     DateTime                @default(now()) @map("created_at")
+  updatedAt     DateTime                @updatedAt @map("updated_at")
+  deletedAt     DateTime?               @map("deleted_at")
+
+  candidate     Candidate               @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  jobPosting    JobPosting              @relation(fields: [jobPostingId], references: [id], onDelete: Cascade)
+  interviews    Interview[]
+  assessments   Assessment[]
+  offerLetters  OfferLetter[]
+  checklistItems PreOnboardingChecklistItem[]
+
+  @@unique([candidateId, jobPostingId])
+  @@index([status])
+  @@index([candidateId])
+  @@index([jobPostingId])
+  @@map("job_applications")
+}
+
+model Interview {
+  id              String          @id @default(cuid())
+  applicationId   String          @map("application_id")
+  scheduledAt     DateTime        @map("scheduled_at")
+  durationMinutes Int             @default(60) @map("duration_minutes")
+  location        String?
+  meetingLink     String?         @map("meeting_link")
+  interviewerId   String?         @map("interviewer_id")
+  status          InterviewStatus @default(SCHEDULED)
+  notes           String?
+  createdAt       DateTime        @default(now()) @map("created_at")
+  updatedAt       DateTime        @updatedAt @map("updated_at")
+  deletedAt       DateTime?       @map("deleted_at")
+
+  application     JobApplication  @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  interviewer     User?           @relation("InterviewInterviewer", fields: [interviewerId], references: [id])
+
+  @@index([applicationId])
+  @@index([interviewerId])
+  @@index([scheduledAt])
+  @@map("interviews")
+}
+
+model Assessment {
+  id            String         @id @default(cuid())
+  applicationId String         @map("application_id")
+  title         String
+  description   String?
+  dueAt         DateTime?      @map("due_at")
+  completedAt   DateTime?      @map("completed_at")
+  score         Float?
+  notes         String?
+  createdAt     DateTime       @default(now()) @map("created_at")
+  updatedAt     DateTime       @updatedAt @map("updated_at")
+  deletedAt     DateTime?      @map("deleted_at")
+
+  application   JobApplication @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+  @@index([applicationId])
+  @@map("assessments")
+}
+
+model OfferLetter {
+  id            String            @id @default(cuid())
+  applicationId String            @map("application_id")
+  salary        Decimal?          @db.Decimal(12, 2)
+  currency      String            @default("USD")
+  startDate     DateTime?         @map("start_date")
+  content       String
+  status        OfferLetterStatus @default(DRAFT)
+  fileId        String?           @map("file_id")
+  sentAt        DateTime?         @map("sent_at")
+  acceptedAt    DateTime?         @map("accepted_at")
+  createdAt     DateTime          @default(now()) @map("created_at")
+  updatedAt     DateTime          @updatedAt @map("updated_at")
+  deletedAt     DateTime?         @map("deleted_at")
+
+  application   JobApplication    @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  file          StoredFile?       @relation(fields: [fileId], references: [id])
+
+  @@index([applicationId])
+  @@index([status])
+  @@map("offer_letters")
+}
+
+model PreOnboardingChecklistItem {
+  id            String         @id @default(cuid())
+  applicationId String         @map("application_id")
+  title         String
+  isRequired    Boolean        @default(true) @map("is_required")
+  isCompleted   Boolean        @default(false) @map("is_completed")
+  completedAt   DateTime?      @map("completed_at")
+  sortOrder     Int            @default(0) @map("sort_order")
+  createdAt     DateTime       @default(now()) @map("created_at")
+  updatedAt     DateTime       @updatedAt @map("updated_at")
+  deletedAt     DateTime?      @map("deleted_at")
+
+  application   JobApplication @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+  @@index([applicationId])
+  @@map("pre_onboarding_checklist_items")
+}
+
+model Employee {
+  id                    String                 @id @default(cuid())
+  userId                String                 @unique @map("user_id")
+  candidateId           String?                @unique @map("candidate_id")
+  employeeCode          String                 @unique @map("employee_code")
+  lifecycleState        EmployeeLifecycleState @default(PRE_ONBOARDING) @map("lifecycle_state")
+  hiredAt               DateTime               @default(now()) @map("hired_at")
+  terminatedAt          DateTime?              @map("terminated_at")
+  emergencyContactName  String?                @map("emergency_contact_name")
+  emergencyContactPhone String?                @map("emergency_contact_phone")
+  createdAt             DateTime               @default(now()) @map("created_at")
+  updatedAt             DateTime               @updatedAt @map("updated_at")
+  deletedAt             DateTime?              @map("deleted_at")
+
+  user                  User                   @relation(fields: [userId], references: [id])
+  candidate             Candidate?             @relation(fields: [candidateId], references: [id])
+  lifecycleEvents       EmployeeLifecycleEvent[]
+  assignedAssets        Asset[]
+
+  @@index([lifecycleState])
+  @@map("employees")
+}
+
+model EmployeeLifecycleEvent {
+  id          String                  @id @default(cuid())
+  employeeId  String                  @map("employee_id")
+  fromState   EmployeeLifecycleState? @map("from_state")
+  toState     EmployeeLifecycleState  @map("to_state")
+  notes       String?
+  changedById String?                 @map("changed_by_id")
+  timestamp   DateTime                @default(now())
+  createdAt   DateTime                @default(now()) @map("created_at")
+
+  employee    Employee                @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@index([employeeId])
+  @@index([timestamp])
+  @@map("employee_lifecycle_events")
+}
+
+model CompanyPolicy {
+  id            String       @id @default(cuid())
+  title         String
+  description   String?
+  version       String       @default("1.0")
+  status        PolicyStatus @default(DRAFT)
+  fileId        String?      @map("file_id")
+  publishedAt   DateTime?    @map("published_at")
+  publishedById String?      @map("published_by_id")
+  createdAt     DateTime     @default(now()) @map("created_at")
+  updatedAt     DateTime     @updatedAt @map("updated_at")
+  deletedAt     DateTime?    @map("deleted_at")
+
+  file          StoredFile?  @relation(fields: [fileId], references: [id])
+  publishedBy   User?        @relation("PolicyPublisher", fields: [publishedById], references: [id])
+
+  @@index([status])
+  @@map("company_policies")
+}
+
+model Asset {
+  id           String      @id @default(cuid())
+  name         String
+  tag          String      @unique
+  category     String?
+  serialNumber String?     @map("serial_number")
+  status       AssetStatus @default(AVAILABLE)
+  employeeId   String?     @map("employee_id")
+  assignedAt   DateTime?   @map("assigned_at")
+  notes        String?
+  createdAt    DateTime    @default(now()) @map("created_at")
+  updatedAt    DateTime    @updatedAt @map("updated_at")
+  deletedAt    DateTime?   @map("deleted_at")
+
+  employee     Employee?   @relation(fields: [employeeId], references: [id])
+
+  @@index([status])
+  @@index([employeeId])
+  @@map("assets")
+}
+
+model Notification {
+  id        String    @id @default(cuid())
+  userId    String    @map("user_id")
+  title     String
+  message   String
+  isRead    Boolean   @default(false) @map("is_read")
+  link      String?
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([isRead])
+  @@map("notifications")
+}
+
+model SupportTicket {
+  id          String              @id @default(cuid())
+  userId      String              @map("user_id")
+  subject     String
+  description String
+  status      SupportTicketStatus @default(OPEN)
+  priority    String              @default("medium")
+  createdAt   DateTime            @default(now()) @map("created_at")
+  updatedAt   DateTime            @updatedAt @map("updated_at")
+  deletedAt   DateTime?           @map("deleted_at")
+
+  user        User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([status])
+  @@map("support_tickets")
 }

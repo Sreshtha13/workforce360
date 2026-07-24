@@ -12,7 +12,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
-import { adminNav, filterNavByPermissions, mainNav } from "@/lib/navigation";
+import { adminNav, candidateNav, filterNavByPermissions, hrNav, mainNav, portalNav } from "@/lib/navigation";
 import { glass, iconSize, motion } from "@/lib/design-system";
 import { typographyScale } from "@/lib/design-tokens";
 import { cn } from "@/lib/utils";
@@ -35,11 +35,16 @@ export function DashboardShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [adminExpanded, setAdminExpanded] = useState(true);
+  const [hrExpanded, setHrExpanded] = useState(true);
+  const [portalExpanded, setPortalExpanded] = useState(true);
 
   if (!user) return null;
 
   const permissions = user.permissions;
   const visibleMain = filterNavByPermissions(mainNav, permissions);
+  const visibleCandidate = filterNavByPermissions(candidateNav, permissions);
+  const visibleHr = filterNavByPermissions(hrNav, permissions);
+  const visiblePortal = filterNavByPermissions(portalNav, permissions);
   const visibleAdmin = filterNavByPermissions(adminNav, permissions);
   const breadcrumbs = buildBreadcrumbs(pathname);
   const initials = `${user.firstName[0] ?? ""}${user.lastName[0] ?? ""}`;
@@ -89,6 +94,84 @@ export function DashboardShell({ children }: { children: ReactNode }) {
             onNavigate={() => setMobileOpen(false)}
           />
         ))}
+
+        {visibleCandidate.length > 0 &&
+          visibleCandidate.map((item) => (
+            <SidebarLink
+              key={item.href}
+              href={item.href}
+              label={item.label}
+              icon={item.icon}
+              active={pathname === item.href || pathname.startsWith(`${item.href}/`)}
+              onNavigate={() => setMobileOpen(false)}
+            />
+          ))}
+
+        {visibleHr.length > 0 && (
+          <div className="mt-4">
+            <button
+              type="button"
+              onClick={() => setHrExpanded((v) => !v)}
+              className={cn(
+                typographyScale.overline.className,
+                "flex w-full items-center justify-between px-2 py-2 text-sidebar-foreground/70",
+              )}
+            >
+              HR & Recruitment
+              <ChevronDown
+                className={cn(
+                  iconSize.sm,
+                  "transition-transform",
+                  hrExpanded ? "rotate-0" : "-rotate-90",
+                )}
+              />
+            </button>
+            {hrExpanded &&
+              visibleHr.map((item) => (
+                <SidebarLink
+                  key={item.href}
+                  href={item.href}
+                  label={item.label}
+                  icon={item.icon}
+                  active={pathname === item.href || pathname.startsWith(`${item.href}/`)}
+                  onNavigate={() => setMobileOpen(false)}
+                />
+              ))}
+          </div>
+        )}
+
+        {visiblePortal.length > 0 && (
+          <div className="mt-4">
+            <button
+              type="button"
+              onClick={() => setPortalExpanded((v) => !v)}
+              className={cn(
+                typographyScale.overline.className,
+                "flex w-full items-center justify-between px-2 py-2 text-sidebar-foreground/70",
+              )}
+            >
+              Employee Portal
+              <ChevronDown
+                className={cn(
+                  iconSize.sm,
+                  "transition-transform",
+                  portalExpanded ? "rotate-0" : "-rotate-90",
+                )}
+              />
+            </button>
+            {portalExpanded &&
+              visiblePortal.map((item) => (
+                <SidebarLink
+                  key={item.href}
+                  href={item.href}
+                  label={item.label}
+                  icon={item.icon}
+                  active={pathname === item.href || pathname.startsWith(`${item.href}/`)}
+                  onNavigate={() => setMobileOpen(false)}
+                />
+              ))}
+          </div>
+        )}
 
         {visibleAdmin.length > 0 && (
           <div className="mt-4">

@@ -35,6 +35,16 @@ async function main() {
       "employment_status",
     ]);
     const adminResources = new Set(["user", "role", "permission"]);
+    const recruitmentResources = new Set([
+      "job",
+      "candidate",
+      "application",
+      "interview",
+      "assessment",
+      "offer",
+    ]);
+    const hrResources = new Set(["employee", "policy", "asset", "hr"]);
+    const portalResources = new Set(["portal"]);
     const label = resource
       .split("_")
       .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
@@ -45,6 +55,15 @@ async function main() {
     }
     if (adminResources.has(resource)) {
       return { module: "Administration", feature: label };
+    }
+    if (recruitmentResources.has(resource)) {
+      return { module: "Recruitment", feature: label };
+    }
+    if (hrResources.has(resource)) {
+      return { module: "HR", feature: label };
+    }
+    if (portalResources.has(resource)) {
+      return { module: "Employee Portal", feature: label };
     }
     return { module: "General", feature: label };
   }
@@ -95,6 +114,42 @@ async function main() {
     { name: "Create Employment Statuses", code: "employment_status.create", resource: "employment_status", action: "create" },
     { name: "Update Employment Statuses", code: "employment_status.update", resource: "employment_status", action: "update" },
     { name: "Delete Employment Statuses", code: "employment_status.delete", resource: "employment_status", action: "delete" },
+
+    { name: "Read Jobs", code: "job.read", resource: "job", action: "read" },
+    { name: "Create Jobs", code: "job.create", resource: "job", action: "create" },
+    { name: "Update Jobs", code: "job.update", resource: "job", action: "update" },
+    { name: "Delete Jobs", code: "job.delete", resource: "job", action: "delete" },
+
+    { name: "Read Candidates", code: "candidate.read", resource: "candidate", action: "read" },
+    { name: "Update Candidates", code: "candidate.update", resource: "candidate", action: "update" },
+
+    { name: "Read Applications", code: "application.read", resource: "application", action: "read" },
+    { name: "Update Applications", code: "application.update", resource: "application", action: "update" },
+
+    { name: "Read Interviews", code: "interview.read", resource: "interview", action: "read" },
+    { name: "Create Interviews", code: "interview.create", resource: "interview", action: "create" },
+
+    { name: "Create Assessments", code: "assessment.create", resource: "assessment", action: "create" },
+
+    { name: "Read Offers", code: "offer.read", resource: "offer", action: "read" },
+    { name: "Create Offers", code: "offer.create", resource: "offer", action: "create" },
+    { name: "Update Offers", code: "offer.update", resource: "offer", action: "update" },
+
+    { name: "Read Employees", code: "employee.read", resource: "employee", action: "read" },
+    { name: "Update Employees", code: "employee.update", resource: "employee", action: "update" },
+
+    { name: "HR Dashboard", code: "hr.dashboard.read", resource: "hr", action: "read" },
+
+    { name: "Read Policies", code: "policy.read", resource: "policy", action: "read" },
+    { name: "Create Policies", code: "policy.create", resource: "policy", action: "create" },
+    { name: "Update Policies", code: "policy.update", resource: "policy", action: "update" },
+
+    { name: "Read Assets", code: "asset.read", resource: "asset", action: "read" },
+    { name: "Create Assets", code: "asset.create", resource: "asset", action: "create" },
+    { name: "Update Assets", code: "asset.update", resource: "asset", action: "update" },
+
+    { name: "Portal Read", code: "portal.read", resource: "portal", action: "read" },
+    { name: "Portal Update", code: "portal.update", resource: "portal", action: "update" },
   ];
   
   const createdPermissions = [];
@@ -160,6 +215,17 @@ async function main() {
       isSystem: true,
     },
   });
+
+  const candidateRole = await prisma.role.upsert({
+    where: { code: "candidate" },
+    update: {},
+    create: {
+      name: "Candidate",
+      code: "candidate",
+      description: "Job applicant with candidate portal access",
+      isSystem: true,
+    },
+  });
   
   console.log("✅ Roles created");
   
@@ -177,7 +243,25 @@ async function main() {
   }
   
   const hrPermissions = createdPermissions.filter((p) =>
-    ["user", "department", "team", "designation", "office", "employee_type", "employment_status"].includes(p.resource),
+    [
+      "user",
+      "department",
+      "team",
+      "designation",
+      "office",
+      "employee_type",
+      "employment_status",
+      "job",
+      "candidate",
+      "application",
+      "interview",
+      "assessment",
+      "offer",
+      "employee",
+      "hr",
+      "policy",
+      "asset",
+    ].includes(p.resource),
   );
   
   for (const permission of hrPermissions) {
@@ -211,6 +295,44 @@ async function main() {
     await prisma.rolePermission.create({
       data: {
         roleId: adminRole.id,
+        permissionId: permission.id,
+      },
+    });
+  }
+
+  const employeePermissions = createdPermissions.filter((p) =>
+    ["portal"].includes(p.resource),
+  );
+  for (const permission of employeePermissions) {
+    await prisma.rolePermission.upsert({
+      where: {
+        roleId_permissionId: {
+          roleId: employeeRole.id,
+          permissionId: permission.id,
+        },
+      },
+      update: {},
+      create: {
+        roleId: employeeRole.id,
+        permissionId: permission.id,
+      },
+    });
+  }
+
+  const candidatePermissions = createdPermissions.filter((p) =>
+    p.code === "portal.read" || p.code === "portal.update",
+  );
+  for (const permission of candidatePermissions) {
+    await prisma.rolePermission.upsert({
+      where: {
+        roleId_permissionId: {
+          roleId: candidateRole.id,
+          permissionId: permission.id,
+        },
+      },
+      update: {},
+      create: {
+        roleId: candidateRole.id,
         permissionId: permission.id,
       },
     });
@@ -289,6 +411,60 @@ async function main() {
   console.log("✅ Super admin user created");
   console.log(`📧 Email: ${superAdminEmail}`);
   console.log(`🔑 Password: ${superAdminPassword}`);
+
+  const hrUserEmail = "hr@workforce360.com";
+  let hrUser = await prisma.user.findUnique({ where: { email: hrUserEmail } });
+  if (!hrUser) {
+    hrUser = await prisma.user.create({
+      data: {
+        email: hrUserEmail,
+        passwordHash: await bcrypt.hash("Hr@123456", 12),
+        firstName: "HR",
+        lastName: "Manager",
+        status: "active",
+        emailVerified: true,
+      },
+    });
+  }
+  await prisma.userRole.upsert({
+    where: { userId_roleId: { userId: hrUser.id, roleId: hrRole.id } },
+    update: {},
+    create: { userId: hrUser.id, roleId: hrRole.id },
+  });
+
+  await prisma.jobPosting.upsert({
+    where: { slug: "senior-software-engineer" },
+    update: { status: "PUBLISHED", publishedAt: new Date() },
+    create: {
+      title: "Senior Software Engineer",
+      slug: "senior-software-engineer",
+      description:
+        "Build modular ERP features across our Next.js and Node.js stack. You will own recruitment and HR modules end-to-end.",
+      requirements: "5+ years TypeScript, React, Node.js, PostgreSQL. Experience with RBAC and SaaS products.",
+      location: "San Francisco, CA (Hybrid)",
+      employmentType: "Full Time",
+      status: "PUBLISHED",
+      publishedAt: new Date(),
+    },
+  });
+
+  await prisma.jobPosting.upsert({
+    where: { slug: "hr-coordinator" },
+    update: { status: "PUBLISHED", publishedAt: new Date() },
+    create: {
+      title: "HR Coordinator",
+      slug: "hr-coordinator",
+      description:
+        "Support recruitment pipeline operations, onboarding, and employee lifecycle tracking.",
+      requirements: "2+ years HR operations. Familiarity with ATS and onboarding workflows.",
+      location: "Remote",
+      employmentType: "Full Time",
+      status: "PUBLISHED",
+      publishedAt: new Date(),
+    },
+  });
+
+  console.log(`📧 HR user: ${hrUserEmail} / Hr@123456`);
   console.log("");
   console.log("🎉 Database seeded successfully!");
 }

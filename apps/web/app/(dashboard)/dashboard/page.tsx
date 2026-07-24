@@ -14,9 +14,9 @@ import { AdminShortcuts } from "@/components/dashboard/admin-shortcuts";
 import { MetricStatCard } from "@/components/dashboard/metric-stat-card";
 import {
   AttendanceSummary,
-  HiringOverview,
   LeaveOverview,
 } from "@/components/dashboard/overview-widgets";
+import { HiringOverview } from "@/components/dashboard/hiring-overview-live";
 import { PendingApprovals } from "@/components/dashboard/pending-approvals";
 import { QuickActions } from "@/components/dashboard/quick-actions";
 import { RecentActivity } from "@/components/dashboard/recent-activity";

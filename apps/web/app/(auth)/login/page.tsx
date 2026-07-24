@@ -77,8 +77,13 @@ export default function LoginPage() {
 
       <div className={cn("mt-6 rounded-xl p-4 text-sm", statusSurface.info)}>
         <p className={typographyScale.label.className}>Demo credentials</p>
-        <p className="mt-2 text-muted-foreground">Email: admin@workforce360.com</p>
-        <p className="text-muted-foreground">Password: Admin@123</p>
+        <p className="mt-2 text-muted-foreground">Admin: admin@workforce360.com / Admin@123</p>
+        <p className="text-muted-foreground">HR: hr@workforce360.com / Hr@123456</p>
+        <p className="mt-3">
+          <Link href="/careers" className="font-medium text-brand-700 hover:underline dark:text-brand-300">
+            Browse careers and apply →
+          </Link>
+        </p>
       </div>
     </AuthLayout>
   );
