@@ -144,6 +144,7 @@ export type CreateTeamInput = {
   code?: string;
   description?: string;
   leadId?: string;
+  memberIds?: string[];
 };
 
 export type UpdateTeamInput = Partial<CreateTeamInput>;

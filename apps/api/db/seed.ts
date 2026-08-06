@@ -125,6 +125,7 @@ async function main() {
 
     { name: "Read Applications", code: "application.read", resource: "application", action: "read" },
     { name: "Update Applications", code: "application.update", resource: "application", action: "update" },
+    { name: "Override Pipeline Stage", code: "application.override_stage", resource: "application", action: "override_stage" },
 
     { name: "Read Interviews", code: "interview.read", resource: "interview", action: "read" },
     { name: "Create Interviews", code: "interview.create", resource: "interview", action: "create" },
@@ -358,23 +359,71 @@ async function main() {
   console.log("✅ Employee types created");
   
   const employmentStatuses = [
-    { name: "Full Time", code: "full_time" },
-    { name: "Part Time", code: "part_time" },
-    { name: "Contract", code: "contract" },
-    { name: "Intern", code: "intern" },
-    { name: "Probation", code: "probation" },
-    { name: "Consultant", code: "consultant" },
+    { name: "Active", code: "active", description: "Currently working" },
+    { name: "On Probation", code: "probation", description: "Within probation period" },
+    { name: "On Leave", code: "on_leave", description: "Temporarily away" },
+    { name: "Notice Period", code: "notice", description: "Serving notice" },
+    { name: "Suspended", code: "suspended", description: "Temporarily suspended" },
+    { name: "Terminated", code: "terminated", description: "Employment ended" },
   ];
-  
+
+  // Rename legacy type-like statuses first so new status names do not collide on unique `name`.
+  for (const legacy of [
+    { code: "full_time", name: "Legacy Full Time (use Employee Type)" },
+    { code: "part_time", name: "Legacy Part Time (use Employee Type)" },
+    { code: "contract", name: "Legacy Contract (use Employee Type)" },
+    { code: "intern", name: "Legacy Intern (use Employee Type)" },
+    { code: "consultant", name: "Legacy Consultant (use Employee Type)" },
+  ]) {
+    await prisma.employmentStatus.updateMany({
+      where: { code: legacy.code },
+      data: { name: legacy.name, isActive: false },
+    });
+  }
+
   for (const status of employmentStatuses) {
-    await prisma.employmentStatus.upsert({
-      where: { code: status.code },
-      update: {},
-      create: status,
+    const existingByCode = await prisma.employmentStatus.findUnique({ where: { code: status.code } });
+    if (existingByCode) {
+      await prisma.employmentStatus.update({
+        where: { id: existingByCode.id },
+        data: { name: status.name, description: status.description, isActive: true },
+      });
+      continue;
+    }
+    const existingByName = await prisma.employmentStatus.findUnique({ where: { name: status.name } });
+    if (existingByName) {
+      await prisma.employmentStatus.update({
+        where: { id: existingByName.id },
+        data: { code: status.code, description: status.description, isActive: true },
+      });
+      continue;
+    }
+    await prisma.employmentStatus.create({ data: status });
+  }
+
+  // Soft-disable any remaining legacy employment status codes that duplicated employee types
+  for (const legacyCode of ["full_time", "part_time", "contract", "intern", "consultant"]) {
+    await prisma.employmentStatus.updateMany({
+      where: { code: legacyCode, deletedAt: null },
+      data: { isActive: false },
     });
   }
   
   console.log("✅ Employment statuses created");
+
+  const hrDepartment = await prisma.department.upsert({
+    where: { companyId_code: { companyId: company.id, code: "HR" } },
+    update: { name: "Human Resources", isActive: true },
+    create: {
+      companyId: company.id,
+      name: "Human Resources",
+      code: "HR",
+      description: "Human Resources department",
+      isActive: true,
+    },
+  });
+
+  console.log("✅ HR department created");
   
   const superAdminEmail = "admin@workforce360.com";
   const superAdminPassword = "Admin@123";
@@ -413,6 +462,11 @@ async function main() {
   console.log(`🔑 Password: ${superAdminPassword}`);
 
   const hrUserEmail = "hr@workforce360.com";
+  const activeEmploymentStatus = await prisma.employmentStatus.findUnique({
+    where: { code: "active" },
+  });
+  const fullTimeType = await prisma.employeeType.findUnique({ where: { code: "FT" } });
+
   let hrUser = await prisma.user.findUnique({ where: { email: hrUserEmail } });
   if (!hrUser) {
     hrUser = await prisma.user.create({
@@ -422,7 +476,31 @@ async function main() {
         firstName: "HR",
         lastName: "Manager",
         status: "active",
+        employeeId: "EMP002",
         emailVerified: true,
+        departmentId: hrDepartment.id,
+        employeeTypeId: fullTimeType?.id,
+        employmentStatusId: activeEmploymentStatus?.id,
+        dateOfJoining: new Date(),
+      },
+    });
+  } else {
+    const nextEmployeeId =
+      hrUser.employeeId ??
+      (await prisma.user.findFirst({
+        where: { employeeId: "EMP002" },
+        select: { id: true },
+      })
+        ? undefined
+        : "EMP002");
+
+    hrUser = await prisma.user.update({
+      where: { id: hrUser.id },
+      data: {
+        departmentId: hrDepartment.id,
+        ...(nextEmployeeId ? { employeeId: nextEmployeeId } : {}),
+        employeeTypeId: hrUser.employeeTypeId ?? fullTimeType?.id,
+        employmentStatusId: hrUser.employmentStatusId ?? activeEmploymentStatus?.id,
       },
     });
   }
@@ -430,6 +508,18 @@ async function main() {
     where: { userId_roleId: { userId: hrUser.id, roleId: hrRole.id } },
     update: {},
     create: { userId: hrUser.id, roleId: hrRole.id },
+  });
+
+  // Ensure Employee master record exists for HR user
+  await prisma.employee.upsert({
+    where: { userId: hrUser.id },
+    update: { lifecycleState: "ACTIVE" },
+    create: {
+      userId: hrUser.id,
+      employeeCode: hrUser.employeeId ?? "EMP002",
+      lifecycleState: "ACTIVE",
+      hiredAt: new Date(),
+    },
   });
 
   await prisma.jobPosting.upsert({

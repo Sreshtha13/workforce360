@@ -2,10 +2,11 @@
 
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
-import { apiClient } from "@/lib/api-client";
+import { apiClient, ApiClientError } from "@/lib/api-client";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { LoadingState, ErrorState, EmptyState } from "@/components/admin/admin-states";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { PIPELINE_LABELS, type PipelineStatus } from "@/types/phase2";
 
 export default function CandidateDashboardPage() {
@@ -15,14 +16,49 @@ export default function CandidateDashboardPage() {
       const res = await apiClient.recruitment.getMyProfile();
       return res.data!;
     },
+    retry: false,
   });
 
   if (query.isLoading) return <LoadingState message="Loading your applications..." />;
-  if (query.isError || !query.data) {
+
+  if (query.isError) {
+    const isNotFound =
+      query.error instanceof ApiClientError && query.error.status === 404;
+    if (isNotFound) {
+      return (
+        <div className="space-y-6">
+          <AdminPageHeader
+            title="My applications"
+            description="Track job applications and pre-onboarding tasks."
+          />
+          <EmptyState
+            title="No candidate profile yet"
+            description="Apply to an open role from the careers page to create your candidate profile and track applications here."
+            actionLabel="Browse careers"
+            onAction={() => {
+              window.location.href = "/careers";
+            }}
+          />
+        </div>
+      );
+    }
     return (
       <ErrorState
-        message="Could not load candidate profile. Register via Careers to apply."
+        message="Could not load your applications."
         onRetry={() => query.refetch()}
+      />
+    );
+  }
+
+  if (!query.data) {
+    return (
+      <EmptyState
+        title="No applications"
+        description="Apply to an open role from the careers page."
+        actionLabel="Browse careers"
+        onAction={() => {
+          window.location.href = "/careers";
+        }}
       />
     );
   }
@@ -33,30 +69,45 @@ export default function CandidateDashboardPage() {
   return (
     <div className="space-y-6">
       <AdminPageHeader
-        title="Candidate dashboard"
+        title="My applications"
         description={`Track applications and onboarding tasks for ${candidate.firstName} ${candidate.lastName}.`}
       >
-        <Link href="/careers" className="text-sm font-medium text-brand-600 hover:underline">
-          Browse open roles
+        <Link href="/careers">
+          <Button variant="outline" size="sm">
+            Browse open roles
+          </Button>
         </Link>
       </AdminPageHeader>
 
       <div className="rounded-2xl border border-white/20 bg-white/50 p-5 dark:bg-white/5">
         <p className="text-sm text-muted-foreground">Overall pipeline status</p>
-        <div className="mt-2 flex items-center gap-3">
+        <div className="mt-2 flex flex-wrap items-center gap-3">
           <Badge>{PIPELINE_LABELS[candidate.pipelineStatus as PipelineStatus]}</Badge>
           {candidate.resumeFile && (
-            <span className="text-sm text-muted-foreground">Resume: {candidate.resumeFile.originalName}</span>
+            <span className="text-sm text-muted-foreground">
+              Resume: {candidate.resumeFile.originalName}
+            </span>
           )}
+          <span className="text-sm text-muted-foreground">{candidate.email}</span>
         </div>
       </div>
 
       {applications.length === 0 ? (
-        <EmptyState title="No applications yet" description="Apply to an open role from the careers page." />
+        <EmptyState
+          title="No applications yet"
+          description="Apply to an open role from the careers page to get started."
+          actionLabel="Browse careers"
+          onAction={() => {
+            window.location.href = "/careers";
+          }}
+        />
       ) : (
         <div className="grid gap-4">
           {applications.map((app) => (
-            <div key={app.id} className="rounded-2xl border border-white/20 bg-white/50 p-5 dark:bg-white/5">
+            <div
+              key={app.id}
+              className="rounded-2xl border border-white/20 bg-white/50 p-5 dark:bg-white/5"
+            >
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
                   <h3 className="font-semibold">{app.jobPosting?.title}</h3>
@@ -64,8 +115,18 @@ export default function CandidateDashboardPage() {
                     Applied {new Date(app.appliedAt).toLocaleDateString()}
                   </p>
                 </div>
-                <Badge variant="secondary">{PIPELINE_LABELS[app.status as PipelineStatus]}</Badge>
+                <Badge variant="secondary">
+                  {PIPELINE_LABELS[app.status as PipelineStatus]}
+                </Badge>
               </div>
+
+              {app.interviews && app.interviews.length > 0 && (
+                <div className="mt-3 text-sm text-muted-foreground">
+                  Latest interview:{" "}
+                  {new Date(app.interviews[0].scheduledAt).toLocaleString()} ·{" "}
+                  {app.interviews[0].status}
+                </div>
+              )}
 
               {app.checklistItems && app.checklistItems.length > 0 && (
                 <div className="mt-4 space-y-2">

@@ -189,7 +189,7 @@ model EmployeeType {
 
 model EmploymentStatus {
   id          String    @id @default(cuid())
-  /// Employment type label: Full Time, Part Time, Contract, Intern, Probation, Consultant
+  /// Workforce status: Active, On Probation, On Leave, Notice Period, Suspended, Terminated
   name        String    @unique
   code        String?   @unique
   description String?
@@ -513,6 +513,7 @@ model StoredFile {
   candidateResumes Candidate[]   @relation("CandidateResume")
   offerLetters OfferLetter[]
   policies     CompanyPolicy[]
+  supportTickets SupportTicket[]
 
   @@index([uploadedById])
   @@index([entityType, entityId])
@@ -784,11 +785,15 @@ model SupportTicket {
   description String
   status      SupportTicketStatus @default(OPEN)
   priority    String              @default("medium")
+  category    String?
+  latestReply String?             @map("latest_reply")
+  attachmentFileId String?        @map("attachment_file_id")
   createdAt   DateTime            @default(now()) @map("created_at")
   updatedAt   DateTime            @updatedAt @map("updated_at")
   deletedAt   DateTime?           @map("deleted_at")
 
   user        User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  attachment  StoredFile?         @relation(fields: [attachmentFileId], references: [id])
 
   @@index([userId])
   @@index([status])

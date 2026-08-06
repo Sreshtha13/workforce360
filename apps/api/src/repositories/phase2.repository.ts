@@ -169,7 +169,7 @@ export class RecruitmentRepository {
     return prisma.jobApplication.findFirst({
       where: { id, deletedAt: null },
       include: {
-        candidate: true,
+        candidate: { include: { employee: true } },
         jobPosting: true,
         interviews: { where: { deletedAt: null } },
         assessments: { where: { deletedAt: null } },
@@ -179,15 +179,30 @@ export class RecruitmentRepository {
     });
   }
 
-  listApplications(filters?: { status?: string; jobPostingId?: string }) {
+  listApplications(filters?: { status?: string; jobPostingId?: string; statuses?: string[] }) {
     const where: Prisma.JobApplicationWhereInput = { deletedAt: null };
-    if (filters?.status) where.status = filters.status as Prisma.EnumCandidatePipelineStatusFilter["equals"];
+    if (filters?.statuses?.length) {
+      where.status = {
+        in: filters.statuses as import("@prisma/client").CandidatePipelineStatus[],
+      };
+    } else if (filters?.status) {
+      where.status = filters.status as import("@prisma/client").CandidatePipelineStatus;
+    }
     if (filters?.jobPostingId) where.jobPostingId = filters.jobPostingId;
     return prisma.jobApplication.findMany({
       where,
       include: {
         candidate: { include: { resumeFile: true } },
         jobPosting: { select: { id: true, title: true, slug: true } },
+        checklistItems: { where: { deletedAt: null }, orderBy: { sortOrder: "asc" } },
+        interviews: {
+          where: { deletedAt: null },
+          orderBy: { scheduledAt: "desc" },
+          take: 1,
+          include: {
+            interviewer: { select: { id: true, firstName: true, lastName: true } },
+          },
+        },
       },
       orderBy: { appliedAt: "desc" },
     });
@@ -267,6 +282,8 @@ export class HrRepository {
             lastName: true,
             phone: true,
             employeeId: true,
+            dateOfJoining: true,
+            dateOfBirth: true,
             department: { select: { id: true, name: true } },
             designation: { select: { id: true, name: true } },
             office: { select: { id: true, name: true } },
@@ -302,8 +319,22 @@ export class HrRepository {
     return prisma.employee.findFirst({
       where: { userId, deletedAt: null },
       include: {
-        user: true,
+        user: {
+          include: {
+            department: true,
+            designation: true,
+            office: true,
+            employeeType: true,
+            employmentStatus: true,
+            manager: { select: { id: true, firstName: true, lastName: true, email: true } },
+            teamMemberships: {
+              where: { deletedAt: null, leftAt: null },
+              select: { team: { select: { id: true, name: true } } },
+            },
+          },
+        },
         assignedAssets: { where: { deletedAt: null } },
+        lifecycleEvents: { orderBy: { createdAt: "desc" }, take: 10 },
       },
     });
   }
@@ -332,7 +363,20 @@ export class HrRepository {
     if (filters?.status) where.status = filters.status as Prisma.EnumPolicyStatusFilter["equals"];
     return prisma.companyPolicy.findMany({
       where,
-      include: { file: true, publishedBy: { select: { id: true, firstName: true, lastName: true } } },
+      select: {
+        id: true,
+        title: true,
+        description: true,
+        version: true,
+        status: true,
+        publishedAt: true,
+        createdAt: true,
+        updatedAt: true,
+        file: {
+          select: { id: true, originalName: true, mimeType: true, sizeBytes: true },
+        },
+        publishedBy: { select: { id: true, firstName: true, lastName: true } },
+      },
       orderBy: { updatedAt: "desc" },
     });
   }

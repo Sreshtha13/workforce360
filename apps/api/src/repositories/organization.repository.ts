@@ -24,6 +24,7 @@ export type CreateTeamData = {
   code?: string;
   description?: string;
   leadId?: string | null;
+  memberIds?: string[];
 };
 
 export type CreateDesignationData = {
@@ -177,6 +178,33 @@ export class OrganizationRepository {
       where: { id },
       data: { deletedAt: new Date() },
     });
+  }
+
+  async setTeamMembers(teamId: string, userIds: string[]): Promise<void> {
+    const existing = await prisma.teamMember.findMany({
+      where: { teamId, deletedAt: null },
+      select: { id: true, userId: true },
+    });
+
+    const targetSet = new Set(userIds);
+    const existingSet = new Set(existing.map((m) => m.userId));
+
+    const toRemove = existing.filter((m) => !targetSet.has(m.userId));
+    const toAdd = userIds.filter((id) => !existingSet.has(id));
+
+    await prisma.$transaction([
+      ...toRemove.map((m) =>
+        prisma.teamMember.update({
+          where: { id: m.id },
+          data: { deletedAt: new Date(), leftAt: new Date() },
+        }),
+      ),
+      ...toAdd.map((userId) =>
+        prisma.teamMember.create({
+          data: { teamId, userId },
+        }),
+      ),
+    ]);
   }
   
   async findAllDesignations(departmentId?: string) {

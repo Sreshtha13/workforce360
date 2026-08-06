@@ -10,6 +10,7 @@ import { recruitmentRouter } from "./recruitment.routes";
 import { hrRouter } from "./hr.routes";
 import { portalRouter } from "./portal.routes";
 import { storageRouter } from "./storage.routes";
+import { dashboardRouter } from "./dashboard.routes";
 
 const apiRouter = Router();
 
@@ -24,5 +25,6 @@ apiRouter.use("/recruitment", recruitmentRouter);
 apiRouter.use("/hr", hrRouter);
 apiRouter.use("/portal", portalRouter);
 apiRouter.use("/storage", storageRouter);
+apiRouter.use("/dashboard", dashboardRouter);
 
 export { apiRouter };

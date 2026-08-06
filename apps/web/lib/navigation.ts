@@ -16,6 +16,7 @@ import {
   UsersRound,
   Workflow,
 } from "lucide-react";
+import { isPortalModuleEnabled } from "@/lib/module-availability";
 
 export type NavItem = {
   label: string;
@@ -206,37 +207,38 @@ export const adminNav: NavItem[] = [
     label: "Departments",
     href: "/admin/departments",
     icon: Building2,
-    permissions: ["department.create", "department.update", "department.delete"],
+    permissions: ["department.read", "department.create", "department.update", "department.delete"],
   },
   {
     label: "Teams",
     href: "/admin/teams",
     icon: UsersRound,
-    permissions: ["team.create", "team.update", "team.delete"],
+    permissions: ["team.read", "team.create", "team.update", "team.delete"],
   },
   {
     label: "Designations",
     href: "/admin/designations",
     icon: Briefcase,
-    permissions: ["designation.create", "designation.update", "designation.delete"],
+    permissions: ["designation.read", "designation.create", "designation.update", "designation.delete"],
   },
   {
     label: "Offices",
     href: "/admin/offices",
     icon: MapPin,
-    permissions: ["office.create", "office.update", "office.delete"],
+    permissions: ["office.read", "office.create", "office.update", "office.delete"],
   },
   {
     label: "Employee Types",
     href: "/admin/employee-types",
     icon: Tags,
-    permissions: ["employee_type.create", "employee_type.update", "employee_type.delete"],
+    permissions: ["employee_type.read", "employee_type.create", "employee_type.update", "employee_type.delete"],
   },
   {
     label: "Employment Statuses",
     href: "/admin/employment-statuses",
     icon: UserCheck,
     permissions: [
+      "employment_status.read",
       "employment_status.create",
       "employment_status.update",
       "employment_status.delete",
@@ -249,6 +251,7 @@ export function filterNavByPermissions(
   permissions: string[],
 ): NavItem[] {
   return items.filter((item) => {
+    if (!isPortalModuleEnabled(item.href)) return false;
     if (item.public) return true;
     if (!item.permissions?.length) return true;
     return item.permissions.some((p) => permissions.includes(p));

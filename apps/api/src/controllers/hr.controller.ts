@@ -4,9 +4,10 @@ import { hrService } from "../services/hr.service";
 import { portalService } from "../services/hr.service";
 
 export class HrController {
-  getDashboard = async (_req: Request, res: Response): Promise<void> => {
+  getDashboard = async (req: Request, res: Response): Promise<void> => {
     try {
-      const data = await hrService.getHrDashboard();
+      const userId = req.user!.userId;
+      const data = await hrService.getHrDashboard(userId);
       sendSuccess(res, data);
     } catch (error) {
       sendError(res, 500, { code: "HR_DASHBOARD_FAILED", message: "Failed to load HR dashboard" });

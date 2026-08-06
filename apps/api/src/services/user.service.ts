@@ -4,6 +4,7 @@ import { authService } from "./auth.service";
 import { hashPassword } from "../lib/password";
 import { getNextEmployeeId } from "../lib/employee-id";
 import { userIsSuperAdmin } from "../lib/super-admin";
+import { prisma } from "../lib/prisma";
 import type { CreateUserInput, UpdateUserInput } from "../repositories/user.repository";
 
 export class UserService {
@@ -16,6 +17,9 @@ export class UserService {
   async getAllUsers(
     filters?: {
       departmentId?: string;
+      officeId?: string;
+      employeeTypeId?: string;
+      employmentStatusId?: string;
       status?: string;
       search?: string;
       includeDeleted?: boolean;
@@ -159,15 +163,56 @@ export class UserService {
     if (!user) {
       throw new Error("User not found");
     }
-    
+
+    const role = await prisma.role.findFirst({
+      where: { id: roleId, deletedAt: null },
+      select: { id: true, code: true },
+    });
+    if (!role) {
+      throw new Error("Role not found");
+    }
+
+    if (role.code === "super_admin" && assignedBy) {
+      const requesterIsSuperAdmin = await userIsSuperAdmin(assignedBy);
+      if (!requesterIsSuperAdmin) {
+        throw new Error("Only Super Administrators can assign the Super Admin role");
+      }
+    }
+
     const existingRoles = await this.userRepo.getUserRoles(userId);
     const hasRole = existingRoles.some((ur) => ur.roleId === roleId);
-    
+
     if (hasRole) {
       throw new Error("User already has this role");
     }
-    
-    return this.userRepo.assignRole(userId, roleId, assignedBy);
+
+    const assignment = await this.userRepo.assignRole(userId, roleId, assignedBy);
+
+    if (role.code === "hr") {
+      const hrDepartment = await prisma.department.findFirst({
+        where: {
+          deletedAt: null,
+          OR: [
+            { code: { equals: "hr", mode: "insensitive" } },
+            { name: { equals: "HR", mode: "insensitive" } },
+            { name: { contains: "Human Resources", mode: "insensitive" } },
+          ],
+        },
+      });
+
+      if (!hrDepartment) {
+        throw new Error(
+          "HR department not found. Create a department named HR before assigning the HR role.",
+        );
+      }
+
+      const currentUser = await this.userRepo.findUserById(userId);
+      if (currentUser && !currentUser.departmentId) {
+        await this.userRepo.updateUser(userId, { departmentId: hrDepartment.id });
+      }
+    }
+
+    return assignment;
   }
   
   async removeRole(userId: string, roleId: string) {

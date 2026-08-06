@@ -214,7 +214,7 @@ export class HrService {
     return this.hrRepo.listOffers(filters);
   }
 
-  getHrDashboard() {
+  getHrDashboard(userId: string) {
     return Promise.all([
       this.hrRepo.listEmployees(),
       this.recruitmentRepo.getPipelineSummary(),
@@ -222,15 +222,128 @@ export class HrService {
         from: new Date(),
         to: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000),
       }),
-    ]).then(([employees, pipeline, upcomingInterviews]) => ({
-      employeeCount: employees.length,
-      activeEmployees: employees.filter((e) => e.lifecycleState === "ACTIVE").length,
-      onboardingEmployees: employees.filter((e) =>
-        ["PRE_ONBOARDING", "ONBOARDING"].includes(e.lifecycleState),
-      ).length,
-      pipeline,
-      upcomingInterviews: upcomingInterviews.slice(0, 10),
-    }));
+      this.hrRepo.listOffers({ status: "DRAFT" }),
+      prisma.user.findUnique({
+        where: { id: userId },
+        select: {
+          id: true,
+          firstName: true,
+          lastName: true,
+          email: true,
+          department: { select: { id: true, name: true } },
+          designation: { select: { id: true, name: true } },
+          userRoles: {
+            where: { deletedAt: null },
+            select: { role: { select: { id: true, name: true, code: true } } },
+          },
+        },
+      }),
+      prisma.employee.count({
+        where: {
+          deletedAt: null,
+          lifecycleState: { in: ["PRE_ONBOARDING", "ONBOARDING"] },
+        },
+      }),
+      prisma.auditLog.findMany({
+        orderBy: { createdAt: "desc" },
+        take: 8,
+        include: {
+          user: { select: { id: true, firstName: true, lastName: true } },
+        },
+      }),
+      prisma.jobPosting.count({ where: { deletedAt: null, status: "PUBLISHED" } }),
+    ]).then(
+      ([
+        employees,
+        pipeline,
+        upcomingInterviews,
+        draftOffers,
+        profile,
+        onboardingCount,
+        recentActivity,
+        openJobs,
+      ]) => {
+        const today = new Date();
+        const todayMonth = today.getMonth();
+        const todayDay = today.getDate();
+
+        const joiningToday = employees.filter((e) => {
+          const doj = e.user?.dateOfJoining;
+          if (!doj) return false;
+          const d = new Date(doj);
+          return d.getMonth() === todayMonth && d.getDate() === todayDay;
+        }).length;
+
+        const birthdays = employees.filter((e) => {
+          const dob = e.user?.dateOfBirth;
+          if (!dob) return false;
+          const d = new Date(dob);
+          return d.getMonth() === todayMonth && d.getDate() === todayDay;
+        }).length;
+
+        // Probation ≈ ACTIVE employees hired within the last 90 days (no PROBATION enum in schema).
+        const ninetyDaysAgo = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000);
+        const probation = employees.filter((e) => {
+          if (e.lifecycleState !== "ACTIVE") return false;
+          const hired = e.hiredAt ? new Date(e.hiredAt) : e.user?.dateOfJoining ? new Date(e.user.dateOfJoining) : null;
+          return hired != null && hired >= ninetyDaysAgo;
+        }).length;
+
+        const pendingBreakdown: { label: string; count: number; href: string }[] = [
+          ...(onboardingCount > 0
+            ? [{ label: "Onboarding in progress", count: onboardingCount, href: "/hr/onboarding" }]
+            : []),
+          ...(draftOffers.length > 0
+            ? [{ label: "Draft offers awaiting send", count: draftOffers.length, href: "/hr/offers" }]
+            : []),
+        ];
+
+        const pipelinePending = pipeline
+          .filter((row) => !["HIRED", "REJECTED"].includes(row.status))
+          .reduce((sum, row) => sum + row._count._all, 0);
+
+        if (pipelinePending > 0) {
+          pendingBreakdown.push({
+            label: "Pipeline applications",
+            count: pipelinePending,
+            href: "/hr/pipeline",
+          });
+        }
+
+        return {
+          profile,
+          employeeCount: employees.length,
+          activeEmployees: employees.filter((e) => e.lifecycleState === "ACTIVE").length,
+          onboardingEmployees: employees.filter((e) =>
+            ["PRE_ONBOARDING", "ONBOARDING"].includes(e.lifecycleState),
+          ).length,
+          joiningToday,
+          birthdays,
+          probation,
+          expiringDocuments: 0,
+          openJobs,
+          pendingApprovals: {
+            total: pendingBreakdown.reduce((sum, item) => sum + item.count, 0),
+            breakdown: pendingBreakdown,
+          },
+          pipeline,
+          upcomingInterviews: upcomingInterviews.slice(0, 10),
+          recentActivity: recentActivity.map((entry) => ({
+            id: entry.id,
+            action: entry.action,
+            entity: entry.entity,
+            createdAt: entry.createdAt.toISOString(),
+            actor: entry.user
+              ? `${entry.user.firstName} ${entry.user.lastName}`
+              : "System",
+          })),
+          attendance: {
+            available: false as const,
+            message: "Attendance tracking is not yet enabled.",
+          },
+        };
+      },
+    );
   }
 }
 
@@ -278,7 +391,7 @@ export class PortalService {
   ) {
     const { emergencyContactName, emergencyContactPhone, ...userData } = data;
 
-    const user = await this.userRepo.updateUser(userId, userData);
+    await this.userRepo.updateUser(userId, userData);
 
     const employee = await this.hrRepo.findEmployeeByUserId(userId);
     if (employee && (emergencyContactName !== undefined || emergencyContactPhone !== undefined)) {
@@ -303,12 +416,22 @@ export class PortalService {
     return this.portalRepo.listTickets(userId);
   }
 
-  createTicket(userId: string, input: { subject: string; description: string; priority?: string }) {
+  createTicket(userId: string, input: {
+    subject: string;
+    description: string;
+    priority?: string;
+    category?: string;
+    attachmentFileId?: string;
+  }) {
     return this.portalRepo.createTicket({
       user: { connect: { id: userId } },
       subject: input.subject,
       description: input.description,
       priority: input.priority ?? "medium",
+      category: input.category,
+      ...(input.attachmentFileId
+        ? { attachment: { connect: { id: input.attachmentFileId } } }
+        : {}),
     });
   }
 

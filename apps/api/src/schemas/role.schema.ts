@@ -35,7 +35,9 @@ export const removePermissionSchema = z.object({
 });
 
 export const setRolePermissionsSchema = z.object({
-  permissionIds: z.array(z.string().min(1)).default([]),
+  permissionIds: z
+    .array(z.string().min(1))
+    .min(1, "At least one permission must be selected"),
 });
 
 export type CreateRoleInput = z.infer<typeof createRoleSchema>;

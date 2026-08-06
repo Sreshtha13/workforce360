@@ -147,11 +147,42 @@ export class OrganizationService {
     return error instanceof Error ? error : new Error("Failed to save team");
   }
 
+  private async validateTeamMembers(departmentId: string, memberIds: string[]): Promise<void> {
+    if (memberIds.length === 0) return;
+
+    const members = await prisma.user.findMany({
+      where: {
+        id: { in: memberIds },
+        deletedAt: null,
+        status: "active",
+      },
+      select: { id: true, departmentId: true, firstName: true, lastName: true },
+    });
+
+    if (members.length !== memberIds.length) {
+      throw new Error("One or more team members are invalid or inactive");
+    }
+
+    for (const member of members) {
+      if (member.departmentId !== departmentId) {
+        throw new Error(
+          `${member.firstName} ${member.lastName} must belong to the selected department to join this team`,
+        );
+      }
+    }
+  }
+
   async createTeam(data: CreateTeamData) {
     await this.validateTeamDepartmentAndLead(data.departmentId, data.leadId);
+    if (data.memberIds?.length) {
+      await this.validateTeamMembers(data.departmentId, data.memberIds);
+    }
 
     try {
       const team = await this.orgRepo.createTeam(data);
+      if (data.memberIds?.length) {
+        await this.orgRepo.setTeamMembers(team.id, data.memberIds);
+      }
       return this.orgRepo.findTeamById(team.id);
     } catch (error) {
       throw this.mapTeamWriteError(error);
@@ -169,9 +200,15 @@ export class OrganizationService {
       data.leadId !== undefined ? data.leadId ?? null : existing.leadId;
 
     await this.validateTeamDepartmentAndLead(departmentId, leadId);
+    if (data.memberIds !== undefined) {
+      await this.validateTeamMembers(departmentId, data.memberIds);
+    }
 
     try {
       await this.orgRepo.updateTeam(id, data);
+      if (data.memberIds !== undefined) {
+        await this.orgRepo.setTeamMembers(id, data.memberIds);
+      }
       return this.orgRepo.findTeamById(id);
     } catch (error) {
       throw this.mapTeamWriteError(error);

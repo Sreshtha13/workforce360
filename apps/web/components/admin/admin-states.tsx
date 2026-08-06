@@ -1,4 +1,4 @@
-import { AlertCircle, CheckCircle2, Info } from "lucide-react";
+import { AlertCircle, CheckCircle2, Info, type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { statusSurface } from "@/lib/design-system";
 import { Button } from "@/components/ui/button";
@@ -54,6 +54,8 @@ type EmptyStateProps = {
   description?: string;
   actionLabel?: string;
   onAction?: () => void;
+  icon?: LucideIcon;
+  className?: string;
 };
 
 export function EmptyState(props: EmptyStateProps) {

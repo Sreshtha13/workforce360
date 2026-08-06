@@ -53,8 +53,23 @@ export default function HrPoliciesPage() {
     },
   });
 
+  const publishMutation = useMutation({
+    mutationFn: (id: string) => apiClient.hr.publishPolicy(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["hr", "policies"] });
+      setFeedback("Policy published.");
+      setError(null);
+    },
+    onError: (err) => {
+      setError(err instanceof ApiClientError ? err.message : "Failed to publish policy");
+      setFeedback(null);
+    },
+  });
+
   if (query.isLoading) return <LoadingState message="Loading policies..." />;
-  if (query.isError) return <ErrorState message="Failed to load policies." />;
+  if (query.isError) return <ErrorState message="Failed to load policies." onRetry={() => query.refetch()} />;
+
+  const policies = query.data ?? [];
 
   return (
     <div className="space-y-6">
@@ -68,8 +83,13 @@ export default function HrPoliciesPage() {
       {feedback && <AlertBanner variant="success" message={feedback} />}
       {error && <AlertBanner variant="error" message={error} />}
 
+      {policies.length === 0 ? (
+        <p className="rounded-xl border border-dashed border-white/20 p-8 text-center text-sm text-muted-foreground">
+          No policies yet. Create and publish company policies for employees.
+        </p>
+      ) : (
       <div className="space-y-3">
-        {(query.data ?? []).map((policy) => (
+        {policies.map((policy) => (
           <div key={policy.id} className="flex items-center justify-between rounded-xl border border-white/20 bg-white/40 p-4 dark:bg-white/5">
             <div>
               <p className="font-medium">{policy.title}</p>
@@ -84,12 +104,8 @@ export default function HrPoliciesPage() {
                 <Button
                   size="sm"
                   variant="outline"
-                  onClick={() =>
-                    apiClient.hr.publishPolicy(policy.id).then(() => {
-                      query.refetch();
-                      setFeedback("Policy published.");
-                    })
-                  }
+                  disabled={publishMutation.isPending}
+                  onClick={() => publishMutation.mutate(policy.id)}
                 >
                   Publish
                 </Button>
@@ -98,6 +114,7 @@ export default function HrPoliciesPage() {
           </div>
         ))}
       </div>
+      )}
 
       <FormSheet
         open={sheetOpen}

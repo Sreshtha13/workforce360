@@ -8,7 +8,6 @@ import {
   ChevronDown,
   LogOut,
   Menu,
-  Search,
   Sparkles,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
@@ -18,8 +17,8 @@ import { typographyScale } from "@/lib/design-tokens";
 import { cn } from "@/lib/utils";
 import { Breadcrumbs, buildBreadcrumbs } from "@/components/design-system/breadcrumbs";
 import { ThemeToggle } from "@/components/design-system/theme-toggle";
+import { GlobalSearch } from "@/components/dashboard/global-search";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
@@ -265,20 +264,7 @@ export function DashboardShell({ children }: { children: ReactNode }) {
             <Breadcrumbs items={breadcrumbs} />
           </div>
 
-          <div className="relative hidden min-w-0 flex-1 sm:block sm:max-w-sm lg:max-w-md">
-            <Search
-              className={cn(
-                iconSize.md,
-                "pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-muted-foreground",
-              )}
-            />
-            <Input
-              placeholder="Search modules, users, departments..."
-              className="border-white/20 bg-white/40 pl-9 dark:bg-white/5"
-              disabled
-              aria-label="Global search (coming soon)"
-            />
-          </div>
+          <GlobalSearch />
 
           <div className="ml-auto flex items-center gap-1 sm:gap-2">
             <ThemeToggle />

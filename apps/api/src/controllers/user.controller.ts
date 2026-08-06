@@ -11,8 +11,19 @@ export class UserController {
   
   getUsers = async (req: Request, res: Response): Promise<void> => {
     try {
-      const { departmentId, status, search, includeDeleted } = req.query as {
+      const {
+        departmentId,
+        officeId,
+        employeeTypeId,
+        employmentStatusId,
+        status,
+        search,
+        includeDeleted,
+      } = req.query as {
         departmentId?: string;
+        officeId?: string;
+        employeeTypeId?: string;
+        employmentStatusId?: string;
         status?: string;
         search?: string;
         includeDeleted?: boolean;
@@ -20,6 +31,9 @@ export class UserController {
       const users = await this.userService.getAllUsers(
         {
           departmentId,
+          officeId,
+          employeeTypeId,
+          employmentStatusId,
           status,
           search,
           includeDeleted,

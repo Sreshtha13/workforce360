@@ -145,7 +145,7 @@ export class RecruitmentController {
   listApplications = async (req: Request, res: Response): Promise<void> => {
     try {
       const applications = await recruitmentService.listApplications(
-        req.query as { status?: string; jobPostingId?: string },
+        req.query as { status?: string; statuses?: string[]; jobPostingId?: string },
       );
       sendSuccess(res, applications);
     } catch (error) {

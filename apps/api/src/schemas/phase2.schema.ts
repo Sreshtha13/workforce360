@@ -98,6 +98,13 @@ export const listCandidatesQuerySchema = z.object({
 
 export const listApplicationsQuerySchema = z.object({
   status: z.string().optional(),
+  statuses: z
+    .union([z.string(), z.array(z.string())])
+    .optional()
+    .transform((value) => {
+      if (!value) return undefined;
+      return Array.isArray(value) ? value : value.split(",").map((s) => s.trim()).filter(Boolean);
+    }),
   jobPostingId: z.string().optional(),
 });
 
@@ -137,6 +144,8 @@ export const createTicketSchema = z.object({
   subject: z.string().min(1).max(200),
   description: z.string().min(1),
   priority: z.enum(["low", "medium", "high"]).optional(),
+  category: z.string().max(100).optional(),
+  attachmentFileId: z.string().optional(),
 });
 
 export const listEmployeesQuerySchema = z.object({

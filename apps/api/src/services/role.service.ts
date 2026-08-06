@@ -126,13 +126,15 @@ export class RoleService {
       throw new Error("Cannot modify permissions on system role");
     }
 
-    if (permissionIds.length > 0) {
-      const all = await this.roleRepo.findAllPermissions();
-      const validIds = new Set(all.map((p) => p.id));
-      for (const id of permissionIds) {
-        if (!validIds.has(id)) {
-          throw new Error(`Invalid permission ID: ${id}`);
-        }
+    if (permissionIds.length === 0) {
+      throw new Error("At least one permission must be assigned to a role");
+    }
+
+    const all = await this.roleRepo.findAllPermissions();
+    const validIds = new Set(all.map((p) => p.id));
+    for (const id of permissionIds) {
+      if (!validIds.has(id)) {
+        throw new Error(`Invalid permission ID: ${id}`);
       }
     }
 

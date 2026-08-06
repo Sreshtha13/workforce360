@@ -4,6 +4,15 @@ import { hashPassword } from "../lib/password";
 import { writeAuditLog } from "../lib/audit";
 import { prisma } from "../lib/prisma";
 import { hrService } from "./hr.service";
+import { userIsSuperAdmin } from "../lib/super-admin";
+
+const PIPELINE_STAGE_ORDER: CandidatePipelineStatus[] = [
+  "APPLIED",
+  "SCREENING",
+  "INTERVIEW",
+  "OFFER",
+  "HIRED",
+];
 
 const DEFAULT_CHECKLIST = [
   "Submit signed offer letter",
@@ -22,6 +31,29 @@ function slugify(title: string): string {
 
 export class RecruitmentService {
   private repo = new RecruitmentRepository();
+
+  private async actorCanOverridePipeline(actorId: string): Promise<boolean> {
+    if (await userIsSuperAdmin(actorId)) return true;
+
+    const assignment = await prisma.userRole.findFirst({
+      where: {
+        userId: actorId,
+        deletedAt: null,
+        role: {
+          deletedAt: null,
+          rolePermissions: {
+            some: {
+              deletedAt: null,
+              permission: { code: "application.override_stage", isActive: true },
+            },
+          },
+        },
+      },
+      select: { id: true },
+    });
+
+    return assignment !== null;
+  }
 
   listPublicJobs() {
     return this.repo.listPublishedJobs();
@@ -198,7 +230,7 @@ export class RecruitmentService {
     return application;
   }
 
-  listApplications(filters?: { status?: string; jobPostingId?: string }) {
+  listApplications(filters?: { status?: string; jobPostingId?: string; statuses?: string[] }) {
     return this.repo.listApplications(filters);
   }
 
@@ -214,6 +246,19 @@ export class RecruitmentService {
   ) {
     const application = await this.repo.findApplicationById(applicationId);
     if (!application) throw new Error("Application not found");
+
+    if (status !== "REJECTED" && status !== application.status) {
+      const fromIdx = PIPELINE_STAGE_ORDER.indexOf(application.status);
+      const toIdx = PIPELINE_STAGE_ORDER.indexOf(status);
+      if (fromIdx >= 0 && toIdx >= 0 && toIdx < fromIdx) {
+        const canOverride = await this.actorCanOverridePipeline(actorId);
+        if (!canOverride) {
+          throw new Error(
+            "Cannot move candidate to an earlier pipeline stage without override permission",
+          );
+        }
+      }
+    }
 
     const updated = await this.repo.updateApplication(applicationId, {
       status,

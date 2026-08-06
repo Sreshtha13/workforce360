@@ -147,6 +147,16 @@ export type Asset = {
   serialNumber?: string | null;
   status: string;
   assignedAt?: string | null;
+  employee?: {
+    id: string;
+    employeeCode: string;
+    user?: {
+      id: string;
+      firstName: string;
+      lastName: string;
+      email: string;
+    } | null;
+  } | null;
 };
 
 export type SupportTicket = {
@@ -155,7 +165,10 @@ export type SupportTicket = {
   description: string;
   status: string;
   priority: string;
+  category?: string | null;
+  latestReply?: string | null;
   createdAt: string;
+  updatedAt?: string;
 };
 
 export type NotificationItem = {
@@ -179,26 +192,120 @@ export type PortalDashboard = {
   };
 };
 
+export type PortalProfileUser = {
+  id: string;
+  email: string;
+  firstName: string;
+  lastName: string;
+  phone?: string | null;
+  avatar?: string | null;
+  employeeId?: string | null;
+  dateOfBirth?: string | null;
+  dateOfJoining?: string | null;
+  department?: { id: string; name: string } | null;
+  designation?: { id: string; name: string } | null;
+  office?: { id: string; name: string } | null;
+  employeeType?: { id: string; name: string } | null;
+  employmentStatus?: { id: string; name: string } | null;
+  manager?: { id: string; firstName: string; lastName: string } | null;
+  teamMemberships?: { team: { id: string; name: string } }[] | null;
+};
+
 export type PortalProfile = {
-  user: {
-    id: string;
-    email: string;
-    firstName: string;
-    lastName: string;
-    phone?: string | null;
-    employeeId?: string | null;
-    department?: { id: string; name: string } | null;
-    designation?: { id: string; name: string } | null;
-  };
+  user: PortalProfileUser;
   employee: EmployeeMaster | null;
 };
 
 export type HrDashboard = {
+  profile?: {
+    id: string;
+    firstName: string;
+    lastName: string;
+    email: string;
+    department?: { id: string; name: string } | null;
+    designation?: { id: string; name: string } | null;
+    userRoles?: { role: { id: string; name: string; code?: string | null } }[];
+  } | null;
   employeeCount: number;
   activeEmployees: number;
   onboardingEmployees: number;
+  joiningToday?: number;
+  birthdays?: number;
+  probation?: number;
+  expiringDocuments?: number;
+  openJobs?: number;
+  pendingApprovals?: {
+    total: number;
+    breakdown: { label: string; count: number; href: string }[];
+  };
   pipeline: { status: PipelineStatus; _count: { _all: number } }[];
   upcomingInterviews: Interview[];
+  recentActivity?: {
+    id: string;
+    action: string;
+    entity: string;
+    createdAt: string;
+    actor: string;
+  }[];
+  attendance?: {
+    available: boolean;
+    message?: string;
+  };
+};
+
+export type AdminDashboard = {
+  stats: {
+    totalEmployees: number;
+    activeEmployees: number;
+    inactiveEmployees: number;
+    totalUsers: number;
+    departments: number;
+    teams: number;
+    designations: number;
+    offices: number;
+  };
+  departmentBreakdown: { id: string; name: string; employeeCount: number }[];
+  pendingApprovals: {
+    total: number;
+    breakdown: { label: string; count: number; href: string }[];
+  };
+  attendance: { available: false; message: string };
+  leave: { available: false; message: string };
+  hiring: {
+    openJobs: number;
+    pipeline: { status: PipelineStatus; _count: { _all: number } }[];
+  };
+  recentActivity: {
+    id: string;
+    action: string;
+    entity: string;
+    entityId: string | null;
+    createdAt: string;
+    actor: { id: string; name: string; email: string } | null;
+  }[];
+  searchResults?: {
+    employees: {
+      id: string;
+      firstName: string;
+      lastName: string;
+      email: string;
+      employeeId: string | null;
+      department?: { id: string; name: string } | null;
+    }[];
+    departments: { id: string; name: string; code: string | null }[];
+  };
+};
+
+export type DashboardEmployeePreview = {
+  id: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  employeeId: string | null;
+  status: string;
+  department?: { id: string; name: string } | null;
+  designation?: { id: string; name: string } | null;
+  userRoles: { role: { id: string; name: string } }[];
 };
 
 export const PIPELINE_STATUSES: PipelineStatus[] = [

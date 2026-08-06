@@ -21,8 +21,8 @@ import {
 const router = Router();
 const orgController = new OrganizationController();
 
-router.get("/departments", requireAuth, orgController.getDepartments);
-router.get("/departments/:id", requireAuth, orgController.getDepartmentById);
+router.get("/departments", requireAuth, requirePermission("department.read"), orgController.getDepartments);
+router.get("/departments/:id", requireAuth, requirePermission("department.read"), orgController.getDepartmentById);
 router.post(
   "/departments",
   requireAuth,
@@ -44,8 +44,8 @@ router.delete(
   orgController.deleteDepartment,
 );
 
-router.get("/teams", requireAuth, orgController.getTeams);
-router.get("/teams/:id", requireAuth, orgController.getTeamById);
+router.get("/teams", requireAuth, requirePermission("team.read"), orgController.getTeams);
+router.get("/teams/:id", requireAuth, requirePermission("team.read"), orgController.getTeamById);
 router.post(
   "/teams",
   requireAuth,
@@ -67,8 +67,8 @@ router.delete(
   orgController.deleteTeam,
 );
 
-router.get("/designations", requireAuth, orgController.getDesignations);
-router.get("/designations/:id", requireAuth, orgController.getDesignationById);
+router.get("/designations", requireAuth, requirePermission("designation.read"), orgController.getDesignations);
+router.get("/designations/:id", requireAuth, requirePermission("designation.read"), orgController.getDesignationById);
 router.post(
   "/designations",
   requireAuth,
@@ -90,8 +90,8 @@ router.delete(
   orgController.deleteDesignation,
 );
 
-router.get("/offices", requireAuth, orgController.getOffices);
-router.get("/offices/:id", requireAuth, orgController.getOfficeById);
+router.get("/offices", requireAuth, requirePermission("office.read"), orgController.getOffices);
+router.get("/offices/:id", requireAuth, requirePermission("office.read"), orgController.getOfficeById);
 router.post(
   "/offices",
   requireAuth,
@@ -113,8 +113,8 @@ router.delete(
   orgController.deleteOffice,
 );
 
-router.get("/employee-types", requireAuth, orgController.getEmployeeTypes);
-router.get("/employee-types/:id", requireAuth, orgController.getEmployeeTypeById);
+router.get("/employee-types", requireAuth, requirePermission("employee_type.read"), orgController.getEmployeeTypes);
+router.get("/employee-types/:id", requireAuth, requirePermission("employee_type.read"), orgController.getEmployeeTypeById);
 router.post(
   "/employee-types",
   requireAuth,
@@ -136,8 +136,8 @@ router.delete(
   orgController.deleteEmployeeType,
 );
 
-router.get("/employment-statuses", requireAuth, orgController.getEmploymentStatuses);
-router.get("/employment-statuses/:id", requireAuth, orgController.getEmploymentStatusById);
+router.get("/employment-statuses", requireAuth, requirePermission("employment_status.read"), orgController.getEmploymentStatuses);
+router.get("/employment-statuses/:id", requireAuth, requirePermission("employment_status.read"), orgController.getEmploymentStatusById);
 router.post(
   "/employment-statuses",
   requireAuth,

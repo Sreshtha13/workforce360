@@ -150,7 +150,7 @@ export class OrganizationController {
     }
   };
   
-  getDesignations = async (_req: Request, res: Response): Promise<void> => {
+  getDesignations = async (req: Request, res: Response): Promise<void> => {
     try {
       const { departmentId } = req.query;
       const designations = await this.orgService.getAllDesignations(departmentId as string | undefined);

@@ -52,6 +52,8 @@ import type {
   Interview,
   OfferLetter,
   Assessment,
+  AdminDashboard,
+  DashboardEmployeePreview,
 } from "@/types/phase2";
 
 const API_BASE_URL =
@@ -256,6 +258,9 @@ export const apiClient = {
   users: {
     list: (params?: {
       departmentId?: string;
+      officeId?: string;
+      employeeTypeId?: string;
+      employmentStatusId?: string;
       status?: string;
       search?: string;
       includeDeleted?: boolean;
@@ -263,6 +268,9 @@ export const apiClient = {
       request<User[]>(
         `/api/users${buildQuery({
           departmentId: params?.departmentId,
+          officeId: params?.officeId,
+          employeeTypeId: params?.employeeTypeId,
+          employmentStatusId: params?.employmentStatusId,
           status: params?.status,
           search: params?.search,
           includeDeleted: params?.includeDeleted ? "true" : undefined,
@@ -589,10 +597,11 @@ export const apiClient = {
         method: "POST",
         body: JSON.stringify({ fileId }),
       }),
-    listApplications: (params?: { status?: string; jobPostingId?: string }) =>
+    listApplications: (params?: { status?: string; statuses?: string; jobPostingId?: string }) =>
       request<JobApplication[]>(
         `/api/recruitment/applications${buildQuery({
           status: params?.status,
+          statuses: params?.statuses,
           jobPostingId: params?.jobPostingId,
         })}`,
       ),
@@ -652,6 +661,21 @@ export const apiClient = {
         method: "PATCH",
         body: JSON.stringify({ isCompleted }),
       }),
+  },
+
+  dashboard: {
+    getAdmin: (search?: string) =>
+      request<AdminDashboard>(
+        `/api/dashboard${buildQuery(search ? { search } : undefined)}`,
+      ),
+    listEmployees: (search?: string) =>
+      request<DashboardEmployeePreview[]>(
+        `/api/dashboard/employees${buildQuery(search ? { search } : undefined)}`,
+      ),
+    search: (q: string) =>
+      request<AdminDashboard["searchResults"]>(
+        `/api/dashboard/search${buildQuery({ q })}`,
+      ),
   },
 
   hr: {
@@ -717,7 +741,13 @@ export const apiClient = {
     markNotificationRead: (id: string) =>
       request<{ ok: boolean }>(`/api/portal/notifications/${id}/read`, { method: "POST" }),
     listTickets: () => request<SupportTicket[]>("/api/portal/tickets"),
-    createTicket: (data: { subject: string; description: string; priority?: string }) =>
+    createTicket: (data: {
+      subject: string;
+      description: string;
+      category?: string;
+      priority?: "low" | "medium" | "high";
+      attachmentFileId?: string;
+    }) =>
       request<SupportTicket>("/api/portal/tickets", {
         method: "POST",
         body: JSON.stringify(data),
