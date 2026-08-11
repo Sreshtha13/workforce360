@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import { apiClient, ApiClientError } from "@/lib/api-client";
+import { useAuth } from "@/lib/auth-context";
+import { canAccessCandidateApplications } from "@/lib/navigation";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { LoadingState, ErrorState, EmptyState } from "@/components/admin/admin-states";
 import { Badge } from "@/components/ui/badge";
@@ -10,6 +12,9 @@ import { Button } from "@/components/ui/button";
 import { PIPELINE_LABELS, type PipelineStatus } from "@/types/phase2";
 
 export default function CandidateDashboardPage() {
+  const { user } = useAuth();
+  const isApplicant = canAccessCandidateApplications(user);
+
   const query = useQuery({
     queryKey: ["candidate", "me"],
     queryFn: async () => {
@@ -17,13 +22,47 @@ export default function CandidateDashboardPage() {
       return res.data!;
     },
     retry: false,
+    enabled: isApplicant,
   });
+
+  if (!isApplicant) {
+    return (
+      <div className="space-y-6">
+        <AdminPageHeader
+          title="My applications"
+          description="Applicant tracking for open roles."
+        />
+        <ErrorState message="This area is only available to candidates. Super Admin and internal staff accounts do not use the applicant workflow." />
+      </div>
+    );
+  }
 
   if (query.isLoading) return <LoadingState message="Loading your applications..." />;
 
   if (query.isError) {
-    const isNotFound =
-      query.error instanceof ApiClientError && query.error.status === 404;
+    const status = query.error instanceof ApiClientError ? query.error.status : null;
+    const code =
+      query.error instanceof ApiClientError ? query.error.code : null;
+
+    if (status === 403 || code === "FEATURE_UNAVAILABLE") {
+      return (
+        <div className="space-y-6">
+          <AdminPageHeader
+            title="My applications"
+            description="Applicant tracking for open roles."
+          />
+          <ErrorState
+            message={
+              query.error instanceof ApiClientError
+                ? query.error.message
+                : "You are not authorized to access candidate applications."
+            }
+          />
+        </div>
+      );
+    }
+
+    const isNotFound = status === 404;
     if (isNotFound) {
       return (
         <div className="space-y-6">
@@ -81,7 +120,7 @@ export default function CandidateDashboardPage() {
 
       <div className="rounded-2xl border border-white/20 bg-white/50 p-5 dark:bg-white/5">
         <p className="text-sm text-muted-foreground">Overall pipeline status</p>
-        <div className="mt-2 flex flex-wrap items-center gap-3">
+        <div className="mt-2 flex flex-wrap items-center gap-2">
           <Badge>{PIPELINE_LABELS[candidate.pipelineStatus as PipelineStatus]}</Badge>
           {candidate.resumeFile && (
             <span className="text-sm text-muted-foreground">

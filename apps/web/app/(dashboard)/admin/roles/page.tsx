@@ -42,7 +42,7 @@ const emptyRoleForm = {
 type PermissionSheetMode = "view" | "edit" | null;
 
 export default function RolesAdminPage() {
-  const { hasPermission } = useAuth();
+  const { hasPermission, isSuperAdmin, refetch: refetchAuth } = useAuth();
   const queryClient = useQueryClient();
   const [roleSheetOpen, setRoleSheetOpen] = useState(false);
   const [editingRole, setEditingRole] = useState<RoleRow | null>(null);
@@ -63,7 +63,12 @@ export default function RolesAdminPage() {
   const canCreate = hasPermission("role.create");
   const canUpdate = hasPermission("role.update");
   const canDelete = hasPermission("role.delete");
-  const canEditPermissions = hasPermission("role.update");
+  /** Custom roles: role.update. System roles: Super Admin only (API-enforced). */
+  const canEditCustomPermissions = hasPermission("role.update");
+  const canEditSystemPermissions = isSuperAdmin;
+
+  const canEditRolePermissions = (role: RoleRow) =>
+    role.isSystem ? canEditSystemPermissions : canEditCustomPermissions;
 
   const rolesQuery = useQuery({
     queryKey: ["roles"],
@@ -178,9 +183,11 @@ export default function RolesAdminPage() {
       if (!permissionTarget) throw new Error("No role selected");
       return apiClient.roles.setPermissions(permissionTarget.id, selectedPermissionIds);
     },
-    onSuccess: () => {
+    onSuccess: async () => {
       queryClient.invalidateQueries({ queryKey: ["roles"] });
       queryClient.invalidateQueries({ queryKey: ["role-permissions", permissionTarget?.id] });
+      queryClient.invalidateQueries({ queryKey: ["permissions"] });
+      await refetchAuth();
       setPermissionTarget(null);
       setPermissionMode(null);
       setFeedback({ type: "success", message: "Role permissions updated" });
@@ -260,7 +267,7 @@ export default function RolesAdminPage() {
     <div className="space-y-6">
       <AdminPageHeader
         title="Role Management"
-        description="Create roles, assign permissions, and manage access across the organization."
+        description="Create roles and assign permissions. System role names stay locked; only Super Admins can edit system role permissions."
         actionLabel={canCreate ? "Add Role" : undefined}
         onAction={canCreate ? openCreateRole : undefined}
       />
@@ -324,18 +331,20 @@ export default function RolesAdminPage() {
               key: "actions",
               header: "Actions",
               className: "text-right",
-              render: (r) => (
-                <div className="flex flex-wrap justify-end gap-2">
-                  {canEditPermissions && !r.isSystem ? (
-                    <Button
-                      variant="default"
-                      size="sm"
-                      onClick={() => openPermissions(r, "edit")}
-                    >
-                      <Pencil className={cn(iconSize.sm, "mr-1")} />
-                      Edit Permissions
-                    </Button>
-                  ) : (
+              render: (r) => {
+                const canEditPerms = canEditRolePermissions(r);
+                return (
+                  <div className="flex flex-wrap justify-end gap-2">
+                    {canEditPerms ? (
+                      <Button
+                        variant="default"
+                        size="sm"
+                        onClick={() => openPermissions(r, "edit")}
+                      >
+                        <Pencil className={cn(iconSize.sm, "mr-1")} />
+                        Edit Permissions
+                      </Button>
+                    ) : null}
                     <Button
                       variant="outline"
                       size="sm"
@@ -343,47 +352,38 @@ export default function RolesAdminPage() {
                     >
                       View permissions
                     </Button>
-                  )}
-                  {canEditPermissions && !r.isSystem && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => openPermissions(r, "view")}
-                    >
-                      View
-                    </Button>
-                  )}
-                  {canUpdate && !r.isSystem && (
-                    <Button variant="outline" size="sm" onClick={() => openEditRole(r)}>
-                      <Pencil className={cn(iconSize.sm, "mr-1")} />
-                      Edit role
-                    </Button>
-                  )}
-                  {canCreate && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      disabled={duplicateRoleMutation.isPending}
-                      onClick={() => duplicateRoleMutation.mutate(r)}
-                    >
-                      <Copy className={cn(iconSize.sm, "mr-1")} />
-                      Duplicate
-                    </Button>
-                  )}
-                  {canDelete && !r.isSystem && (
-                    <Button
-                      variant="destructive"
-                      size="sm"
-                      onClick={() =>
-                        confirm(`Delete role "${r.name}"?`) && deleteRoleMutation.mutate(r.id)
-                      }
-                    >
-                      <Trash2 className={cn(iconSize.sm, "mr-1")} />
-                      Delete
-                    </Button>
-                  )}
-                </div>
-              ),
+                    {canUpdate && !r.isSystem && (
+                      <Button variant="outline" size="sm" onClick={() => openEditRole(r)}>
+                        <Pencil className={cn(iconSize.sm, "mr-1")} />
+                        Edit role
+                      </Button>
+                    )}
+                    {canCreate && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={duplicateRoleMutation.isPending}
+                        onClick={() => duplicateRoleMutation.mutate(r)}
+                      >
+                        <Copy className={cn(iconSize.sm, "mr-1")} />
+                        Duplicate
+                      </Button>
+                    )}
+                    {canDelete && !r.isSystem && (
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        onClick={() =>
+                          confirm(`Delete role "${r.name}"?`) && deleteRoleMutation.mutate(r.id)
+                        }
+                      >
+                        <Trash2 className={cn(iconSize.sm, "mr-1")} />
+                        Delete
+                      </Button>
+                    )}
+                  </div>
+                );
+              },
             },
           ]}
         />
@@ -465,11 +465,15 @@ export default function RolesAdminPage() {
               {permissionTarget?.name}
             </SheetTitle>
             <SheetDescription>
-              {permissionTarget?.isSystem
-                ? "System role permissions are read-only."
+              {permissionMode === "edit" && permissionTarget?.isSystem
+                ? "System role — Super Admin may update the permission matrix. Name and code stay locked."
                 : permissionMode === "edit"
                   ? "Select permissions for this role using the matrix below."
-                  : "Read-only view of permissions assigned to this role."}
+                  : permissionTarget?.isSystem
+                    ? isSuperAdmin
+                      ? "System role permissions. Use Edit Permissions to make changes."
+                      : "System role permissions are read-only. Only Super Administrators can change them."
+                    : "Read-only view of permissions assigned to this role."}
             </SheetDescription>
           </SheetHeader>
           <div className="flex-1 overflow-y-auto px-1 py-4">
@@ -481,13 +485,25 @@ export default function RolesAdminPage() {
               <PermissionMatrix
                 permissions={allPermissions}
                 selectedIds={selectedPermissionIds}
-                onChange={permissionMode === "edit" ? setSelectedPermissionIds : undefined}
-                readOnly={permissionMode !== "edit" || permissionTarget?.isSystem}
+                onChange={
+                  permissionMode === "edit" &&
+                  permissionTarget &&
+                  canEditRolePermissions(permissionTarget)
+                    ? setSelectedPermissionIds
+                    : undefined
+                }
+                readOnly={
+                  permissionMode !== "edit" ||
+                  !permissionTarget ||
+                  !canEditRolePermissions(permissionTarget)
+                }
               />
             )}
           </div>
 
-          {permissionMode === "edit" && canEditPermissions && !permissionTarget?.isSystem && (
+          {permissionMode === "edit" &&
+            permissionTarget &&
+            canEditRolePermissions(permissionTarget) && (
             <SheetFooter className="flex-row justify-end gap-2 border-t border-white/10 pt-4 dark:border-white/5">
               <Button
                 type="button"

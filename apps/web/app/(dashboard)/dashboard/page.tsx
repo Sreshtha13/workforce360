@@ -21,6 +21,7 @@ import { MetricStatCard } from "@/components/dashboard/metric-stat-card";
 import {
   AttendanceSummary,
   LeaveOverview,
+  ModuleComingSoonCard,
 } from "@/components/dashboard/overview-widgets";
 import { HiringOverview } from "@/components/dashboard/hiring-overview-live";
 import { PendingApprovals } from "@/components/dashboard/pending-approvals";
@@ -32,7 +33,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 export default function DashboardPage() {
   const { user, hasPermission } = useAuth();
 
-  const canViewDashboard = hasPermission("user.read");
+  const canViewDashboard = hasPermission("dashboard.read");
 
   const dashboardQuery = useQuery({
     queryKey: ["dashboard", "admin"],
@@ -45,7 +46,10 @@ export default function DashboardPage() {
 
   if (!user) return null;
 
-  const visibleAdmin = filterNavByPermissions(adminNav, user.permissions);
+  const visibleAdmin = filterNavByPermissions(adminNav, {
+    permissions: user.permissions,
+    roles: user.roles,
+  });
   const stats = dashboardQuery.data?.stats;
   const loading = dashboardQuery.isLoading;
 
@@ -211,8 +215,22 @@ export default function DashboardPage() {
           loading={loading}
         />
 
-        <AttendanceSummary data={dashboardQuery.data?.attendance} />
-        <LeaveOverview data={dashboardQuery.data?.leave} />
+        {dashboardQuery.data?.attendance?.available ? (
+          <AttendanceSummary data={dashboardQuery.data.attendance} />
+        ) : canViewDashboard && !loading ? (
+          <ModuleComingSoonCard
+            title="Attendance"
+            message="Attendance tracking is not yet enabled. Live metrics will appear here when the module ships."
+          />
+        ) : null}
+        {dashboardQuery.data?.leave?.available ? (
+          <LeaveOverview data={dashboardQuery.data.leave} />
+        ) : canViewDashboard && !loading ? (
+          <ModuleComingSoonCard
+            title="Leave overview"
+            message="Leave management is not yet enabled. Request counts will appear here when the module ships."
+          />
+        ) : null}
         <HiringOverview
           openJobs={dashboardQuery.data?.hiring.openJobs}
           pipeline={dashboardQuery.data?.hiring.pipeline}

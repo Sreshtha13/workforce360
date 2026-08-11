@@ -39,6 +39,8 @@ import type {
 import type {
   Candidate,
   CompanyPolicy,
+  PolicyAcknowledgementReport,
+  PolicyAssignment,
   EmployeeMaster,
   HrDashboard,
   JobApplication,
@@ -443,6 +445,10 @@ export const apiClient = {
           `/api/organization/designations${departmentId ? `?departmentId=${encodeURIComponent(departmentId)}` : ""}`,
         ),
       get: (id: string) => request<Designation>(`/api/organization/designations/${id}`),
+      nextCode: (departmentId: string) =>
+        request<{ code: string }>(
+          `/api/organization/designations/next-code?departmentId=${encodeURIComponent(departmentId)}`,
+        ),
       create: (data: CreateDesignationInput) =>
         request<Designation>("/api/organization/designations", {
           method: "POST",
@@ -693,17 +699,47 @@ export const apiClient = {
         method: "PATCH",
         body: JSON.stringify({ lifecycleState, notes }),
       }),
-    listPolicies: (status?: string) =>
+    listPolicies: (status?: string, familyId?: string) =>
       request<CompanyPolicy[]>(
-        `/api/hr/policies${buildQuery({ status })}`,
+        `/api/hr/policies${buildQuery({ status, familyId })}`,
       ),
+    getPolicy: (id: string) => request<CompanyPolicy>(`/api/hr/policies/${id}`),
     createPolicy: (data: { title: string; description?: string; version?: string; fileId?: string }) =>
       request<CompanyPolicy>("/api/hr/policies", {
         method: "POST",
         body: JSON.stringify(data),
       }),
+    updatePolicy: (
+      id: string,
+      data: { title?: string; description?: string; version?: string; fileId?: string | null },
+    ) =>
+      request<CompanyPolicy>(`/api/hr/policies/${id}`, {
+        method: "PUT",
+        body: JSON.stringify(data),
+      }),
     publishPolicy: (id: string) =>
       request<CompanyPolicy>(`/api/hr/policies/${id}/publish`, { method: "POST" }),
+    createPolicyVersion: (id: string) =>
+      request<CompanyPolicy>(`/api/hr/policies/${id}/versions`, { method: "POST" }),
+    listPolicyAssignments: (familyId: string) =>
+      request<PolicyAssignment[]>(`/api/hr/policy-families/${familyId}/assignments`),
+    assignPolicy: (data: {
+      familyId: string;
+      targetType: "ALL" | "USER" | "DEPARTMENT" | "TEAM";
+      userId?: string;
+      departmentId?: string;
+      teamId?: string;
+    }) =>
+      request<PolicyAssignment>("/api/hr/policy-assignments", {
+        method: "POST",
+        body: JSON.stringify(data),
+      }),
+    removePolicyAssignment: (assignmentId: string) =>
+      request<{ message: string }>(`/api/hr/policy-assignments/${assignmentId}`, {
+        method: "DELETE",
+      }),
+    getPolicyAcknowledgements: (policyId: string) =>
+      request<PolicyAcknowledgementReport>(`/api/hr/policies/${policyId}/acknowledgements`),
     listAssets: (params?: { status?: string; employeeId?: string }) =>
       request<Asset[]>(
         `/api/hr/assets${buildQuery({ status: params?.status, employeeId: params?.employeeId })}`,
@@ -714,6 +750,36 @@ export const apiClient = {
       request<Asset>(`/api/hr/assets/${assetId}/assign`, {
         method: "POST",
         body: JSON.stringify({ employeeId }),
+      }),
+    listTickets: (params?: { status?: string; assignedToId?: string; search?: string }) =>
+      request<SupportTicket[]>(
+        `/api/hr/tickets${buildQuery({
+          status: params?.status,
+          assignedToId: params?.assignedToId,
+          search: params?.search,
+        })}`,
+      ),
+    getTicket: (id: string) => request<SupportTicket>(`/api/hr/tickets/${id}`),
+    assignTicket: (id: string, assignedToId: string | null) =>
+      request<SupportTicket>(`/api/hr/tickets/${id}/assign`, {
+        method: "POST",
+        body: JSON.stringify({ assignedToId }),
+      }),
+    updateTicketStatus: (
+      id: string,
+      status: "OPEN" | "IN_PROGRESS" | "WAITING_FOR_EMPLOYEE" | "RESOLVED" | "CLOSED",
+    ) =>
+      request<SupportTicket>(`/api/hr/tickets/${id}/status`, {
+        method: "PATCH",
+        body: JSON.stringify({ status }),
+      }),
+    replyToTicket: (
+      id: string,
+      data: { body: string; attachmentFileId?: string; setWaiting?: boolean },
+    ) =>
+      request<SupportTicket>(`/api/hr/tickets/${id}/replies`, {
+        method: "POST",
+        body: JSON.stringify(data),
       }),
     listInterviews: (params?: { from?: string; to?: string }) =>
       request<Interview[]>(
@@ -741,6 +807,7 @@ export const apiClient = {
     markNotificationRead: (id: string) =>
       request<{ ok: boolean }>(`/api/portal/notifications/${id}/read`, { method: "POST" }),
     listTickets: () => request<SupportTicket[]>("/api/portal/tickets"),
+    getTicket: (id: string) => request<SupportTicket>(`/api/portal/tickets/${id}`),
     createTicket: (data: {
       subject: string;
       description: string;
@@ -752,7 +819,16 @@ export const apiClient = {
         method: "POST",
         body: JSON.stringify(data),
       }),
+    replyToTicket: (id: string, data: { body: string; attachmentFileId?: string }) =>
+      request<SupportTicket>(`/api/portal/tickets/${id}/replies`, {
+        method: "POST",
+        body: JSON.stringify(data),
+      }),
     listMyAssets: () => request<Asset[]>("/api/portal/assets"),
     listPolicies: () => request<CompanyPolicy[]>("/api/portal/policies"),
+    acknowledgePolicy: (policyId: string) =>
+      request<{ id: string; acknowledgedAt: string }>(`/api/portal/policies/${policyId}/acknowledge`, {
+        method: "POST",
+      }),
   },
 };

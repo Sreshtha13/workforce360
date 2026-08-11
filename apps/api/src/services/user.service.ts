@@ -2,18 +2,30 @@ import { UserRepository } from "../repositories/user.repository";
 import { departmentManagerService } from "./department-manager.service";
 import { authService } from "./auth.service";
 import { hashPassword } from "../lib/password";
-import { getNextEmployeeId } from "../lib/employee-id";
+import { AppError, toClientError } from "../lib/app-error";
 import { userIsSuperAdmin } from "../lib/super-admin";
+import {
+  assertCanViewUser,
+  resolveEmployeeVisibilityScope,
+} from "../lib/employee-scope";
 import { prisma } from "../lib/prisma";
+import {
+  allocateNextEmployeeId,
+  isEmployeeIdConflict,
+  previewNextEmployeeId,
+} from "./employee-id.service";
+import { employeeMasterService } from "./employee-master.service";
 import type { CreateUserInput, UpdateUserInput } from "../repositories/user.repository";
+
+const CREATE_USER_MAX_RETRIES = 3;
 
 export class UserService {
   private userRepo: UserRepository;
-  
+
   constructor() {
     this.userRepo = new UserRepository();
   }
-  
+
   async getAllUsers(
     filters?: {
       departmentId?: string;
@@ -32,55 +44,89 @@ export class UserService {
       }
     }
 
-    return this.userRepo.findAllUsers(filters);
+    let ids: string[] | undefined;
+    if (requesterId) {
+      const scope = await resolveEmployeeVisibilityScope(requesterId);
+      if (scope.type === "userIds") {
+        ids = scope.userIds;
+      }
+    }
+
+    return this.userRepo.findAllUsers({ ...filters, ids });
   }
-  
-  async getUserById(id: string) {
+
+  async getUserById(id: string, requesterId?: string) {
     const user = await this.userRepo.findUserById(id);
     if (!user) {
       throw new Error("User not found");
     }
+
+    if (requesterId) {
+      await assertCanViewUser(requesterId, id);
+    }
+
     return user;
   }
 
   async getNextEmployeeId(): Promise<string> {
-    const latest = await this.userRepo.findLatestEmployeeId();
-    return getNextEmployeeId(latest);
+    return previewNextEmployeeId();
   }
-  
+
   async createUser(data: CreateUserInput & { password?: string }) {
     const { password, managerId: _ignoredManagerId, ...userData } = data;
 
-    if (!userData.employeeId) {
-      userData.employeeId = await this.getNextEmployeeId();
-    }
-    
     let passwordHash: string | undefined;
     if (password) {
       passwordHash = await hashPassword(password);
     }
-    
-    const created = await this.userRepo.createUser({
-      ...userData,
-      passwordHash,
-    });
 
-    if (userData.departmentId) {
-      const derivedManagerId = await departmentManagerService.resolveManagerForDepartmentAssignment(
-        created.id,
-        userData.departmentId,
-      );
-      if (derivedManagerId) {
-        return this.userRepo.updateUser(created.id, { managerId: derivedManagerId });
+    let lastError: unknown;
+
+    for (let attempt = 0; attempt < CREATE_USER_MAX_RETRIES; attempt++) {
+      try {
+        const payload = { ...userData };
+        if (!payload.employeeId) {
+          payload.employeeId = await allocateNextEmployeeId();
+        }
+
+        const created = await this.userRepo.createUser({
+          ...payload,
+          passwordHash,
+        });
+
+        await employeeMasterService.ensureEmployeeRecord(created.id, {
+          employeeCode: created.employeeId ?? payload.employeeId,
+          lifecycleState: "ACTIVE",
+          hiredAt: created.dateOfJoining ?? undefined,
+        });
+
+        if (payload.departmentId) {
+          const derivedManagerId = await departmentManagerService.resolveManagerForDepartmentAssignment(
+            created.id,
+            payload.departmentId,
+          );
+          if (derivedManagerId) {
+            return this.userRepo.updateUser(created.id, { managerId: derivedManagerId });
+          }
+        }
+
+        return created;
+      } catch (error) {
+        lastError = error;
+        if (isEmployeeIdConflict(error) && attempt < CREATE_USER_MAX_RETRIES - 1) {
+          userData.employeeId = undefined;
+          continue;
+        }
+        throw toClientError(error);
       }
     }
 
-    return created;
+    throw toClientError(lastError);
   }
-  
+
   async updateUser(id: string, data: UpdateUserInput & { password?: string }) {
     const { password, ...userData } = data;
-    
+
     const existing = await this.userRepo.findUserById(id);
     if (!existing) {
       throw new Error("User not found");
@@ -118,22 +164,34 @@ export class UserService {
       await departmentManagerService.validateManagerUser(userData.managerId);
       await departmentManagerService.validateNoReportingCycle(id, userData.managerId);
     }
-    
+
     let passwordHash: string | undefined;
     if (password) {
       passwordHash = await hashPassword(password);
     }
 
-    const updated = await this.userRepo.updateUser(id, {
-      ...userData,
-      ...(passwordHash && { passwordHash }),
-    });
+    try {
+      const updated = await this.userRepo.updateUser(id, {
+        ...userData,
+        ...(passwordHash && { passwordHash }),
+      });
 
-    if (passwordHash) {
-      await authService.invalidateUserSessions(id);
+      if (updated.employeeId) {
+        await employeeMasterService.ensureEmployeeRecord(updated.id, {
+          employeeCode: updated.employeeId,
+          lifecycleState: "ACTIVE",
+          hiredAt: updated.dateOfJoining ?? undefined,
+        });
+      }
+
+      if (passwordHash) {
+        await authService.invalidateUserSessions(id);
+      }
+
+      return updated;
+    } catch (error) {
+      throw toClientError(error);
     }
-
-    return updated;
   }
 
   async revokeUserSessions(userId: string) {
@@ -144,7 +202,7 @@ export class UserService {
 
     await authService.invalidateUserSessions(userId);
   }
-  
+
   async deleteUser(id: string) {
     const existing = await this.userRepo.findUserById(id);
     if (!existing) {
@@ -153,11 +211,12 @@ export class UserService {
 
     await departmentManagerService.assertUserCanBeDeleted(id);
     await this.userRepo.clearUserAssignments(id);
+    await employeeMasterService.softDeleteForUser(id);
     const deleted = await this.userRepo.deleteUser(id);
     await authService.invalidateUserSessions(id);
     return deleted;
   }
-  
+
   async assignRole(userId: string, roleId: string, assignedBy?: string) {
     const user = await this.userRepo.findUserById(userId);
     if (!user) {
@@ -201,29 +260,37 @@ export class UserService {
       });
 
       if (!hrDepartment) {
-        throw new Error(
+        throw new AppError(
+          "HR_DEPARTMENT_NOT_FOUND",
           "HR department not found. Create a department named HR before assigning the HR role.",
+          400,
         );
       }
 
       const currentUser = await this.userRepo.findUserById(userId);
       if (currentUser && !currentUser.departmentId) {
-        await this.userRepo.updateUser(userId, { departmentId: hrDepartment.id });
+        const updated = await this.userRepo.updateUser(userId, { departmentId: hrDepartment.id });
+        if (updated.employeeId) {
+          await employeeMasterService.ensureEmployeeRecord(updated.id, {
+            employeeCode: updated.employeeId,
+            lifecycleState: "ACTIVE",
+          });
+        }
       }
     }
 
     return assignment;
   }
-  
+
   async removeRole(userId: string, roleId: string) {
     const user = await this.userRepo.findUserById(userId);
     if (!user) {
       throw new Error("User not found");
     }
-    
+
     return this.userRepo.removeRole(userId, roleId);
   }
-  
+
   async getUserRoles(userId: string) {
     return this.userRepo.getUserRoles(userId);
   }

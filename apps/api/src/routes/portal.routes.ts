@@ -3,7 +3,7 @@ import { PortalController } from "../controllers/hr.controller";
 import { requireAuth } from "../middleware/auth";
 import { requirePermission } from "../middleware/rbac";
 import { validate } from "../middleware/validate";
-import { updatePortalProfileSchema, createTicketSchema } from "../schemas/phase2.schema";
+import { updatePortalProfileSchema, createTicketSchema, ticketReplySchema } from "../schemas/phase2.schema";
 
 const router = Router();
 const controller = new PortalController();
@@ -44,15 +44,28 @@ router.post(
 router.get(
   "/tickets",
   requireAuth,
-  requirePermission("portal.read"),
+  requirePermission("ticket.create", "portal.read"),
   controller.listTickets,
+);
+router.get(
+  "/tickets/:id",
+  requireAuth,
+  requirePermission("ticket.create", "portal.read"),
+  controller.getTicket,
 );
 router.post(
   "/tickets",
   requireAuth,
-  requirePermission("portal.read"),
+  requirePermission("ticket.create", "portal.read"),
   validate(createTicketSchema),
   controller.createTicket,
+);
+router.post(
+  "/tickets/:id/replies",
+  requireAuth,
+  requirePermission("ticket.create", "portal.read"),
+  validate(ticketReplySchema),
+  controller.replyToTicket,
 );
 
 router.get(
@@ -66,6 +79,12 @@ router.get(
   requireAuth,
   requirePermission("portal.read"),
   controller.listPolicies,
+);
+router.post(
+  "/policies/:id/acknowledge",
+  requireAuth,
+  requirePermission("portal.read"),
+  controller.acknowledgePolicy,
 );
 
 export { router as portalRouter };

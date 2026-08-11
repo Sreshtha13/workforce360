@@ -6,14 +6,15 @@ const mockHrRepo = vi.hoisted(() => ({
   createEmployee: vi.fn(),
   createLifecycleEvent: vi.fn(),
   updateEmployee: vi.fn(),
+  listEmployees: vi.fn(),
 }));
 
 const mockRecruitmentRepo = vi.hoisted(() => ({
   findApplicationById: vi.fn(),
+  getPipelineSummary: vi.fn(),
 }));
 
 const mockUserRepo = vi.hoisted(() => ({
-  findLatestEmployeeId: vi.fn(),
   findUserById: vi.fn(),
   updateUser: vi.fn(),
 }));
@@ -23,6 +24,10 @@ const mockPortalRepo = vi.hoisted(() => ({
   listNotifications: vi.fn(),
   listTickets: vi.fn(),
 }));
+
+const mockAllocateNextEmployeeId = vi.fn();
+const mockEnsureEmployeeRecord = vi.fn();
+const mockBackfillMissingEmployeeRecords = vi.fn();
 
 vi.mock("../repositories/phase2.repository", () => ({
   HrRepository: vi.fn(function HrRepositoryMock() {
@@ -49,7 +54,22 @@ vi.mock("../lib/audit", () => ({
 vi.mock("../lib/prisma", () => ({
   prisma: {
     role: { findUnique: vi.fn() },
-    user: { update: vi.fn() },
+    user: { findUnique: vi.fn(), update: vi.fn() },
+    employee: { count: vi.fn() },
+    auditLog: { findMany: vi.fn() },
+    jobPosting: { count: vi.fn() },
+  },
+}));
+
+vi.mock("./employee-id.service", () => ({
+  allocateNextEmployeeId: (...args: unknown[]) => mockAllocateNextEmployeeId(...args),
+}));
+
+vi.mock("./employee-master.service", () => ({
+  employeeMasterService: {
+    ensureEmployeeRecord: (...args: unknown[]) => mockEnsureEmployeeRecord(...args),
+    backfillMissingEmployeeRecords: (...args: unknown[]) =>
+      mockBackfillMissingEmployeeRecords(...args),
   },
 }));
 
@@ -63,10 +83,22 @@ describe("HrService", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     service = new HrService();
+    mockBackfillMissingEmployeeRecords.mockResolvedValue(0);
+  });
+
+  describe("listEmployees", () => {
+    it("backfills missing employee records before listing", async () => {
+      mockHrRepo.listEmployees.mockResolvedValue([{ id: "emp-1" }, { id: "emp-2" }]);
+
+      const rows = await service.listEmployees();
+
+      expect(mockBackfillMissingEmployeeRecords).toHaveBeenCalled();
+      expect(rows).toHaveLength(2);
+    });
   });
 
   describe("hireCandidate", () => {
-    it("creates employee master when application is HIRED", async () => {
+    it("reuses existing user employee ID and creates employee master", async () => {
       mockRecruitmentRepo.findApplicationById.mockResolvedValue({
         id: "app-1",
         status: "HIRED",
@@ -78,11 +110,14 @@ describe("HrService", () => {
         },
       });
       vi.mocked(prisma.role.findUnique).mockResolvedValue({ id: "role-emp", code: "employee" } as never);
-      mockUserRepo.findLatestEmployeeId.mockResolvedValue("EMP005");
+      vi.mocked(prisma.user.findUnique).mockResolvedValue({
+        employeeId: "EMP005",
+        dateOfJoining: new Date(),
+      } as never);
       vi.mocked(prisma.user.update).mockResolvedValue({} as never);
-      mockHrRepo.createEmployee.mockResolvedValue({
+      mockEnsureEmployeeRecord.mockResolvedValue({
         id: "emp-1",
-        employeeCode: "EMP006",
+        employeeCode: "EMP005",
         userId: "user-1",
       });
       mockHrRepo.createLifecycleEvent.mockResolvedValue({});
@@ -93,13 +128,45 @@ describe("HrService", () => {
         actorId: "hr-1",
       });
 
-      expect(result.employeeCode).toBe("EMP006");
-      expect(prisma.user.update).toHaveBeenCalled();
-      expect(mockHrRepo.createEmployee).toHaveBeenCalled();
-      expect(mockPortalRepo.createNotification).toHaveBeenCalled();
+      expect(result.employeeCode).toBe("EMP005");
+      expect(mockAllocateNextEmployeeId).not.toHaveBeenCalled();
+      expect(mockEnsureEmployeeRecord).toHaveBeenCalledWith(
+        "user-1",
+        expect.objectContaining({ employeeCode: "EMP005", candidateId: "cand-1" }),
+      );
       expect(writeAuditLog).toHaveBeenCalledWith(
         expect.objectContaining({ action: "hire_candidate", entity: "employee" }),
       );
+    });
+
+    it("allocates a new employee ID when user has none", async () => {
+      mockRecruitmentRepo.findApplicationById.mockResolvedValue({
+        id: "app-1",
+        status: "HIRED",
+        jobPosting: {},
+        candidate: { id: "cand-1", userId: "user-1", employee: null },
+      });
+      vi.mocked(prisma.role.findUnique).mockResolvedValue({ id: "role-emp", code: "employee" } as never);
+      vi.mocked(prisma.user.findUnique).mockResolvedValue({
+        employeeId: null,
+        dateOfJoining: null,
+      } as never);
+      mockAllocateNextEmployeeId.mockResolvedValue("EMP006");
+      vi.mocked(prisma.user.update).mockResolvedValue({} as never);
+      mockEnsureEmployeeRecord.mockResolvedValue({
+        id: "emp-1",
+        employeeCode: "EMP006",
+      });
+      mockHrRepo.createLifecycleEvent.mockResolvedValue({});
+      mockPortalRepo.createNotification.mockResolvedValue({});
+
+      const result = await service.hireCandidate({
+        applicationId: "app-1",
+        actorId: "hr-1",
+      });
+
+      expect(mockAllocateNextEmployeeId).toHaveBeenCalled();
+      expect(result.employeeCode).toBe("EMP006");
     });
 
     it("returns existing employee if already hired", async () => {
@@ -112,7 +179,7 @@ describe("HrService", () => {
 
       const result = await service.hireCandidate({ applicationId: "app-1", actorId: "hr-1" });
       expect(result).toBe(existing);
-      expect(mockHrRepo.createEmployee).not.toHaveBeenCalled();
+      expect(mockEnsureEmployeeRecord).not.toHaveBeenCalled();
     });
 
     it("throws when application is not HIRED", async () => {

@@ -39,10 +39,30 @@ export type Candidate = {
   lastName: string;
   phone?: string | null;
   linkedInUrl?: string | null;
+  notes?: string | null;
   pipelineStatus: PipelineStatus;
   resumeFile?: StoredFile | null;
+  user?: {
+    id: string;
+    email: string;
+    firstName: string;
+    lastName: string;
+    phone?: string | null;
+    avatar?: string | null;
+  } | null;
   applications?: JobApplication[];
   employee?: EmployeeMaster | null;
+  statusHistory?: CandidateStatusHistoryEntry[];
+};
+
+export type CandidateStatusHistoryEntry = {
+  id: string;
+  applicationId: string | null;
+  action: string;
+  before: unknown;
+  after: unknown;
+  createdAt: string;
+  actor: { id: string; name: string; email: string } | null;
 };
 
 export type JobApplication = {
@@ -131,12 +151,46 @@ export type EmployeeMaster = {
 
 export type CompanyPolicy = {
   id: string;
+  familyId?: string;
+  previousVersionId?: string | null;
   title: string;
   description?: string | null;
   version: string;
   status: string;
   publishedAt?: string | null;
+  acknowledged?: boolean;
+  acknowledgedAt?: string | null;
   file?: StoredFile | null;
+  publishedBy?: { id: string; firstName: string; lastName: string } | null;
+  _count?: { acknowledgements: number };
+};
+
+export type PolicyAssignment = {
+  id: string;
+  familyId: string;
+  targetType: "ALL" | "USER" | "DEPARTMENT" | "TEAM";
+  user?: { id: string; firstName: string; lastName: string; email: string } | null;
+  department?: { id: string; name: string } | null;
+  team?: { id: string; name: string } | null;
+  assignedBy?: { id: string; firstName: string; lastName: string } | null;
+  createdAt?: string;
+};
+
+export type PolicyAcknowledgementReport = {
+  policy: {
+    id: string;
+    familyId: string;
+    title: string;
+    version: string;
+    status: string;
+  };
+  assignments: PolicyAssignment[];
+  acknowledgements: {
+    id: string;
+    acknowledgedAt: string;
+    user: { id: string; firstName: string; lastName: string; email: string };
+  }[];
+  summary: { acknowledgedCount: number };
 };
 
 export type Asset = {
@@ -159,6 +213,15 @@ export type Asset = {
   } | null;
 };
 
+export type SupportTicketMessage = {
+  id: string;
+  body: string;
+  authorType: "EMPLOYEE" | "STAFF" | "SYSTEM";
+  createdAt: string;
+  author?: { id: string; firstName: string; lastName: string; email: string } | null;
+  attachment?: StoredFile | null;
+};
+
 export type SupportTicket = {
   id: string;
   subject: string;
@@ -169,6 +232,13 @@ export type SupportTicket = {
   latestReply?: string | null;
   createdAt: string;
   updatedAt?: string;
+  resolvedAt?: string | null;
+  closedAt?: string | null;
+  user?: { id: string; firstName: string; lastName: string; email: string } | null;
+  assignedTo?: { id: string; firstName: string; lastName: string; email: string } | null;
+  attachment?: StoredFile | null;
+  messages?: SupportTicketMessage[];
+  _count?: { messages: number };
 };
 
 export type NotificationItem = {

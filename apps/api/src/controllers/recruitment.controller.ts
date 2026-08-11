@@ -1,5 +1,7 @@
 import type { Request, Response } from "express";
 import { sendSuccess, sendError } from "../lib/response";
+import { toClientError } from "../lib/app-error";
+import { userIsStaffWithoutCandidateAccess } from "../lib/candidate-access";
 import { recruitmentService } from "../services/recruitment.service";
 import { authService } from "../services/auth.service";
 import { authCookieOptions } from "../lib/cookies";
@@ -117,6 +119,15 @@ export class RecruitmentController {
 
   getMyCandidateProfile = async (req: Request, res: Response): Promise<void> => {
     try {
+      if (await userIsStaffWithoutCandidateAccess(req.user!.userId)) {
+        sendError(res, 403, {
+          code: "FEATURE_UNAVAILABLE",
+          message:
+            "Candidate applications are not available for this account. Use HR or Admin modules instead.",
+        });
+        return;
+      }
+
       const candidate = await recruitmentService.getCandidateByUserId(req.user!.userId);
       if (!candidate) {
         sendError(res, 404, { code: "NOT_FOUND", message: "Candidate profile not found" });
@@ -130,6 +141,15 @@ export class RecruitmentController {
 
   attachResume = async (req: Request, res: Response): Promise<void> => {
     try {
+      if (await userIsStaffWithoutCandidateAccess(req.user!.userId)) {
+        sendError(res, 403, {
+          code: "FEATURE_UNAVAILABLE",
+          message:
+            "Candidate applications are not available for this account. Use HR or Admin modules instead.",
+        });
+        return;
+      }
+
       const candidate = await recruitmentService.getCandidateByUserId(req.user!.userId);
       if (!candidate) {
         sendError(res, 404, { code: "NOT_FOUND", message: "Candidate profile not found" });
@@ -176,9 +196,10 @@ export class RecruitmentController {
       );
       sendSuccess(res, result);
     } catch (error) {
-      sendError(res, 400, {
-        code: "UPDATE_STATUS_FAILED",
-        message: error instanceof Error ? error.message : "Failed to update status",
+      const clientError = toClientError(error);
+      sendError(res, clientError.statusCode, {
+        code: clientError.code === "OPERATION_FAILED" ? "UPDATE_STATUS_FAILED" : clientError.code,
+        message: clientError.message,
       });
     }
   };

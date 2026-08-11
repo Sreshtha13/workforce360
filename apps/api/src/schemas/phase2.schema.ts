@@ -120,6 +120,21 @@ export const createPolicySchema = z.object({
   fileId: z.string().optional(),
 });
 
+export const updatePolicySchema = z.object({
+  title: z.string().min(1).optional(),
+  description: z.string().optional(),
+  version: z.string().optional(),
+  fileId: z.string().nullable().optional(),
+});
+
+export const assignPolicySchema = z.object({
+  familyId: z.string().min(1),
+  targetType: z.enum(["ALL", "USER", "DEPARTMENT", "TEAM"]),
+  userId: z.string().optional(),
+  departmentId: z.string().optional(),
+  teamId: z.string().optional(),
+});
+
 export const createAssetSchema = z.object({
   name: z.string().min(1),
   tag: z.string().min(1),
@@ -148,6 +163,26 @@ export const createTicketSchema = z.object({
   attachmentFileId: z.string().optional(),
 });
 
+export const ticketReplySchema = z.object({
+  body: z.string().min(1).max(5000),
+  attachmentFileId: z.string().optional(),
+  setWaiting: z.boolean().optional(),
+});
+
+export const assignTicketSchema = z.object({
+  assignedToId: z.string().nullable(),
+});
+
+export const updateTicketStatusSchema = z.object({
+  status: z.enum(["OPEN", "IN_PROGRESS", "WAITING_FOR_EMPLOYEE", "RESOLVED", "CLOSED"]),
+});
+
+export const listTicketsQuerySchema = z.object({
+  status: z.string().optional(),
+  assignedToId: z.string().optional(),
+  search: z.string().optional(),
+});
+
 export const listEmployeesQuerySchema = z.object({
   lifecycleState: z.string().optional(),
   search: z.string().optional(),
@@ -164,6 +199,7 @@ export const listOffersQuerySchema = z.object({
 
 export const listPoliciesQuerySchema = z.object({
   status: z.string().optional(),
+  familyId: z.string().optional(),
 });
 
 export const listAssetsQuerySchema = z.object({

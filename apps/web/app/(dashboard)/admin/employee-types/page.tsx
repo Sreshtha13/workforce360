@@ -53,16 +53,19 @@ export default function EmployeeTypesPage() {
   const canDelete = hasPermission("employee_type.delete");
   const canReadUsers = hasPermission("user.read");
   const canAssignUsers = hasPermission("user.update");
+  const canView =
+    hasPermission("employee_type.read") || canCreate || canUpdate || canDelete;
 
   const query = useQuery({
     queryKey: ["employee-types"],
     queryFn: async () => (await apiClient.organization.employeeTypes.list()).data ?? [],
+    enabled: canView,
   });
 
   const usersQuery = useQuery({
     queryKey: ["employee-type-users", usersSheetTarget?.id],
     queryFn: async () => (await apiClient.users.list()).data ?? [],
-    enabled: !!usersSheetTarget && canReadUsers,
+    enabled: !!usersSheetTarget && canReadUsers && canView,
   });
 
   const allUsers = (usersQuery.data ?? []) as User[];
@@ -149,6 +152,9 @@ export default function EmployeeTypesPage() {
     setAssignUserId("");
   };
 
+  if (!canView) {
+    return <ErrorState message="You do not have permission to view employee types." />;
+  }
   if (query.isLoading) return <LoadingState />;
   if (query.isError) {
     return <ErrorState message="Failed to load employee types" onRetry={() => query.refetch()} />;

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import { apiClient } from "@/lib/api-client";
+import { useAuth } from "@/lib/auth-context";
 import { useDebouncedValue } from "@/lib/use-debounced-value";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { DataTable } from "@/components/admin/data-table";
@@ -18,8 +19,15 @@ import {
 import { useState } from "react";
 
 export default function HrEmployeesPage() {
+  const { user, hasPermission, isSuperAdmin } = useAuth();
   const [search, debouncedSearch, setSearch] = useDebouncedValue("", 300);
   const [lifecycle, setLifecycle] = useState("ALL");
+  const canView = hasPermission("employee.read");
+  const isDeveloperScoped = Boolean(
+    user?.roles?.some((r) => r.code === "developer") &&
+      !isSuperAdmin &&
+      !hasPermission("employee.update"),
+  );
 
   const query = useQuery({
     queryKey: ["hr", "employees", debouncedSearch, lifecycle],
@@ -30,8 +38,12 @@ export default function HrEmployeesPage() {
       });
       return res.data ?? [];
     },
+    enabled: canView,
   });
 
+  if (!canView) {
+    return <ErrorState message="You do not have permission to view employees." />;
+  }
   if (query.isLoading) return <LoadingState message="Loading employees..." />;
   if (query.isError) {
     return <ErrorState message="Failed to load employees." onRetry={() => query.refetch()} />;
@@ -43,7 +55,11 @@ export default function HrEmployeesPage() {
     <div className="space-y-6">
       <AdminPageHeader
         title="Employee master"
-        description="Canonical employee records linked to user accounts and hired candidates."
+        description={
+          isDeveloperScoped
+            ? "Team-scoped employee list — limited to colleagues on your teams."
+            : "Canonical employee records linked to user accounts and hired candidates."
+        }
       />
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
@@ -114,7 +130,9 @@ export default function HrEmployeesPage() {
         emptyMessage={
           debouncedSearch || lifecycle !== "ALL"
             ? "Try adjusting search or lifecycle filter."
-            : "Employee records appear after candidates are hired."
+            : isDeveloperScoped
+              ? "No teammates found. Join a team to see colleagues here."
+              : "Employee records appear after candidates are hired."
         }
       />
     </div>

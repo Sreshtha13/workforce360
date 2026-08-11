@@ -48,16 +48,19 @@ export default function EmploymentStatusesPage() {
   const canUpdate = hasPermission("employment_status.update");
   const canDelete = hasPermission("employment_status.delete");
   const canReadUsers = hasPermission("user.read");
+  const canView =
+    hasPermission("employment_status.read") || canCreate || canUpdate || canDelete;
 
   const query = useQuery({
     queryKey: ["employment-statuses"],
     queryFn: async () => (await apiClient.organization.employmentStatuses.list()).data ?? [],
+    enabled: canView,
   });
 
   const usersQuery = useQuery({
     queryKey: ["employment-status-users", usersSheetTarget?.id],
     queryFn: async () => (await apiClient.users.list()).data ?? [],
-    enabled: !!usersSheetTarget && canReadUsers,
+    enabled: !!usersSheetTarget && canReadUsers && canView,
   });
 
   const assignedUsers = useMemo(() => {
@@ -113,6 +116,9 @@ export default function EmploymentStatusesPage() {
     setUsersSearch("");
   };
 
+  if (!canView) {
+    return <ErrorState message="You do not have permission to view employment statuses." />;
+  }
   if (query.isLoading) return <LoadingState />;
   if (query.isError) {
     return (

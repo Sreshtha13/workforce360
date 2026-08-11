@@ -68,10 +68,15 @@ export async function requireAuth(
         .filter((rp) => rp.permission.isActive)
         .map((rp) => rp.permission.code),
     );
+
+    const roles = user.userRoles
+      .map((ur) => ur.role.code)
+      .filter((code): code is string => Boolean(code));
     
     req.user = {
       ...payload,
       permissions: Array.from(new Set(permissions)),
+      roles: Array.from(new Set(roles)),
     };
     
     next();

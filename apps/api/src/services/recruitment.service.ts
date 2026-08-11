@@ -5,14 +5,7 @@ import { writeAuditLog } from "../lib/audit";
 import { prisma } from "../lib/prisma";
 import { hrService } from "./hr.service";
 import { userIsSuperAdmin } from "../lib/super-admin";
-
-const PIPELINE_STAGE_ORDER: CandidatePipelineStatus[] = [
-  "APPLIED",
-  "SCREENING",
-  "INTERVIEW",
-  "OFFER",
-  "HIRED",
-];
+import { assertPipelineTransition } from "./pipeline-stage.service";
 
 const DEFAULT_CHECKLIST = [
   "Submit signed offer letter",
@@ -43,8 +36,11 @@ export class RecruitmentService {
           deletedAt: null,
           rolePermissions: {
             some: {
-              deletedAt: null,
-              permission: { code: "application.override_stage", isActive: true },
+              permission: {
+                code: "application.override_stage",
+                isActive: true,
+                deletedAt: null,
+              },
             },
           },
         },
@@ -118,8 +114,47 @@ export class RecruitmentService {
     return this.repo.listCandidates(filters);
   }
 
-  getCandidate(id: string) {
-    return this.repo.findCandidateById(id);
+  async getCandidate(id: string) {
+    const candidate = await this.repo.findCandidateById(id);
+    if (!candidate) return null;
+
+    const applicationIds = candidate.applications.map((app) => app.id);
+    const statusHistory =
+      applicationIds.length === 0
+        ? []
+        : await prisma.auditLog.findMany({
+            where: {
+              entity: "job_application",
+              entityId: { in: applicationIds },
+              action: "update_status",
+            },
+            orderBy: { createdAt: "desc" },
+            take: 50,
+            include: {
+              user: {
+                select: { id: true, firstName: true, lastName: true, email: true },
+              },
+            },
+          });
+
+    return {
+      ...candidate,
+      statusHistory: statusHistory.map((entry) => ({
+        id: entry.id,
+        applicationId: entry.entityId,
+        action: entry.action,
+        before: entry.before,
+        after: entry.after,
+        createdAt: entry.createdAt.toISOString(),
+        actor: entry.user
+          ? {
+              id: entry.user.id,
+              name: `${entry.user.firstName} ${entry.user.lastName}`.trim(),
+              email: entry.user.email,
+            }
+          : null,
+      })),
+    };
   }
 
   getCandidateByUserId(userId: string) {
@@ -247,18 +282,12 @@ export class RecruitmentService {
     const application = await this.repo.findApplicationById(applicationId);
     if (!application) throw new Error("Application not found");
 
-    if (status !== "REJECTED" && status !== application.status) {
-      const fromIdx = PIPELINE_STAGE_ORDER.indexOf(application.status);
-      const toIdx = PIPELINE_STAGE_ORDER.indexOf(status);
-      if (fromIdx >= 0 && toIdx >= 0 && toIdx < fromIdx) {
-        const canOverride = await this.actorCanOverridePipeline(actorId);
-        if (!canOverride) {
-          throw new Error(
-            "Cannot move candidate to an earlier pipeline stage without override permission",
-          );
-        }
-      }
-    }
+    const canOverride = await this.actorCanOverridePipeline(actorId);
+    assertPipelineTransition({
+      from: application.status,
+      to: status,
+      canOverride,
+    });
 
     const updated = await this.repo.updateApplication(applicationId, {
       status,

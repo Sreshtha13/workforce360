@@ -68,6 +68,12 @@ router.delete(
 );
 
 router.get("/designations", requireAuth, requirePermission("designation.read"), orgController.getDesignations);
+router.get(
+  "/designations/next-code",
+  requireAuth,
+  requirePermission("designation.create"),
+  orgController.getNextDesignationCode,
+);
 router.get("/designations/:id", requireAuth, requirePermission("designation.read"), orgController.getDesignationById);
 router.post(
   "/designations",

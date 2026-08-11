@@ -39,12 +39,12 @@ export function DashboardShell({ children }: { children: ReactNode }) {
 
   if (!user) return null;
 
-  const permissions = user.permissions;
-  const visibleMain = filterNavByPermissions(mainNav, permissions);
-  const visibleCandidate = filterNavByPermissions(candidateNav, permissions);
-  const visibleHr = filterNavByPermissions(hrNav, permissions);
-  const visiblePortal = filterNavByPermissions(portalNav, permissions);
-  const visibleAdmin = filterNavByPermissions(adminNav, permissions);
+  const navUser = { permissions: user.permissions, roles: user.roles };
+  const visibleMain = filterNavByPermissions(mainNav, navUser);
+  const visibleCandidate = filterNavByPermissions(candidateNav, navUser);
+  const visibleHr = filterNavByPermissions(hrNav, navUser);
+  const visiblePortal = filterNavByPermissions(portalNav, navUser);
+  const visibleAdmin = filterNavByPermissions(adminNav, navUser);
   const breadcrumbs = buildBreadcrumbs(pathname);
   const initials = `${user.firstName[0] ?? ""}${user.lastName[0] ?? ""}`;
 

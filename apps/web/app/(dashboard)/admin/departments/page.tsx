@@ -51,6 +51,8 @@ export default function DepartmentsPage() {
   const canCreate = hasPermission("department.create");
   const canUpdate = hasPermission("department.update");
   const canDelete = hasPermission("department.delete");
+  const canView =
+    hasPermission("department.read") || canCreate || canUpdate || canDelete;
 
   const query = useQuery({
     queryKey: ["departments"],
@@ -58,6 +60,7 @@ export default function DepartmentsPage() {
       const res = await apiClient.organization.departments.list();
       return (res.data ?? []) as DepartmentRow[];
     },
+    enabled: canView,
   });
 
   const lookupsQuery = useQuery({
@@ -165,6 +168,9 @@ export default function DepartmentsPage() {
       label: `${u.firstName} ${u.lastName}`,
     })) ?? [];
 
+  if (!canView) {
+    return <ErrorState message="You do not have permission to view departments." />;
+  }
   if (query.isLoading) return <LoadingState message="Loading departments..." />;
   if (query.isError) {
     return (

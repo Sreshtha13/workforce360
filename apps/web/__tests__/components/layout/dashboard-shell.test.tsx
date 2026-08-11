@@ -24,6 +24,14 @@ vi.mock("next/link", () => ({
   ),
 }));
 
+vi.mock("@/components/dashboard/global-search", () => ({
+  GlobalSearch: () => <div data-testid="global-search" />,
+}));
+
+vi.mock("@/components/design-system/theme-toggle", () => ({
+  ThemeToggle: () => <button type="button">Theme</button>,
+}));
+
 vi.mock("@/lib/auth-context", () => ({
   useAuth: () => ({
     user: {
@@ -31,10 +39,17 @@ vi.mock("@/lib/auth-context", () => ({
       email: "admin@example.com",
       firstName: "Jane",
       lastName: "Doe",
-      roles: [],
-      permissions: ["user.read", "department.create"],
+      roles: [{ id: "r1", name: "Administrator", code: "admin" }],
+      permissions: ["user.read", "department.create", "portal.read"],
     },
     logout: mockLogout,
+    hasPermission: (permission: string) =>
+      ["user.read", "department.create", "portal.read"].includes(permission),
+    hasAnyPermission: (...permissions: string[]) =>
+      permissions.some((p) =>
+        ["user.read", "department.create", "portal.read"].includes(p),
+      ),
+    isSuperAdmin: false,
   }),
 }));
 
@@ -47,12 +62,13 @@ describe("DashboardShell", () => {
     );
 
     expect(screen.getByText("Dashboard content")).toBeInTheDocument();
-    expect(screen.getByText("admin@example.com")).toBeInTheDocument();
-    expect(screen.getByText("JD")).toBeInTheDocument();
+    expect(screen.getAllByText("admin@example.com").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("JD").length).toBeGreaterThan(0);
     expect(screen.getByRole("navigation", { name: "Modules" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /Dashboard/i })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /Users/i })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /Departments/i })).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /My Applications/i })).not.toBeInTheDocument();
   });
 
   it("calls logout when logout is clicked", async () => {
@@ -63,7 +79,7 @@ describe("DashboardShell", () => {
       </DashboardShell>,
     );
 
-    await user.click(screen.getByRole("button", { name: "Logout" }));
+    await user.click(screen.getAllByRole("button", { name: "Logout" })[0]);
     expect(mockLogout).toHaveBeenCalledOnce();
   });
 });

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiClient, ApiClientError } from "@/lib/api-client";
 import { useAuth } from "@/lib/auth-context";
@@ -50,19 +50,51 @@ export default function DesignationsPage() {
   const [editing, setEditing] = useState<Designation | null>(null);
   const [form, setForm] = useState(emptyForm);
   const [feedback, setFeedback] = useState<{ type: "success" | "error"; message: string } | null>(null);
+  const [codeLoading, setCodeLoading] = useState(false);
   const canCreate = hasPermission("designation.create");
   const canUpdate = hasPermission("designation.update");
   const canDelete = hasPermission("designation.delete");
+  const canView =
+    hasPermission("designation.read") || canCreate || canUpdate || canDelete;
 
   const query = useQuery({
     queryKey: ["designations"],
     queryFn: async () => (await apiClient.organization.designations.list()).data ?? [],
+    enabled: canView,
   });
 
   const departmentsQuery = useQuery({
     queryKey: ["designation-departments"],
     queryFn: async () => (await apiClient.organization.departments.list()).data ?? [],
+    enabled: canView,
   });
+
+  useEffect(() => {
+    if (!open || editing || !form.departmentId) return;
+
+    let cancelled = false;
+    setCodeLoading(true);
+
+    apiClient.organization.designations
+      .nextCode(form.departmentId)
+      .then((res) => {
+        if (cancelled) return;
+        const code = res.data?.code ?? "";
+        setForm((prev) => (prev.departmentId === form.departmentId ? { ...prev, code } : prev));
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setForm((prev) => (prev.departmentId === form.departmentId ? { ...prev, code: "" } : prev));
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setCodeLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [open, editing, form.departmentId]);
 
   const save = useMutation({
     mutationFn: async () => {
@@ -98,6 +130,9 @@ export default function DesignationsPage() {
     },
   });
 
+  if (!canView) {
+    return <ErrorState message="You do not have permission to view designations." />;
+  }
   if (query.isLoading) return <LoadingState />;
   if (query.isError) return <ErrorState message="Failed to load designations" onRetry={() => query.refetch()} />;
 
@@ -131,7 +166,7 @@ export default function DesignationsPage() {
     <div className="space-y-6">
       <AdminPageHeader
         title="Designations"
-        description="Job titles with hierarchy levels and live assignment metrics."
+        description="Job titles with hierarchy levels and live assignment metrics. Codes are unique per department (e.g. ENG-001)."
         actionLabel={canCreate ? "Add Designation" : undefined}
         onAction={canCreate ? openCreate : undefined}
       />
@@ -146,6 +181,7 @@ export default function DesignationsPage() {
           rowKey={(r) => r.id}
           columns={[
             { key: "name", header: "Designation", render: (r) => r.name },
+            { key: "code", header: "Code", render: (r) => r.code ?? "—" },
             { key: "department", header: "Department", render: (r) => r.department?.name ?? "—" },
             { key: "level", header: "Hierarchy Level", render: (r) => formatLevel(r.level) },
             { key: "usersAssigned", header: "Users Assigned", render: (r) => r.metrics.usersAssigned },
@@ -182,13 +218,25 @@ export default function DesignationsPage() {
           label="Department"
           name="departmentId"
           value={form.departmentId}
-          onChange={(v) => setForm({ ...form, departmentId: v })}
+          onChange={(v) => setForm({ ...form, departmentId: v, code: editing ? form.code : "" })}
           options={deptOptions}
           required
           helperText={departmentsQuery.isError ? "Failed to load departments" : undefined}
         />
         <FormField label="Name" name="name" value={form.name} onChange={(v) => setForm({ ...form, name: v })} required />
-        <FormField label="Code" name="code" value={form.code} onChange={(v) => setForm({ ...form, code: v })} />
+        <FormField
+          label="Code"
+          name="code"
+          value={form.code}
+          onChange={(v) => setForm({ ...form, code: v })}
+          helperText={
+            editing
+              ? "Unique within this department."
+              : codeLoading
+                ? "Generating next code…"
+                : "Auto-generated per department (e.g. ENG-001). You can edit before saving."
+          }
+        />
         <FormSelect
           label="Hierarchy Level"
           name="level"

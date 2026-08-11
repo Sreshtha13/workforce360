@@ -1,5 +1,6 @@
 import type { NextFunction, Request, Response } from "express";
 import { ZodError } from "zod";
+import { AppError } from "../lib/app-error";
 import { sendError } from "../lib/response";
 
 export function notFoundHandler(_req: Request, res: Response): void {
@@ -20,6 +21,14 @@ export function errorHandler(
       code: "VALIDATION_ERROR",
       message: "Request validation failed",
       details: err.flatten(),
+    });
+    return;
+  }
+
+  if (err instanceof AppError) {
+    sendError(res, err.statusCode, {
+      code: err.code,
+      message: err.message,
     });
     return;
   }

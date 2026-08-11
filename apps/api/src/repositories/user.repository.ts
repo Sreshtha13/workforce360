@@ -21,7 +21,7 @@ export type CreateUserInput = {
   officeId?: string;
   employeeTypeId?: string;
   employmentStatusId?: string | null;
-  managerId?: string;
+  managerId?: string | null;
 };
 
 export type UpdateUserInput = Partial<CreateUserInput> & {
@@ -37,10 +37,17 @@ export class UserRepository {
     status?: string;
     search?: string;
     includeDeleted?: boolean;
+    /** When set, restrict results to these user ids (employee visibility scope). */
+    ids?: string[];
   }) {
+    if (filters?.ids && filters.ids.length === 0) {
+      return [];
+    }
+
     const rows = await prisma.user.findMany({
       where: {
         ...(filters?.includeDeleted ? {} : { deletedAt: null }),
+        ...(filters?.ids && { id: { in: filters.ids } }),
         ...(filters?.departmentId && { departmentId: filters.departmentId }),
         ...(filters?.officeId && { officeId: filters.officeId }),
         ...(filters?.employeeTypeId && { employeeTypeId: filters.employeeTypeId }),
