@@ -3,6 +3,7 @@ import { UserController } from "../controllers/user.controller";
 import { validate } from "../middleware/validate";
 import { requireAuth } from "../middleware/auth";
 import { requirePermission } from "../middleware/rbac";
+import { requireSelfOrPermission } from "../middleware/ownership";
 import {
   createUserSchema,
   updateUserSchema,
@@ -107,7 +108,12 @@ router.get(
  *       404:
  *         description: User not found
  */
-router.get("/:id", requireAuth, requirePermission("user.read"), userController.getUserById);
+router.get(
+  "/:id",
+  requireAuth,
+  requireSelfOrPermission("user.read"),
+  userController.getUserById,
+);
 
 /**
  * @swagger

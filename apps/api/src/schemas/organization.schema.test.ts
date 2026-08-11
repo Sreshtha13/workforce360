@@ -43,16 +43,26 @@ describe("organization schemas", () => {
   });
 
   describe("designation schemas", () => {
-    it("accepts optional numeric level", () => {
+    it("accepts required department, name, and numeric level", () => {
       const result = createDesignationSchema.safeParse({
+        departmentId: "dept-1",
         name: "Senior Engineer",
         level: 5,
       });
       expect(result.success).toBe(true);
     });
 
+    it("rejects designation without departmentId", () => {
+      const result = createDesignationSchema.safeParse({
+        name: "Senior Engineer",
+        level: 5,
+      });
+      expect(result.success).toBe(false);
+    });
+
     it("rejects non-integer level", () => {
       const result = createDesignationSchema.safeParse({
+        departmentId: "dept-1",
         name: "Engineer",
         level: 1.5,
       });
@@ -81,9 +91,12 @@ describe("organization schemas", () => {
   });
 
   describe("employee type schemas", () => {
-    it("requires name", () => {
+    it("requires name and code", () => {
+      expect(
+        createEmployeeTypeSchema.safeParse({ name: "Full Time", code: "FT" }).success,
+      ).toBe(true);
       expect(createEmployeeTypeSchema.safeParse({ name: "Full Time" }).success).toBe(
-        true,
+        false,
       );
       expect(createEmployeeTypeSchema.safeParse({}).success).toBe(false);
     });

@@ -8,18 +8,17 @@ import {
   ChevronDown,
   LogOut,
   Menu,
-  Search,
   Sparkles,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
-import { adminNav, filterNavByPermissions, mainNav } from "@/lib/navigation";
+import { adminNav, candidateNav, filterNavByPermissions, hrNav, mainNav, portalNav } from "@/lib/navigation";
 import { glass, iconSize, motion } from "@/lib/design-system";
 import { typographyScale } from "@/lib/design-tokens";
 import { cn } from "@/lib/utils";
 import { Breadcrumbs, buildBreadcrumbs } from "@/components/design-system/breadcrumbs";
 import { ThemeToggle } from "@/components/design-system/theme-toggle";
+import { GlobalSearch } from "@/components/dashboard/global-search";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
@@ -35,12 +34,17 @@ export function DashboardShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [adminExpanded, setAdminExpanded] = useState(true);
+  const [hrExpanded, setHrExpanded] = useState(true);
+  const [portalExpanded, setPortalExpanded] = useState(true);
 
   if (!user) return null;
 
-  const permissions = user.permissions;
-  const visibleMain = filterNavByPermissions(mainNav, permissions);
-  const visibleAdmin = filterNavByPermissions(adminNav, permissions);
+  const navUser = { permissions: user.permissions, roles: user.roles };
+  const visibleMain = filterNavByPermissions(mainNav, navUser);
+  const visibleCandidate = filterNavByPermissions(candidateNav, navUser);
+  const visibleHr = filterNavByPermissions(hrNav, navUser);
+  const visiblePortal = filterNavByPermissions(portalNav, navUser);
+  const visibleAdmin = filterNavByPermissions(adminNav, navUser);
   const breadcrumbs = buildBreadcrumbs(pathname);
   const initials = `${user.firstName[0] ?? ""}${user.lastName[0] ?? ""}`;
 
@@ -89,6 +93,84 @@ export function DashboardShell({ children }: { children: ReactNode }) {
             onNavigate={() => setMobileOpen(false)}
           />
         ))}
+
+        {visibleCandidate.length > 0 &&
+          visibleCandidate.map((item) => (
+            <SidebarLink
+              key={item.href}
+              href={item.href}
+              label={item.label}
+              icon={item.icon}
+              active={pathname === item.href || pathname.startsWith(`${item.href}/`)}
+              onNavigate={() => setMobileOpen(false)}
+            />
+          ))}
+
+        {visibleHr.length > 0 && (
+          <div className="mt-4">
+            <button
+              type="button"
+              onClick={() => setHrExpanded((v) => !v)}
+              className={cn(
+                typographyScale.overline.className,
+                "flex w-full items-center justify-between px-2 py-2 text-sidebar-foreground/70",
+              )}
+            >
+              HR & Recruitment
+              <ChevronDown
+                className={cn(
+                  iconSize.sm,
+                  "transition-transform",
+                  hrExpanded ? "rotate-0" : "-rotate-90",
+                )}
+              />
+            </button>
+            {hrExpanded &&
+              visibleHr.map((item) => (
+                <SidebarLink
+                  key={item.href}
+                  href={item.href}
+                  label={item.label}
+                  icon={item.icon}
+                  active={pathname === item.href || pathname.startsWith(`${item.href}/`)}
+                  onNavigate={() => setMobileOpen(false)}
+                />
+              ))}
+          </div>
+        )}
+
+        {visiblePortal.length > 0 && (
+          <div className="mt-4">
+            <button
+              type="button"
+              onClick={() => setPortalExpanded((v) => !v)}
+              className={cn(
+                typographyScale.overline.className,
+                "flex w-full items-center justify-between px-2 py-2 text-sidebar-foreground/70",
+              )}
+            >
+              Employee Portal
+              <ChevronDown
+                className={cn(
+                  iconSize.sm,
+                  "transition-transform",
+                  portalExpanded ? "rotate-0" : "-rotate-90",
+                )}
+              />
+            </button>
+            {portalExpanded &&
+              visiblePortal.map((item) => (
+                <SidebarLink
+                  key={item.href}
+                  href={item.href}
+                  label={item.label}
+                  icon={item.icon}
+                  active={pathname === item.href || pathname.startsWith(`${item.href}/`)}
+                  onNavigate={() => setMobileOpen(false)}
+                />
+              ))}
+          </div>
+        )}
 
         {visibleAdmin.length > 0 && (
           <div className="mt-4">
@@ -182,20 +264,7 @@ export function DashboardShell({ children }: { children: ReactNode }) {
             <Breadcrumbs items={breadcrumbs} />
           </div>
 
-          <div className="relative hidden min-w-0 flex-1 sm:block sm:max-w-sm lg:max-w-md">
-            <Search
-              className={cn(
-                iconSize.md,
-                "pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-muted-foreground",
-              )}
-            />
-            <Input
-              placeholder="Search modules, users, departments..."
-              className="border-white/20 bg-white/40 pl-9 dark:bg-white/5"
-              disabled
-              aria-label="Global search (coming soon)"
-            />
-          </div>
+          <GlobalSearch />
 
           <div className="ml-auto flex items-center gap-1 sm:gap-2">
             <ThemeToggle />

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiClient, ApiClientError } from "@/lib/api-client";
 import { useAuth } from "@/lib/auth-context";
@@ -18,7 +18,14 @@ type TeamRow = Team & {
   lead?: { id: string; firstName: string; lastName: string };
 };
 
-const emptyForm = { departmentId: "", name: "", code: "", description: "", leadId: "" };
+const emptyForm = {
+  departmentId: "",
+  name: "",
+  code: "",
+  description: "",
+  leadId: "",
+  memberIds: [] as string[],
+};
 
 export default function TeamsPage() {
   const { hasPermission } = useAuth();
@@ -32,15 +39,18 @@ export default function TeamsPage() {
   const canUpdate = hasPermission("team.update");
   const canDelete = hasPermission("team.delete");
   const canReadUsers = hasPermission("user.read");
+  const canView = hasPermission("team.read") || canCreate || canUpdate || canDelete;
 
   const query = useQuery({
     queryKey: ["teams"],
     queryFn: async () => (await apiClient.organization.teams.list()).data ?? [],
+    enabled: canView,
   });
 
   const departmentsQuery = useQuery({
     queryKey: ["team-departments"],
     queryFn: async () => (await apiClient.organization.departments.list()).data ?? [],
+    enabled: canView,
   });
 
   const employeesQuery = useQuery({
@@ -52,8 +62,28 @@ export default function TeamsPage() {
           status: "active",
         })
       ).data ?? [],
-    enabled: sheetOpen && !!form.departmentId && canReadUsers,
+    enabled: sheetOpen && !!form.departmentId && canReadUsers && canView,
   });
+
+  const teamDetailQuery = useQuery({
+    queryKey: ["team-detail", editing?.id],
+    queryFn: async () => {
+      if (!editing) return null;
+      const res = await apiClient.organization.teams.get(editing.id);
+      return res.data;
+    },
+    enabled: sheetOpen && !!editing && canView,
+  });
+
+  useEffect(() => {
+    if (teamDetailQuery.data && editing) {
+      const members =
+        (teamDetailQuery.data as { members?: { user: { id: string } }[] }).members?.map(
+          (m) => m.user.id,
+        ) ?? [];
+      setForm((prev) => ({ ...prev, memberIds: members }));
+    }
+  }, [teamDetailQuery.data, editing]);
 
   const saveMutation = useMutation({
     mutationFn: async () => {
@@ -63,6 +93,7 @@ export default function TeamsPage() {
         code: form.code || undefined,
         description: form.description || undefined,
         leadId: form.leadId || undefined,
+        memberIds: form.memberIds,
       };
       if (editing) return apiClient.organization.teams.update(editing.id, payload);
       return apiClient.organization.teams.create(payload as CreateTeamInput);
@@ -74,7 +105,11 @@ export default function TeamsPage() {
       setForm(emptyForm);
       setFeedback({ type: "success", message: "Saved successfully" });
     },
-    onError: (err) => setFeedback({ type: "error", message: err instanceof ApiClientError ? err.message : "Save failed" }),
+    onError: (err) =>
+      setFeedback({
+        type: "error",
+        message: err instanceof ApiClientError ? err.message : "Save failed",
+      }),
   });
 
   const deleteMutation = useMutation({
@@ -85,6 +120,9 @@ export default function TeamsPage() {
     },
   });
 
+  if (!canView) {
+    return <ErrorState message="You do not have permission to view teams." />;
+  }
   if (query.isLoading) return <LoadingState />;
   if (query.isError) return <ErrorState message="Failed to load teams" onRetry={() => query.refetch()} />;
 
@@ -97,11 +135,20 @@ export default function TeamsPage() {
   const employeeOptions =
     employeesQuery.data?.map((u: UserSummary) => ({
       value: u.id,
-      label: `${u.firstName} ${u.lastName}`,
+      label: `${u.firstName} ${u.lastName}${u.employeeId ? ` (${u.employeeId})` : ""}`,
     })) ?? [];
 
   const handleDepartmentChange = (departmentId: string) => {
-    setForm((prev) => ({ ...prev, departmentId, leadId: "" }));
+    setForm((prev) => ({ ...prev, departmentId, leadId: "", memberIds: [] }));
+  };
+
+  const toggleMember = (userId: string) => {
+    setForm((prev) => ({
+      ...prev,
+      memberIds: prev.memberIds.includes(userId)
+        ? prev.memberIds.filter((id) => id !== userId)
+        : [...prev.memberIds, userId],
+    }));
   };
 
   const openCreateSheet = () => {
@@ -118,6 +165,7 @@ export default function TeamsPage() {
       code: team.code ?? "",
       description: team.description ?? "",
       leadId: team.lead?.id ?? "",
+      memberIds: [],
     });
     setSheetOpen(true);
   };
@@ -126,7 +174,7 @@ export default function TeamsPage() {
     <div className="space-y-6">
       <AdminPageHeader
         title="Teams"
-        description="Teams belong to departments."
+        description="Teams belong to departments. Assign a lead and members from the same department."
         actionLabel={canCreate ? "Add Team" : undefined}
         onAction={canCreate ? openCreateSheet : undefined}
       />
@@ -199,7 +247,7 @@ export default function TeamsPage() {
           onChange={handleDepartmentChange}
           options={deptOptions}
           required
-          helperText={departmentsQuery.isError ? "Failed to load departments" : undefined}
+          helperText={departmentsQuery.isError ? "Failed to load departments" : "Members are scoped to this department"}
         />
         <FormField label="Name" name="name" value={form.name} onChange={(v) => setForm({ ...form, name: v })} required />
         <FormField label="Code" name="code" value={form.code} onChange={(v) => setForm({ ...form, code: v })} />
@@ -227,6 +275,30 @@ export default function TeamsPage() {
                   : undefined
           }
         />
+        {form.departmentId && canReadUsers && (
+          <div className="space-y-2">
+            <p className="text-sm font-medium">Team members</p>
+            {employeesQuery.isLoading || (editing && teamDetailQuery.isLoading) ? (
+              <p className="text-xs text-muted-foreground">Loading members...</p>
+            ) : employeeOptions.length === 0 ? (
+              <p className="text-xs text-muted-foreground">No active employees in this department</p>
+            ) : (
+              <div className="max-h-48 space-y-2 overflow-y-auto rounded-lg border border-border p-3">
+                {employeeOptions.map((opt) => (
+                  <label key={opt.value} className="flex cursor-pointer items-center gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={form.memberIds.includes(opt.value)}
+                      onChange={() => toggleMember(opt.value)}
+                      className="size-4 rounded border-border accent-primary"
+                    />
+                    {opt.label}
+                  </label>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
       </FormSheet>
     </div>
   );

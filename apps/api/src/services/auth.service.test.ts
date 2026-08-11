@@ -1,23 +1,26 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { AuthService } from "./auth.service";
 
-const mockAuthRepo = {
-  findUserByEmail: vi.fn(),
-  findUserById: vi.fn(),
-  findUserByGoogleId: vi.fn(),
-  createUser: vi.fn(),
-  updateLastLogin: vi.fn(),
-  updatePassword: vi.fn(),
-  createRefreshToken: vi.fn(),
-  findRefreshToken: vi.fn(),
-  revokeRefreshToken: vi.fn(),
-  revokeAllUserRefreshTokens: vi.fn(),
-  createLoginHistory: vi.fn(),
-  createPasswordReset: vi.fn(),
-  findPasswordReset: vi.fn(),
-  markPasswordResetAsUsed: vi.fn(),
-  getUserWithRolesAndPermissions: vi.fn(),
-};
+const { mockAuthRepo } = vi.hoisted(() => ({
+  mockAuthRepo: {
+    findUserByEmail: vi.fn(),
+    findUserById: vi.fn(),
+    findUserByGoogleId: vi.fn(),
+    createUser: vi.fn(),
+    updateLastLogin: vi.fn(),
+    updatePassword: vi.fn(),
+    createRefreshToken: vi.fn(),
+    findRefreshToken: vi.fn(),
+    revokeRefreshToken: vi.fn(),
+    revokeAllUserRefreshTokens: vi.fn(),
+    createLoginHistory: vi.fn(),
+    createPasswordReset: vi.fn(),
+    findPasswordReset: vi.fn(),
+    markPasswordResetAsUsed: vi.fn(),
+    getUserWithRolesAndPermissions: vi.fn(),
+    incrementSessionVersion: vi.fn(),
+    rotateRefreshToken: vi.fn(),
+  },
+}));
 
 vi.mock("../repositories/auth.repository", () => ({
   AuthRepository: vi.fn(function AuthRepositoryMock() {
@@ -29,6 +32,7 @@ vi.mock("../lib/google-oauth", () => ({
   verifyGoogleToken: vi.fn(),
 }));
 
+import { AuthService } from "./auth.service";
 import { verifyGoogleToken } from "../lib/google-oauth";
 import { hashPassword } from "../lib/password";
 import { signRefreshToken } from "../lib/jwt";
@@ -101,6 +105,7 @@ describe("AuthService", () => {
         lastName: "Doe",
         passwordHash: await hashPassword("SecurePass1"),
         status: "active",
+        sessionVersion: 0,
       });
 
       const result = await service.login(
@@ -147,6 +152,7 @@ describe("AuthService", () => {
         firstName: "New",
         lastName: "User",
         status: "active",
+        sessionVersion: 0,
       });
 
       const result = await service.googleLogin("auth-code");
@@ -156,17 +162,17 @@ describe("AuthService", () => {
     });
   });
 
-  describe("refreshAccessToken", () => {
+  describe("refreshSession", () => {
     it("throws for revoked or expired refresh token record", async () => {
       mockAuthRepo.findRefreshToken.mockResolvedValue(null);
 
-      await expect(service.refreshAccessToken("token")).rejects.toThrow(
+      await expect(service.refreshSession("token")).rejects.toThrow(
         "Invalid or expired refresh token",
       );
     });
 
     it("returns new access token for valid refresh token", async () => {
-      const refreshToken = signRefreshToken("user-1", "user@example.com");
+      const refreshToken = signRefreshToken("user-1", "user@example.com", 0);
       mockAuthRepo.findRefreshToken.mockResolvedValue({
         token: refreshToken,
         isRevoked: false,
@@ -176,9 +182,10 @@ describe("AuthService", () => {
         id: "user-1",
         email: "user@example.com",
         status: "active",
+        sessionVersion: 0,
       });
 
-      const result = await service.refreshAccessToken(refreshToken);
+      const result = await service.refreshSession(refreshToken);
 
       expect(result.accessToken).toBeTruthy();
     });

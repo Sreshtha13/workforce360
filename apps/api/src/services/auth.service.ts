@@ -280,6 +280,21 @@ export class AuthService {
       permissions: Array.from(new Set(permissions)),
     };
   }
+
+  async issueTokensForUser(userId: string) {
+    const user = await this.authRepo.getUserWithRolesAndPermissions(userId);
+    if (!user || user.status !== "active") {
+      throw new Error("User not found or inactive");
+    }
+
+    const tokens = await this.issueSession(user);
+    const me = await this.getMe(userId);
+
+    return {
+      ...tokens,
+      user: me,
+    };
+  }
 }
 
 export const authService = new AuthService();

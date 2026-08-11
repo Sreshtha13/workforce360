@@ -66,7 +66,7 @@ const emptyForm: UserFormValues = {
 };
 
 export default function UsersAdminPage() {
-  const { hasPermission, isSuperAdmin } = useAuth();
+  const { user, hasPermission, isSuperAdmin } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
@@ -85,6 +85,10 @@ export default function UsersAdminPage() {
   const canUpdate = hasPermission("user.update");
   const canDelete = hasPermission("user.delete");
   const canAssignRole = hasPermission("user.assign_role");
+  const canView = hasPermission("user.read");
+  const isDeveloperScoped = Boolean(
+    user?.roles?.some((r) => r.code === "developer") && !isSuperAdmin && !canCreate,
+  );
 
   const usersQuery = useQuery({
     queryKey: ["users", search, showDeleted],
@@ -95,27 +99,38 @@ export default function UsersAdminPage() {
       });
       return res.data ?? [];
     },
+    enabled: canView,
+  });
+
+  const rolesQuery = useQuery({
+    queryKey: ["roles"],
+    queryFn: async () => {
+      const res = await apiClient.roles.list();
+      return res.data ?? [];
+    },
+    enabled: canAssignRole,
   });
 
   const lookupsQuery = useQuery({
     queryKey: ["user-form-lookups"],
     queryFn: async () => {
-      const [departments, designations, offices, employeeTypes, employmentStatuses, roles] =
-        await Promise.all([
-          apiClient.organization.departments.list(),
-          apiClient.organization.designations.list(),
-          apiClient.organization.offices.list(),
-          apiClient.organization.employeeTypes.list(),
-          apiClient.organization.employmentStatuses.list(),
-          apiClient.roles.list(),
-        ]);
+      const results = await Promise.allSettled([
+        apiClient.organization.departments.list(),
+        apiClient.organization.designations.list(),
+        apiClient.organization.offices.list(),
+        apiClient.organization.employeeTypes.list(),
+        apiClient.organization.employmentStatuses.list(),
+      ]);
+
+      const dataOf = <T,>(result: PromiseSettledResult<{ data: T | null }>, fallback: T): T =>
+        result.status === "fulfilled" ? (result.value.data ?? fallback) : fallback;
+
       return {
-        departments: departments.data ?? [],
-        designations: designations.data ?? [],
-        offices: offices.data ?? [],
-        employeeTypes: employeeTypes.data ?? [],
-        employmentStatuses: employmentStatuses.data ?? [],
-        roles: roles.data ?? [],
+        departments: dataOf(results[0], []),
+        designations: dataOf(results[1], []),
+        offices: dataOf(results[2], []),
+        employeeTypes: dataOf(results[3], []),
+        employmentStatuses: dataOf(results[4], []),
       };
     },
   });
@@ -226,7 +241,7 @@ export default function UsersAdminPage() {
   const lookupOptions = useMemo(() => {
     const l = lookupsQuery.data;
     if (!l) return null;
-    const toOptions = (items: { id: string; name: string }[]): LookupOption[] =>
+    const toOptions = (items: { id: string; name: string; code?: string | null }[]): LookupOption[] =>
       items.map((item) => ({ value: item.id, label: item.name }));
 
     return {
@@ -238,9 +253,22 @@ export default function UsersAdminPage() {
         label: formatEmployeeType({ code: item.code ?? "", name: item.name }),
       })),
       employmentStatuses: toOptions(l.employmentStatuses),
-      roles: toOptions(l.roles),
     };
   }, [lookupsQuery.data]);
+
+  const roleOptions = useMemo(() => {
+    const assignedRoleIds = new Set(roleTarget?.userRoles?.map((ur) => ur.role.id) ?? []);
+    return (rolesQuery.data ?? [])
+      .filter((role) => isSuperAdmin || role.code !== "super_admin")
+      .map((role) => {
+        const assigned = assignedRoleIds.has(role.id);
+        return {
+          value: role.id,
+          label: assigned ? `${role.name} (already assigned)` : role.name,
+          disabled: assigned,
+        };
+      });
+  }, [rolesQuery.data, roleTarget, isSuperAdmin]);
 
   const prefetchNextEmployeeId = async () => {
     setLoadingEmployeeId(true);
@@ -318,6 +346,10 @@ export default function UsersAdminPage() {
     }
   }, [sheetOpen]);
 
+  if (!canView) {
+    return <ErrorState message="You do not have permission to view users." />;
+  }
+
   if (usersQuery.isLoading) return <LoadingState message="Loading users..." variant="table" />;
   if (usersQuery.isError) {
     return (
@@ -339,7 +371,11 @@ export default function UsersAdminPage() {
     <div className="space-y-6">
       <AdminPageHeader
         title="User Management"
-        description="Create users, manage account status, employment status, and roles."
+        description={
+          isDeveloperScoped
+            ? "Team-scoped directory — you only see colleagues on your teams."
+            : "Create users, manage account status, employment status, and roles."
+        }
       >
         <SearchBar
           placeholder="Search users..."
@@ -796,14 +832,24 @@ export default function UsersAdminPage() {
                 )}
               </div>
             </div>
-            {lookupOptions && (
+            {rolesQuery.isLoading ? (
+              <p className="text-sm text-muted-foreground">Loading roles...</p>
+            ) : rolesQuery.isError ? (
+              <p className="text-sm text-destructive">
+                Failed to load roles.{" "}
+                <button type="button" className="underline" onClick={() => rolesQuery.refetch()}>
+                  Retry
+                </button>
+              </p>
+            ) : (
               <FormSelect
                 label="Add role"
                 name="roleId"
                 value={selectedRoleId}
                 onChange={setSelectedRoleId}
-                options={lookupOptions.roles}
+                options={roleOptions}
                 required
+                helperText="All assignable roles shown; currently assigned appear above and are disabled in the list."
               />
             )}
           </div>

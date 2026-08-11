@@ -45,6 +45,8 @@ describe("role schemas", () => {
       const result = createPermissionSchema.safeParse({
         name: "Read Users",
         code: "user.read",
+        module: "Administration",
+        feature: "Users",
         resource: "user",
         action: "read",
       });

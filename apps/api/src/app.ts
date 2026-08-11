@@ -6,6 +6,10 @@ import { env, isAllowedCorsOrigin } from "./lib/env";
 import { errorHandler, notFoundHandler } from "./middleware/error-handler";
 import { apiRouter } from "./routes";
 
+import { StorageController } from "./controllers/storage.controller";
+
+const storageController = new StorageController();
+
 export function createApp() {
   const app = express();
 
@@ -27,6 +31,12 @@ export function createApp() {
       },
       credentials: true,
     }),
+  );
+  // Local dev file uploads must run before express.json() consumes the body
+  app.put(
+    "/api/storage/upload/:uploadToken",
+    express.raw({ type: "*/*", limit: "10mb" }),
+    storageController.localUpload,
   );
   app.use(express.json({ limit: "1mb" }));
   app.use(cookieParser());

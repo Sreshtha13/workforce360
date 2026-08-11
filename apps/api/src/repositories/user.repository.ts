@@ -21,7 +21,7 @@ export type CreateUserInput = {
   officeId?: string;
   employeeTypeId?: string;
   employmentStatusId?: string | null;
-  managerId?: string;
+  managerId?: string | null;
 };
 
 export type UpdateUserInput = Partial<CreateUserInput> & {
@@ -31,14 +31,27 @@ export type UpdateUserInput = Partial<CreateUserInput> & {
 export class UserRepository {
   async findAllUsers(filters?: {
     departmentId?: string;
+    officeId?: string;
+    employeeTypeId?: string;
+    employmentStatusId?: string;
     status?: string;
     search?: string;
     includeDeleted?: boolean;
+    /** When set, restrict results to these user ids (employee visibility scope). */
+    ids?: string[];
   }) {
+    if (filters?.ids && filters.ids.length === 0) {
+      return [];
+    }
+
     const rows = await prisma.user.findMany({
       where: {
         ...(filters?.includeDeleted ? {} : { deletedAt: null }),
+        ...(filters?.ids && { id: { in: filters.ids } }),
         ...(filters?.departmentId && { departmentId: filters.departmentId }),
+        ...(filters?.officeId && { officeId: filters.officeId }),
+        ...(filters?.employeeTypeId && { employeeTypeId: filters.employeeTypeId }),
+        ...(filters?.employmentStatusId && { employmentStatusId: filters.employmentStatusId }),
         ...(filters?.status && { status: filters.status }),
         ...(filters?.search && {
           OR: [
@@ -96,6 +109,10 @@ export class UserRepository {
         employeeType: true,
         employmentStatus: true,
         manager: { select: activeUserSummarySelect },
+        teamMemberships: {
+          where: { deletedAt: null, leftAt: null },
+          select: { team: { select: { id: true, name: true } } },
+        },
         managedDepartments: {
           where: { deletedAt: null },
           select: { id: true, name: true },

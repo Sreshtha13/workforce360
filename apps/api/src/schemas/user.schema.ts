@@ -43,6 +43,9 @@ export const removeRoleSchema = z.object({
 
 export const listUsersQuerySchema = z.object({
   departmentId: z.string().optional(),
+  officeId: z.string().optional(),
+  employeeTypeId: z.string().optional(),
+  employmentStatusId: z.string().optional(),
   status: z.enum(USER_ACCOUNT_STATUSES).optional(),
   search: z.string().optional(),
   includeDeleted: z

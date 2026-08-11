@@ -70,7 +70,7 @@ type FormSelectProps = {
   name: string;
   value: string;
   onChange: (value: string) => void;
-  options: { value: string; label: string }[];
+  options: { value: string; label: string; disabled?: boolean }[];
   placeholder?: string;
   required?: boolean;
   disabled?: boolean;
@@ -106,9 +106,16 @@ export function FormSelect({
         aria-describedby={error ? `${name}-error` : helperText ? `${name}-helper` : undefined}
         className={cn(error && fieldErrorClass)}
       >
-        <option value="">{placeholder}</option>
+        <option value="" className="bg-background text-foreground dark:bg-card dark:text-foreground">
+          {placeholder}
+        </option>
         {options.map((opt) => (
-          <option key={opt.value} value={opt.value}>
+          <option
+            key={opt.value}
+            value={opt.value}
+            disabled={opt.disabled}
+            className="bg-background text-foreground dark:bg-card dark:text-foreground"
+          >
             {opt.label}
           </option>
         ))}

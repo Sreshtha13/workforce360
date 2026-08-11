@@ -9,6 +9,7 @@ import {
 describe("user schemas", () => {
   const validUser = {
     email: "new@example.com",
+    password: "SecurePass1",
     firstName: "Jane",
     lastName: "Doe",
   };
@@ -25,6 +26,12 @@ describe("user schemas", () => {
         password: "SecurePass1",
       });
       expect(result.success).toBe(true);
+    });
+
+    it("rejects missing password", () => {
+      const { password: _password, ...withoutPassword } = validUser;
+      const result = createUserSchema.safeParse(withoutPassword);
+      expect(result.success).toBe(false);
     });
 
     it("rejects invalid email", () => {

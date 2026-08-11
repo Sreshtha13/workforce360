@@ -1,10 +1,23 @@
 import { prisma } from "./prisma";
 
-/** Non-deleted users linked to an org entity. */
+/** Non-deleted users (all accounts). */
 export const linkedUserFilter = { deletedAt: null } as const;
 
-/** Active employees only (non-deleted, active status). */
-export const activeEmployeeFilter = { deletedAt: null, status: "active" } as const;
+/**
+ * Users counted as workforce employees: have an employee ID and are not soft-deleted.
+ * Excludes pure candidate/portal accounts without an employee record linkage.
+ */
+export const employeeUserFilter = {
+  deletedAt: null,
+  employeeId: { not: null },
+} as const;
+
+/** Active employees only (non-deleted, active account status, with employee ID). */
+export const activeEmployeeFilter = {
+  deletedAt: null,
+  status: "active",
+  employeeId: { not: null },
+} as const;
 
 export const activeUserSummarySelect = {
   id: true,

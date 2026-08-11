@@ -24,6 +24,8 @@ type FormSheetProps = {
   submitLabel?: string;
   loading?: boolean;
   destructive?: boolean;
+  /** Wider sheet for dense content (e.g. permission matrix). */
+  size?: "default" | "wide";
 };
 
 export function FormSheet({
@@ -36,12 +38,17 @@ export function FormSheet({
   submitLabel = "Save",
   loading,
   destructive,
+  size = "default",
 }: FormSheetProps) {
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent
         side="right"
-        className={cn(glass.nav, "w-full border-l-0 sm:max-w-lg")}
+        className={cn(
+          glass.nav,
+          "w-full border-l-0",
+          size === "wide" ? "sm:max-w-4xl" : "sm:max-w-lg",
+        )}
       >
         <SheetHeader className="border-b border-white/10 pb-4 dark:border-white/5">
           <SheetTitle className="text-lg">{title}</SheetTitle>

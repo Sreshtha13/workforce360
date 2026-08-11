@@ -1,6 +1,11 @@
 import { Prisma } from "@prisma/client";
 import { OrganizationRepository } from "../repositories/organization.repository";
 import { departmentManagerService } from "./department-manager.service";
+import {
+  allocateNextDesignationCode,
+  previewNextDesignationCode,
+} from "./designation-code.service";
+import { normalizeDesignationCode } from "../lib/designation-code";
 import { prisma } from "../lib/prisma";
 import type {
   CreateDepartmentData,
@@ -147,11 +152,42 @@ export class OrganizationService {
     return error instanceof Error ? error : new Error("Failed to save team");
   }
 
+  private async validateTeamMembers(departmentId: string, memberIds: string[]): Promise<void> {
+    if (memberIds.length === 0) return;
+
+    const members = await prisma.user.findMany({
+      where: {
+        id: { in: memberIds },
+        deletedAt: null,
+        status: "active",
+      },
+      select: { id: true, departmentId: true, firstName: true, lastName: true },
+    });
+
+    if (members.length !== memberIds.length) {
+      throw new Error("One or more team members are invalid or inactive");
+    }
+
+    for (const member of members) {
+      if (member.departmentId !== departmentId) {
+        throw new Error(
+          `${member.firstName} ${member.lastName} must belong to the selected department to join this team`,
+        );
+      }
+    }
+  }
+
   async createTeam(data: CreateTeamData) {
     await this.validateTeamDepartmentAndLead(data.departmentId, data.leadId);
+    if (data.memberIds?.length) {
+      await this.validateTeamMembers(data.departmentId, data.memberIds);
+    }
 
     try {
       const team = await this.orgRepo.createTeam(data);
+      if (data.memberIds?.length) {
+        await this.orgRepo.setTeamMembers(team.id, data.memberIds);
+      }
       return this.orgRepo.findTeamById(team.id);
     } catch (error) {
       throw this.mapTeamWriteError(error);
@@ -169,9 +205,15 @@ export class OrganizationService {
       data.leadId !== undefined ? data.leadId ?? null : existing.leadId;
 
     await this.validateTeamDepartmentAndLead(departmentId, leadId);
+    if (data.memberIds !== undefined) {
+      await this.validateTeamMembers(departmentId, data.memberIds);
+    }
 
     try {
       await this.orgRepo.updateTeam(id, data);
+      if (data.memberIds !== undefined) {
+        await this.orgRepo.setTeamMembers(id, data.memberIds);
+      }
       return this.orgRepo.findTeamById(id);
     } catch (error) {
       throw this.mapTeamWriteError(error);
@@ -208,7 +250,7 @@ export class OrganizationService {
   private mapDesignationWriteError(error: unknown): Error {
     if (error instanceof Prisma.PrismaClientKnownRequestError) {
       if (error.code === "P2002") {
-        return new Error("A designation with this code already exists");
+        return new Error("A designation with this code already exists in this department");
       }
       if (error.code === "P2003") {
         return new Error("Invalid department reference");
@@ -218,15 +260,55 @@ export class OrganizationService {
     return error instanceof Error ? error : new Error("Failed to save designation");
   }
 
+  async previewNextDesignationCode(departmentId: string) {
+    await this.validateDesignationDepartment(departmentId);
+    return { code: await previewNextDesignationCode(departmentId) };
+  }
+
   async createDesignation(data: CreateDesignationData) {
     await this.validateDesignationDepartment(data.departmentId);
 
-    try {
-      const designation = await this.orgRepo.createDesignation(data);
-      return this.orgRepo.findDesignationById(designation.id);
-    } catch (error) {
-      throw this.mapDesignationWriteError(error);
+    const providedCode =
+      data.code && data.code.trim().length > 0
+        ? normalizeDesignationCode(data.code)
+        : undefined;
+
+    const CREATE_MAX_RETRIES = 3;
+    let lastError: unknown;
+
+    for (let attempt = 0; attempt < CREATE_MAX_RETRIES; attempt++) {
+      try {
+        const designation = await prisma.$transaction(async (tx) => {
+          const code =
+            providedCode ?? (await allocateNextDesignationCode(data.departmentId, tx));
+
+          return tx.designation.create({
+            data: {
+              departmentId: data.departmentId,
+              name: data.name,
+              code,
+              level: data.level,
+              headcount: data.headcount,
+              description: data.description,
+            },
+          });
+        });
+
+        return this.orgRepo.findDesignationById(designation.id);
+      } catch (error) {
+        lastError = error;
+        // Only retry auto-allocated codes on unique conflicts
+        if (
+          providedCode ||
+          !(error instanceof Prisma.PrismaClientKnownRequestError) ||
+          error.code !== "P2002"
+        ) {
+          throw this.mapDesignationWriteError(error);
+        }
+      }
     }
+
+    throw this.mapDesignationWriteError(lastError);
   }
 
   async updateDesignation(id: string, data: Partial<CreateDesignationData>) {
@@ -239,8 +321,17 @@ export class OrganizationService {
       await this.validateDesignationDepartment(data.departmentId);
     }
 
+    const payload: Partial<CreateDesignationData> = { ...data };
+    if (data.code !== undefined) {
+      if (data.code.trim().length > 0) {
+        payload.code = normalizeDesignationCode(data.code);
+      } else {
+        delete payload.code;
+      }
+    }
+
     try {
-      await this.orgRepo.updateDesignation(id, data);
+      await this.orgRepo.updateDesignation(id, payload);
       return this.orgRepo.findDesignationById(id);
     } catch (error) {
       throw this.mapDesignationWriteError(error);

@@ -27,6 +27,7 @@ export const createTeamSchema = z.object({
   code: z.string().max(50).optional(),
   description: z.string().optional(),
   leadId: optionalTeamLeadId,
+  memberIds: z.array(z.string().min(1)).optional(),
 });
 
 export const updateTeamSchema = createTeamSchema.partial().extend({
