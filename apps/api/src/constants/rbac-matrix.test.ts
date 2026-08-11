@@ -66,6 +66,8 @@ describe("RBAC matrix (#21)", () => {
       "employee",
       "candidate",
       "developer",
+      "finance",
+      "payroll",
     ]);
   });
 

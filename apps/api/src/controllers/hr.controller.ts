@@ -428,6 +428,34 @@ export class PortalController {
     }
   };
 
+  listMyPayslips = async (req: Request, res: Response): Promise<void> => {
+    try {
+      const payslips = await portalService.listMyPayslips(req.user!.userId);
+      sendSuccess(res, payslips);
+    } catch (error) {
+      sendError(res, 500, { code: "LIST_PAYSLIPS_FAILED", message: "Failed" });
+    }
+  };
+
+  downloadMyPayslip = async (req: Request, res: Response): Promise<void> => {
+    try {
+      const result = await portalService.getMyPayslipDownload(req.user!.userId, req.params.id);
+      if (result.mode === "redirect") {
+        sendSuccess(res, { url: result.url, fileName: result.fileName });
+        return;
+      }
+      res.setHeader("Content-Type", result.mimeType);
+      res.setHeader("Content-Disposition", `attachment; filename="${result.fileName}"`);
+      res.send(result.buffer);
+    } catch (error) {
+      const clientError = toClientError(error);
+      sendError(res, clientError.statusCode, {
+        code: clientError.code === "OPERATION_FAILED" ? "PAYSLIP_DOWNLOAD_FAILED" : clientError.code,
+        message: clientError.message,
+      });
+    }
+  };
+
   acknowledgePolicy = async (req: Request, res: Response): Promise<void> => {
     try {
       const ack = await portalService.acknowledgePolicy(req.params.id, req.user!.userId);

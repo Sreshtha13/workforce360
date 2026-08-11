@@ -3,17 +3,21 @@ import {
   Building2,
   Briefcase,
   ClipboardList,
+  CreditCard,
+  DollarSign,
   FileText,
   Headphones,
   KeyRound,
   LayoutDashboard,
   MapPin,
+  Receipt,
   Shield,
   Tags,
   UserCheck,
   UserCircle,
   Users,
   UsersRound,
+  Wallet,
   Workflow,
 } from "lucide-react";
 import { isPortalModuleEnabled } from "@/lib/module-availability";
@@ -125,6 +129,60 @@ export const hrNav: NavItem[] = [
     href: "/hr/tickets",
     icon: Headphones,
     permissions: ["ticket.read"],
+  },
+];
+
+export const financeNav: NavItem[] = [
+  {
+    label: "Finance Dashboard",
+    href: "/finance/dashboard",
+    icon: LayoutDashboard,
+    permissions: ["finance.dashboard.read"],
+  },
+  {
+    label: "Clients",
+    href: "/finance/clients",
+    icon: Users,
+    permissions: ["client.read", "client.manage"],
+  },
+  {
+    label: "Invoices",
+    href: "/finance/invoices",
+    icon: FileText,
+    permissions: ["invoice.read", "invoice.manage", "invoice.approve"],
+  },
+  {
+    label: "Payments",
+    href: "/finance/payments",
+    icon: CreditCard,
+    permissions: ["payment.read", "payment.manage"],
+  },
+  {
+    label: "Reimbursements",
+    href: "/finance/reimbursements",
+    icon: Receipt,
+    permissions: ["reimbursement.read", "reimbursement.review"],
+  },
+];
+
+export const payrollNav: NavItem[] = [
+  {
+    label: "Salary Structures",
+    href: "/payroll/salary-structures",
+    icon: Wallet,
+    permissions: ["salary_structure.read", "salary_structure.manage"],
+  },
+  {
+    label: "Salary Revisions",
+    href: "/payroll/salary-revisions",
+    icon: DollarSign,
+    permissions: ["salary_revision.read", "salary_revision.approve"],
+  },
+  {
+    label: "Payroll Runs",
+    href: "/payroll/runs",
+    icon: FileText,
+    permissions: ["payroll_run.read", "payroll_run.manage", "payroll_run.approve"],
   },
 ];
 

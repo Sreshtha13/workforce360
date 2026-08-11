@@ -96,6 +96,65 @@ export async function handleLocalUpload(
   return { storageKey: pending.storageKey };
 }
 
+export async function writeStoredFile(storageKey: string, body: Buffer): Promise<void> {
+  if (env.STORAGE_PROVIDER === "s3") {
+    if (!env.S3_BUCKET || !env.S3_ACCESS_KEY || !env.S3_SECRET_KEY) {
+      throw new Error("S3 storage is not configured");
+    }
+
+    const { S3Client, PutObjectCommand } = await import("@aws-sdk/client-s3");
+    const client = new S3Client({
+      region: env.S3_REGION,
+      endpoint: env.S3_ENDPOINT,
+      credentials: {
+        accessKeyId: env.S3_ACCESS_KEY,
+        secretAccessKey: env.S3_SECRET_KEY,
+      },
+      forcePathStyle: Boolean(env.S3_ENDPOINT),
+    });
+
+    await client.send(
+      new PutObjectCommand({ Bucket: env.S3_BUCKET, Key: storageKey, Body: body }),
+    );
+    return;
+  }
+
+  const filePath = join(process.cwd(), env.STORAGE_LOCAL_DIR, storageKey);
+  await mkdir(dirname(filePath), { recursive: true });
+  await writeFile(filePath, body);
+}
+
+/**
+ * Returns a short-lived pre-signed GET URL when backed by S3, or null when
+ * backed by local storage (callers should fall back to an authenticated
+ * backend proxy-download route in that case).
+ */
+export async function createPresignedDownload(
+  storageKey: string,
+  expiresInSeconds = 300,
+): Promise<string | null> {
+  if (env.STORAGE_PROVIDER !== "s3") return null;
+  if (!env.S3_BUCKET || !env.S3_ACCESS_KEY || !env.S3_SECRET_KEY) {
+    throw new Error("S3 storage is not configured");
+  }
+
+  const { S3Client, GetObjectCommand } = await import("@aws-sdk/client-s3");
+  const { getSignedUrl } = await import("@aws-sdk/s3-request-presigner");
+
+  const client = new S3Client({
+    region: env.S3_REGION,
+    endpoint: env.S3_ENDPOINT,
+    credentials: {
+      accessKeyId: env.S3_ACCESS_KEY,
+      secretAccessKey: env.S3_SECRET_KEY,
+    },
+    forcePathStyle: Boolean(env.S3_ENDPOINT),
+  });
+
+  const command = new GetObjectCommand({ Bucket: env.S3_BUCKET, Key: storageKey });
+  return getSignedUrl(client, command, { expiresIn: expiresInSeconds });
+}
+
 export async function readStoredFile(storageKey: string): Promise<Buffer> {
   if (env.STORAGE_PROVIDER === "s3") {
     if (!env.S3_BUCKET || !env.S3_ACCESS_KEY || !env.S3_SECRET_KEY) {

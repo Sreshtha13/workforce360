@@ -87,4 +87,17 @@ router.post(
   controller.acknowledgePolicy,
 );
 
+router.get(
+  "/payslips",
+  requireAuth,
+  requirePermission("portal.read"),
+  controller.listMyPayslips,
+);
+router.get(
+  "/payslips/:id/download",
+  requireAuth,
+  requirePermission("portal.read"),
+  controller.downloadMyPayslip,
+);
+
 export { router as portalRouter };

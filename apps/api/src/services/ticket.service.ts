@@ -1,15 +1,14 @@
 import type { SupportTicketStatus } from "@prisma/client";
+import {
+  SUPPORT_TICKET_STATUSES,
+  toPrismaTicketStatus,
+  type TicketWorkflowStatus,
+} from "../constants/support-ticket";
 import { AppError } from "../lib/app-error";
 import { writeAuditLog } from "../lib/audit";
-import { TicketRepository } from "../repositories/ticket.repository";
+import { TicketRepository, type TicketWorkflowFields } from "../repositories/ticket.repository";
 
-const STAFF_STATUSES: SupportTicketStatus[] = [
-  "OPEN",
-  "IN_PROGRESS",
-  "WAITING_FOR_EMPLOYEE",
-  "RESOLVED",
-  "CLOSED",
-];
+export { OPEN_TICKET_STATUSES } from "../constants/support-ticket";
 
 export class TicketService {
   private ticketRepo = new TicketRepository();
@@ -75,11 +74,12 @@ export class TicketService {
     attachmentFileId?: string,
   ) {
     const ticket = await this.getMyTicket(ticketId, userId);
-    if (ticket.status === "CLOSED") {
+    const status = ticket.status as TicketWorkflowStatus;
+    if (status === "CLOSED") {
       throw new AppError("TICKET_CLOSED", "Closed tickets cannot receive new replies", 400);
     }
 
-    const message = await this.ticketRepo.addMessage({
+    await this.ticketRepo.addMessage({
       ticketId,
       authorId: userId,
       authorType: "EMPLOYEE",
@@ -87,8 +87,8 @@ export class TicketService {
       attachmentFileId,
     });
 
-    if (ticket.status === "WAITING_FOR_EMPLOYEE" || ticket.status === "RESOLVED") {
-      await this.ticketRepo.updateTicket(ticketId, { status: "IN_PROGRESS" });
+    if (status === "WAITING_FOR_EMPLOYEE" || status === "RESOLVED") {
+      await this.ticketRepo.updateTicket(ticketId, { status: toPrismaTicketStatus("IN_PROGRESS") });
     }
 
     await writeAuditLog({
@@ -109,7 +109,9 @@ export class TicketService {
     options?: { attachmentFileId?: string; setWaiting?: boolean },
   ) {
     const ticket = await this.getStaffTicket(ticketId);
-    if (ticket.status === "CLOSED") {
+    const fields = ticket as unknown as TicketWorkflowFields;
+    const status = fields.status as TicketWorkflowStatus;
+    if (status === "CLOSED") {
       throw new AppError("TICKET_CLOSED", "Closed tickets cannot receive new replies", 400);
     }
 
@@ -121,13 +123,13 @@ export class TicketService {
       attachmentFileId: options?.attachmentFileId,
     });
 
-    const nextStatus: SupportTicketStatus =
+    const nextStatus: TicketWorkflowStatus =
       options?.setWaiting === false ? "IN_PROGRESS" : "WAITING_FOR_EMPLOYEE";
 
-    if (ticket.status !== "CLOSED" && ticket.status !== "RESOLVED") {
+    if (status !== "RESOLVED") {
       await this.ticketRepo.updateTicket(ticketId, {
-        status: nextStatus,
-        assignedToId: ticket.assignedToId ?? staffUserId,
+        status: toPrismaTicketStatus(nextStatus),
+        assignedToId: fields.assignedToId ?? staffUserId,
       });
     }
 
@@ -147,7 +149,7 @@ export class TicketService {
 
     const updated = await this.ticketRepo.updateTicket(ticketId, {
       assignedToId: assigneeId,
-      status: assigneeId ? "IN_PROGRESS" : undefined,
+      status: assigneeId ? toPrismaTicketStatus("IN_PROGRESS") : undefined,
     });
 
     await writeAuditLog({
@@ -162,22 +164,24 @@ export class TicketService {
   }
 
   async updateStatus(ticketId: string, status: SupportTicketStatus, actorId: string) {
-    if (!STAFF_STATUSES.includes(status)) {
+    const workflowStatus = status as TicketWorkflowStatus;
+    if (!(SUPPORT_TICKET_STATUSES as readonly string[]).includes(workflowStatus)) {
       throw new AppError("INVALID_TICKET_STATUS", "Invalid ticket status", 400);
     }
 
     const existing = await this.getStaffTicket(ticketId);
+    const fields = existing as unknown as TicketWorkflowFields;
     const updated = await this.ticketRepo.updateTicket(ticketId, {
-      status,
-      resolvedAt: status === "RESOLVED" ? new Date() : existing.resolvedAt,
-      closedAt: status === "CLOSED" ? new Date() : existing.closedAt,
+      status: toPrismaTicketStatus(workflowStatus),
+      resolvedAt: workflowStatus === "RESOLVED" ? new Date() : fields.resolvedAt,
+      closedAt: workflowStatus === "CLOSED" ? new Date() : fields.closedAt,
     });
 
     await this.ticketRepo.addMessage({
       ticketId,
       authorId: actorId,
       authorType: "SYSTEM",
-      body: `Status changed to ${status}`,
+      body: `Status changed to ${workflowStatus}`,
     });
 
     await writeAuditLog({
@@ -186,7 +190,7 @@ export class TicketService {
       entity: "support_ticket",
       entityId: ticketId,
       before: { status: existing.status },
-      after: { status },
+      after: { status: workflowStatus },
     });
 
     return updated;

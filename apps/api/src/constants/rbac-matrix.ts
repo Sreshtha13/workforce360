@@ -17,6 +17,8 @@ export const SYSTEM_ROLE_CODES = [
   "employee",
   "candidate",
   "developer",
+  "finance",
+  "payroll",
 ] as const;
 
 export type SystemRoleCode = (typeof SYSTEM_ROLE_CODES)[number];
@@ -63,6 +65,26 @@ export const HR_RESOURCES = [
   "policy",
   "asset",
   "ticket",
+  "attendance",
+  "leave",
+  "approval",
+] as const;
+
+/** Finance Team resources granted wholesale in seed (all actions for these resources). */
+export const FINANCE_RESOURCES = [
+  "client",
+  "invoice",
+  "payment",
+  "reimbursement",
+  "finance",
+] as const;
+
+/** Payroll Team resources granted wholesale in seed (all actions for these resources). */
+export const PAYROLL_RESOURCES = [
+  "salary_structure",
+  "salary_revision",
+  "payroll_run",
+  "payslip",
 ] as const;
 
 /** Admin must not receive these write codes (read-only on roles/permissions). */
@@ -125,6 +147,16 @@ export function roleShouldHavePermission(
   if (role === "hr") {
     const resource = permissionCode.split(".")[0];
     return (HR_RESOURCES as readonly string[]).includes(resource);
+  }
+
+  if (role === "finance") {
+    const resource = permissionCode.split(".")[0];
+    return (FINANCE_RESOURCES as readonly string[]).includes(resource);
+  }
+
+  if (role === "payroll") {
+    const resource = permissionCode.split(".")[0];
+    return (PAYROLL_RESOURCES as readonly string[]).includes(resource);
   }
 
   return false;

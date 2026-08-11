@@ -138,6 +138,30 @@ All domain endpoints live under \`/api/...\`. Use this Swagger UI to browse and 
         name: "Organization - Employment Statuses",
         description: "Employment lifecycle statuses (Active, On Leave, etc.)",
       },
+      {
+        name: "Attendance",
+        description: "Attendance tracking, shifts, holidays, and corrections",
+      },
+      {
+        name: "Leave Management",
+        description: "Leave types, balances, applications, and approvals",
+      },
+      {
+        name: "Asset Management",
+        description: "Asset tracking, assignment, returns, and history",
+      },
+      {
+        name: "Approvals",
+        description: "Generic multi-level approval workflow engine",
+      },
+      {
+        name: "Finance",
+        description: "Clients, invoices, payments (Stripe/Razorpay), and employee reimbursements",
+      },
+      {
+        name: "Payroll",
+        description: "Versioned salary structures, salary revisions, payroll runs, and payslips",
+      },
     ],
   },
   apis: [routesGlob, docsGlob],

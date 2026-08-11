@@ -11,7 +11,16 @@ import {
   Sparkles,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
-import { adminNav, candidateNav, filterNavByPermissions, hrNav, mainNav, portalNav } from "@/lib/navigation";
+import {
+  adminNav,
+  candidateNav,
+  filterNavByPermissions,
+  financeNav,
+  hrNav,
+  mainNav,
+  payrollNav,
+  portalNav,
+} from "@/lib/navigation";
 import { glass, iconSize, motion } from "@/lib/design-system";
 import { typographyScale } from "@/lib/design-tokens";
 import { cn } from "@/lib/utils";
@@ -35,6 +44,8 @@ export function DashboardShell({ children }: { children: ReactNode }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [adminExpanded, setAdminExpanded] = useState(true);
   const [hrExpanded, setHrExpanded] = useState(true);
+  const [financeExpanded, setFinanceExpanded] = useState(true);
+  const [payrollExpanded, setPayrollExpanded] = useState(true);
   const [portalExpanded, setPortalExpanded] = useState(true);
 
   if (!user) return null;
@@ -43,6 +54,8 @@ export function DashboardShell({ children }: { children: ReactNode }) {
   const visibleMain = filterNavByPermissions(mainNav, navUser);
   const visibleCandidate = filterNavByPermissions(candidateNav, navUser);
   const visibleHr = filterNavByPermissions(hrNav, navUser);
+  const visibleFinance = filterNavByPermissions(financeNav, navUser);
+  const visiblePayroll = filterNavByPermissions(payrollNav, navUser);
   const visiblePortal = filterNavByPermissions(portalNav, navUser);
   const visibleAdmin = filterNavByPermissions(adminNav, navUser);
   const breadcrumbs = buildBreadcrumbs(pathname);
@@ -127,6 +140,72 @@ export function DashboardShell({ children }: { children: ReactNode }) {
             </button>
             {hrExpanded &&
               visibleHr.map((item) => (
+                <SidebarLink
+                  key={item.href}
+                  href={item.href}
+                  label={item.label}
+                  icon={item.icon}
+                  active={pathname === item.href || pathname.startsWith(`${item.href}/`)}
+                  onNavigate={() => setMobileOpen(false)}
+                />
+              ))}
+          </div>
+        )}
+
+        {visibleFinance.length > 0 && (
+          <div className="mt-4">
+            <button
+              type="button"
+              onClick={() => setFinanceExpanded((v) => !v)}
+              className={cn(
+                typographyScale.overline.className,
+                "flex w-full items-center justify-between px-2 py-2 text-sidebar-foreground/70",
+              )}
+            >
+              Finance
+              <ChevronDown
+                className={cn(
+                  iconSize.sm,
+                  "transition-transform",
+                  financeExpanded ? "rotate-0" : "-rotate-90",
+                )}
+              />
+            </button>
+            {financeExpanded &&
+              visibleFinance.map((item) => (
+                <SidebarLink
+                  key={item.href}
+                  href={item.href}
+                  label={item.label}
+                  icon={item.icon}
+                  active={pathname === item.href || pathname.startsWith(`${item.href}/`)}
+                  onNavigate={() => setMobileOpen(false)}
+                />
+              ))}
+          </div>
+        )}
+
+        {visiblePayroll.length > 0 && (
+          <div className="mt-4">
+            <button
+              type="button"
+              onClick={() => setPayrollExpanded((v) => !v)}
+              className={cn(
+                typographyScale.overline.className,
+                "flex w-full items-center justify-between px-2 py-2 text-sidebar-foreground/70",
+              )}
+            >
+              Payroll
+              <ChevronDown
+                className={cn(
+                  iconSize.sm,
+                  "transition-transform",
+                  payrollExpanded ? "rotate-0" : "-rotate-90",
+                )}
+              />
+            </button>
+            {payrollExpanded &&
+              visiblePayroll.map((item) => (
                 <SidebarLink
                   key={item.href}
                   href={item.href}
