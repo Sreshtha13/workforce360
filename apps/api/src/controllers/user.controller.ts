@@ -1,6 +1,7 @@
 import type { Request, Response } from "express";
 import { UserService } from "../services/user.service";
 import { sendSuccess, sendError } from "../lib/response";
+import { toClientError } from "../lib/app-error";
 
 export class UserController {
   private userService: UserService;
@@ -54,12 +55,25 @@ export class UserController {
   getUserById = async (req: Request, res: Response): Promise<void> => {
     try {
       const { id } = req.params;
-      const user = await this.userService.getUserById(id);
+      const user = await this.userService.getUserById(id, req.user?.userId);
       sendSuccess(res, user);
     } catch (error) {
-      sendError(res, 404, {
-        code: "USER_NOT_FOUND",
-        message: error instanceof Error ? error.message : "User not found",
+      const clientError = toClientError(error);
+      const message = error instanceof Error ? error.message : "User not found";
+      const statusCode =
+        clientError.code === "EMPLOYEE_SCOPE_FORBIDDEN"
+          ? 403
+          : message === "User not found"
+            ? 404
+            : clientError.statusCode;
+      sendError(res, statusCode, {
+        code:
+          clientError.code !== "OPERATION_FAILED"
+            ? clientError.code
+            : statusCode === 404
+              ? "USER_NOT_FOUND"
+              : "GET_USER_FAILED",
+        message: clientError.message !== "Operation failed" ? clientError.message : message,
       });
     }
   };
@@ -83,7 +97,7 @@ export class UserController {
     } catch (error) {
       sendError(res, 400, {
         code: "CREATE_USER_FAILED",
-        message: error instanceof Error ? error.message : "Failed to create user",
+        message: toClientError(error).message,
       });
     }
   };
@@ -94,9 +108,10 @@ export class UserController {
       const user = await this.userService.updateUser(id, req.body);
       sendSuccess(res, user);
     } catch (error) {
-      sendError(res, 400, {
-        code: "UPDATE_USER_FAILED",
-        message: error instanceof Error ? error.message : "Failed to update user",
+      const clientError = toClientError(error);
+      sendError(res, clientError.statusCode, {
+        code: clientError.code === "OPERATION_FAILED" ? "UPDATE_USER_FAILED" : clientError.code,
+        message: clientError.message,
       });
     }
   };

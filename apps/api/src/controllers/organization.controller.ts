@@ -175,6 +175,28 @@ export class OrganizationController {
       });
     }
   };
+
+  getNextDesignationCode = async (req: Request, res: Response): Promise<void> => {
+    try {
+      const departmentId = req.query.departmentId as string | undefined;
+      if (!departmentId?.trim()) {
+        sendError(res, 400, {
+          code: "DEPARTMENT_ID_REQUIRED",
+          message: "departmentId query parameter is required",
+        });
+        return;
+      }
+      const result = await this.orgService.previewNextDesignationCode(departmentId);
+      sendSuccess(res, result);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to preview designation code";
+      const status = message === "Department not found" ? 404 : 400;
+      sendError(res, status, {
+        code: status === 404 ? "DEPARTMENT_NOT_FOUND" : "NEXT_DESIGNATION_CODE_FAILED",
+        message,
+      });
+    }
+  };
   
   createDesignation = async (req: Request, res: Response): Promise<void> => {
     try {

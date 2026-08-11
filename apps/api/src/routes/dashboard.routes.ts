@@ -8,21 +8,21 @@ const router = Router();
 router.get(
   "/",
   requireAuth,
-  requirePermission("user.read"),
+  requirePermission("dashboard.read"),
   dashboardController.getAdminDashboard,
 );
 
 router.get(
   "/employees",
   requireAuth,
-  requirePermission("user.read"),
+  requirePermission("dashboard.read"),
   dashboardController.listActiveEmployees,
 );
 
 router.get(
   "/search",
   requireAuth,
-  requirePermission("user.read"),
+  requirePermission("dashboard.read"),
   dashboardController.search,
 );
 

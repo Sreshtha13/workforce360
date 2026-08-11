@@ -39,15 +39,18 @@ export default function TeamsPage() {
   const canUpdate = hasPermission("team.update");
   const canDelete = hasPermission("team.delete");
   const canReadUsers = hasPermission("user.read");
+  const canView = hasPermission("team.read") || canCreate || canUpdate || canDelete;
 
   const query = useQuery({
     queryKey: ["teams"],
     queryFn: async () => (await apiClient.organization.teams.list()).data ?? [],
+    enabled: canView,
   });
 
   const departmentsQuery = useQuery({
     queryKey: ["team-departments"],
     queryFn: async () => (await apiClient.organization.departments.list()).data ?? [],
+    enabled: canView,
   });
 
   const employeesQuery = useQuery({
@@ -59,7 +62,7 @@ export default function TeamsPage() {
           status: "active",
         })
       ).data ?? [],
-    enabled: sheetOpen && !!form.departmentId && canReadUsers,
+    enabled: sheetOpen && !!form.departmentId && canReadUsers && canView,
   });
 
   const teamDetailQuery = useQuery({
@@ -69,7 +72,7 @@ export default function TeamsPage() {
       const res = await apiClient.organization.teams.get(editing.id);
       return res.data;
     },
-    enabled: sheetOpen && !!editing,
+    enabled: sheetOpen && !!editing && canView,
   });
 
   useEffect(() => {
@@ -117,6 +120,9 @@ export default function TeamsPage() {
     },
   });
 
+  if (!canView) {
+    return <ErrorState message="You do not have permission to view teams." />;
+  }
   if (query.isLoading) return <LoadingState />;
   if (query.isError) return <ErrorState message="Failed to load teams" onRetry={() => query.refetch()} />;
 

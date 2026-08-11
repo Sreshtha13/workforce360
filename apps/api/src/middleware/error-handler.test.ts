@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import { ZodError, z } from "zod";
+import { AppError } from "../lib/app-error";
 import { notFoundHandler, errorHandler } from "./error-handler";
 import {
   createMockRequest,
@@ -38,6 +39,29 @@ describe("error handlers", () => {
         error: expect.objectContaining({ code: "VALIDATION_ERROR" }),
       }),
     );
+  });
+
+  it("errorHandler maps AppError to its status and code", () => {
+    const req = createMockRequest();
+    const res = createMockResponse();
+    const next = createMockNext();
+
+    errorHandler(
+      new AppError("DUPLICATE_EMPLOYEE_ID", "Conflict", 409),
+      req,
+      res,
+      next,
+    );
+
+    expect(res.status).toHaveBeenCalledWith(409);
+    expect(res.json).toHaveBeenCalledWith({
+      data: null,
+      error: {
+        code: "DUPLICATE_EMPLOYEE_ID",
+        message: "Conflict",
+      },
+      meta: null,
+    });
   });
 
   it("errorHandler maps unknown errors to 500 INTERNAL_ERROR", () => {

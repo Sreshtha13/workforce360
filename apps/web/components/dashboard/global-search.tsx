@@ -12,7 +12,7 @@ import { iconSize } from "@/lib/design-system";
 
 export function GlobalSearch({ className }: { className?: string }) {
   const { hasPermission } = useAuth();
-  const canSearch = hasPermission("user.read");
+  const canSearch = hasPermission("dashboard.read");
   const [query, setQuery] = useState("");
   const [debounced, setDebounced] = useState("");
   const [open, setOpen] = useState(false);

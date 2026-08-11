@@ -24,8 +24,20 @@ export type NavItem = {
   icon: LucideIcon;
   /** Any one of these permissions grants access */
   permissions?: string[];
+  /**
+   * When set, the user must have at least one of these role codes.
+   * Used for applicant-only surfaces (e.g. My Applications).
+   */
+  roles?: string[];
+  /** Hide the item if the user has any of these role codes */
+  excludeRoles?: string[];
   /** If true, show to all authenticated users */
   public?: boolean;
+};
+
+export type NavFilterUser = {
+  permissions: string[];
+  roles?: { code?: string | null }[];
 };
 
 export const mainNav: NavItem[] = [
@@ -42,7 +54,8 @@ export const candidateNav: NavItem[] = [
     label: "My Applications",
     href: "/candidate/dashboard",
     icon: ClipboardList,
-    permissions: ["portal.read"],
+    /** Applicant workflow only — not Super Admin / Admin / HR via portal.read */
+    roles: ["candidate"],
   },
 ];
 
@@ -106,6 +119,12 @@ export const hrNav: NavItem[] = [
     href: "/hr/assets",
     icon: Tags,
     permissions: ["asset.read"],
+  },
+  {
+    label: "Support Tickets",
+    href: "/hr/tickets",
+    icon: Headphones,
+    permissions: ["ticket.read"],
   },
 ];
 
@@ -180,7 +199,7 @@ export const portalNav: NavItem[] = [
     label: "Support",
     href: "/portal/support",
     icon: Headphones,
-    permissions: ["portal.read"],
+    permissions: ["ticket.create", "portal.read"],
   },
 ];
 
@@ -246,14 +265,53 @@ export const adminNav: NavItem[] = [
   },
 ];
 
+function roleCodes(user: NavFilterUser | string[]): Set<string> {
+  if (Array.isArray(user)) return new Set();
+  return new Set(
+    (user.roles ?? [])
+      .map((role) => role.code)
+      .filter((code): code is string => Boolean(code)),
+  );
+}
+
+function permissionList(user: NavFilterUser | string[]): string[] {
+  return Array.isArray(user) ? user : user.permissions;
+}
+
+/**
+ * Filters nav items by module flags, permissions, and optional role rules.
+ * Passing a bare permission string[] remains supported for existing call sites.
+ */
 export function filterNavByPermissions(
   items: NavItem[],
-  permissions: string[],
+  userOrPermissions: NavFilterUser | string[],
 ): NavItem[] {
+  const permissions = permissionList(userOrPermissions);
+  const codes = roleCodes(userOrPermissions);
+
   return items.filter((item) => {
     if (!isPortalModuleEnabled(item.href)) return false;
+
+    if (item.excludeRoles?.length && item.excludeRoles.some((code) => codes.has(code))) {
+      return false;
+    }
+
+    if (item.roles?.length) {
+      if (!item.roles.some((code) => codes.has(code))) {
+        return false;
+      }
+    }
+
     if (item.public) return true;
+    // Role checks already applied above; items with no permission list are visible
     if (!item.permissions?.length) return true;
     return item.permissions.some((p) => permissions.includes(p));
   });
+}
+
+/** True when the user should see the applicant "My Applications" surface. */
+export function canAccessCandidateApplications(
+  user: { roles?: { code?: string | null }[] } | null | undefined,
+): boolean {
+  return user?.roles?.some((role) => role.code === "candidate") ?? false;
 }

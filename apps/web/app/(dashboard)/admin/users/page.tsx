@@ -66,7 +66,7 @@ const emptyForm: UserFormValues = {
 };
 
 export default function UsersAdminPage() {
-  const { hasPermission, isSuperAdmin } = useAuth();
+  const { user, hasPermission, isSuperAdmin } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
@@ -85,6 +85,10 @@ export default function UsersAdminPage() {
   const canUpdate = hasPermission("user.update");
   const canDelete = hasPermission("user.delete");
   const canAssignRole = hasPermission("user.assign_role");
+  const canView = hasPermission("user.read");
+  const isDeveloperScoped = Boolean(
+    user?.roles?.some((r) => r.code === "developer") && !isSuperAdmin && !canCreate,
+  );
 
   const usersQuery = useQuery({
     queryKey: ["users", search, showDeleted],
@@ -95,6 +99,7 @@ export default function UsersAdminPage() {
       });
       return res.data ?? [];
     },
+    enabled: canView,
   });
 
   const rolesQuery = useQuery({
@@ -341,6 +346,10 @@ export default function UsersAdminPage() {
     }
   }, [sheetOpen]);
 
+  if (!canView) {
+    return <ErrorState message="You do not have permission to view users." />;
+  }
+
   if (usersQuery.isLoading) return <LoadingState message="Loading users..." variant="table" />;
   if (usersQuery.isError) {
     return (
@@ -362,7 +371,11 @@ export default function UsersAdminPage() {
     <div className="space-y-6">
       <AdminPageHeader
         title="User Management"
-        description="Create users, manage account status, employment status, and roles."
+        description={
+          isDeveloperScoped
+            ? "Team-scoped directory — you only see colleagues on your teams."
+            : "Create users, manage account status, employment status, and roles."
+        }
       >
         <SearchBar
           placeholder="Search users..."

@@ -1,22 +1,49 @@
 import type { EmployeeLifecycleState } from "@prisma/client";
 import { HrRepository, PortalRepository, RecruitmentRepository } from "../repositories/phase2.repository";
 import { UserRepository } from "../repositories/user.repository";
-import { getNextEmployeeId } from "../lib/employee-id";
+import { toClientError } from "../lib/app-error";
 import { writeAuditLog } from "../lib/audit";
 import { prisma } from "../lib/prisma";
+import { allocateNextEmployeeId } from "./employee-id.service";
+import { employeeMasterService } from "./employee-master.service";
+import { policyService } from "./policy.service";
+import { ticketService } from "./ticket.service";
+import {
+  assertCanViewUser,
+  resolveEmployeeVisibilityScope,
+} from "../lib/employee-scope";
 
 export class HrService {
   private hrRepo = new HrRepository();
   private recruitmentRepo = new RecruitmentRepository();
-  private userRepo = new UserRepository();
   private portalRepo = new PortalRepository();
 
-  listEmployees(filters?: { lifecycleState?: string; search?: string }) {
-    return this.hrRepo.listEmployees(filters);
+  async listEmployees(
+    filters?: { lifecycleState?: string; search?: string },
+    requesterId?: string,
+  ) {
+    await employeeMasterService.backfillMissingEmployeeRecords();
+
+    let userIds: string[] | undefined;
+    if (requesterId) {
+      const scope = await resolveEmployeeVisibilityScope(requesterId);
+      if (scope.type === "userIds") {
+        userIds = scope.userIds;
+      }
+    }
+
+    return this.hrRepo.listEmployees({ ...filters, userIds });
   }
 
-  getEmployee(id: string) {
-    return this.hrRepo.findEmployeeById(id);
+  async getEmployee(id: string, requesterId?: string) {
+    const employee = await this.hrRepo.findEmployeeById(id);
+    if (!employee) return null;
+
+    if (requesterId && employee.userId) {
+      await assertCanViewUser(requesterId, employee.userId);
+    }
+
+    return employee;
   }
 
   getEmployeeByUserId(userId: string) {
@@ -49,57 +76,67 @@ export class HrService {
     const employeeRole = await prisma.role.findUnique({ where: { code: "employee" } });
     if (!employeeRole) throw new Error("Employee role is not configured");
 
-    const latestCode = await this.userRepo.findLatestEmployeeId();
-    const employeeCode = getNextEmployeeId(latestCode);
-
-    await prisma.user.update({
+    const existingUser = await prisma.user.findUnique({
       where: { id: userId },
-      data: {
-        employeeId: employeeCode,
-        departmentId: input.departmentId ?? undefined,
-        designationId: input.designationId ?? undefined,
-        dateOfJoining: new Date(),
-        userRoles: {
-          upsert: {
-            where: { userId_roleId: { userId, roleId: employeeRole.id } },
-            create: { roleId: employeeRole.id, assignedBy: input.actorId },
-            update: { deletedAt: null },
+      select: { employeeId: true, dateOfJoining: true },
+    });
+
+    let employeeCode = existingUser?.employeeId ?? null;
+    if (!employeeCode) {
+      employeeCode = await allocateNextEmployeeId();
+    }
+
+    try {
+      await prisma.user.update({
+        where: { id: userId },
+        data: {
+          ...(existingUser?.employeeId ? {} : { employeeId: employeeCode }),
+          departmentId: input.departmentId ?? undefined,
+          designationId: input.designationId ?? undefined,
+          dateOfJoining: existingUser?.dateOfJoining ?? new Date(),
+          userRoles: {
+            upsert: {
+              where: { userId_roleId: { userId, roleId: employeeRole.id } },
+              create: { roleId: employeeRole.id, assignedBy: input.actorId },
+              update: { deletedAt: null },
+            },
           },
         },
-      },
-    });
+      });
 
-    const employee = await this.hrRepo.createEmployee({
-      user: { connect: { id: userId } },
-      candidate: { connect: { id: candidate.id } },
-      employeeCode,
-      lifecycleState: "PRE_ONBOARDING",
-      hiredAt: new Date(),
-    });
+      const employee = await employeeMasterService.ensureEmployeeRecord(userId, {
+        employeeCode,
+        candidateId: candidate.id,
+        lifecycleState: "PRE_ONBOARDING",
+        hiredAt: new Date(),
+      });
 
-    await this.hrRepo.createLifecycleEvent({
-      employee: { connect: { id: employee.id } },
-      toState: "PRE_ONBOARDING",
-      notes: "Created from recruitment hire",
-      changedById: input.actorId,
-    });
+      await this.hrRepo.createLifecycleEvent({
+        employee: { connect: { id: employee.id } },
+        toState: "PRE_ONBOARDING",
+        notes: "Created from recruitment hire",
+        changedById: input.actorId,
+      });
 
-    await this.portalRepo.createNotification({
-      user: { connect: { id: userId } },
-      title: "Welcome to Workforce 360",
-      message: "Your employee account is ready. Complete onboarding in the Employee Portal.",
-      link: "/portal/dashboard",
-    });
+      await this.portalRepo.createNotification({
+        user: { connect: { id: userId } },
+        title: "Welcome to Workforce 360",
+        message: "Your employee account is ready. Complete onboarding in the Employee Portal.",
+        link: "/portal/dashboard",
+      });
 
-    await writeAuditLog({
-      userId: input.actorId,
-      action: "hire_candidate",
-      entity: "employee",
-      entityId: employee.id,
-      after: { candidateId: candidate.id, employeeCode },
-    });
+      await writeAuditLog({
+        userId: input.actorId,
+        action: "hire_candidate",
+        entity: "employee",
+        entityId: employee.id,
+        after: { candidateId: candidate.id, employeeCode },
+      });
 
-    return employee;
+      return employee;
+    } catch (error) {
+      throw toClientError(error);
+    }
   }
 
   async updateLifecycleState(
@@ -146,30 +183,89 @@ export class HrService {
     return this.hrRepo.updateEmployee(employeeId, data);
   }
 
-  listPolicies(filters?: { status?: string }) {
-    return this.hrRepo.listPolicies(filters);
+  listPolicies(filters?: { status?: string; familyId?: string }) {
+    return policyService.listPolicies(filters);
   }
 
-  createPolicy(input: {
-    title: string;
-    description?: string;
-    version?: string;
-    fileId?: string;
-  }) {
-    return this.hrRepo.createPolicy({
-      title: input.title,
-      description: input.description,
-      version: input.version ?? "1.0",
-      file: input.fileId ? { connect: { id: input.fileId } } : undefined,
-    });
+  getPolicyById(id: string) {
+    return policyService.getPolicyById(id);
+  }
+
+  createPolicy(
+    input: { title: string; description?: string; version?: string; fileId?: string },
+    actorId?: string,
+  ) {
+    return policyService.createPolicy(input, actorId);
+  }
+
+  updatePolicy(
+    id: string,
+    input: { title?: string; description?: string; version?: string; fileId?: string | null },
+    actorId?: string,
+  ) {
+    return policyService.updatePolicy(id, input, actorId);
   }
 
   publishPolicy(id: string, publisherId: string) {
-    return this.hrRepo.updatePolicy(id, {
-      status: "PUBLISHED",
-      publishedAt: new Date(),
-      publishedBy: { connect: { id: publisherId } },
-    });
+    return policyService.publishPolicy(id, publisherId);
+  }
+
+  createPolicyVersion(id: string, actorId?: string) {
+    return policyService.createPolicyVersion(id, actorId);
+  }
+
+  listPolicyAssignments(familyId: string) {
+    return policyService.listAssignments(familyId);
+  }
+
+  assignPolicy(
+    input: {
+      familyId: string;
+      targetType: "ALL" | "USER" | "DEPARTMENT" | "TEAM";
+      userId?: string;
+      departmentId?: string;
+      teamId?: string;
+    },
+    actorId?: string,
+  ) {
+    return policyService.assignPolicy(input, actorId);
+  }
+
+  removePolicyAssignment(assignmentId: string, actorId?: string) {
+    return policyService.removeAssignment(assignmentId, actorId);
+  }
+
+  getPolicyAcknowledgementReport(policyId: string) {
+    return policyService.getAcknowledgementReport(policyId);
+  }
+
+  listTickets(filters?: { status?: string; assignedToId?: string; search?: string }) {
+    return ticketService.listStaffTickets(filters);
+  }
+
+  getTicket(id: string) {
+    return ticketService.getStaffTicket(id);
+  }
+
+  assignTicket(ticketId: string, assigneeId: string | null, actorId: string) {
+    return ticketService.assignTicket(ticketId, assigneeId, actorId);
+  }
+
+  updateTicketStatus(ticketId: string, status: string, actorId: string) {
+    return ticketService.updateStatus(
+      ticketId,
+      status as "OPEN" | "IN_PROGRESS" | "WAITING_FOR_EMPLOYEE" | "RESOLVED" | "CLOSED",
+      actorId,
+    );
+  }
+
+  addTicketReply(
+    ticketId: string,
+    staffUserId: string,
+    body: string,
+    options?: { attachmentFileId?: string; setWaiting?: boolean },
+  ) {
+    return ticketService.addStaffReply(ticketId, staffUserId, body, options);
   }
 
   listAssets(filters?: { status?: string; employeeId?: string }) {
@@ -362,7 +458,12 @@ export class PortalService {
     return {
       employee,
       unreadNotifications: notifications.filter((n) => !n.isRead).length,
-      openTickets: tickets.filter((t) => t.status === "OPEN" || t.status === "IN_PROGRESS").length,
+      openTickets: tickets.filter(
+        (t) =>
+          t.status === "OPEN" ||
+          t.status === "IN_PROGRESS" ||
+          t.status === "WAITING_FOR_EMPLOYEE",
+      ).length,
       comingSoon: {
         attendance: true,
         leave: true,
@@ -413,7 +514,11 @@ export class PortalService {
   }
 
   listTickets(userId: string) {
-    return this.portalRepo.listTickets(userId);
+    return ticketService.listMyTickets(userId);
+  }
+
+  getTicket(ticketId: string, userId: string) {
+    return ticketService.getMyTicket(ticketId, userId);
   }
 
   createTicket(userId: string, input: {
@@ -423,16 +528,16 @@ export class PortalService {
     category?: string;
     attachmentFileId?: string;
   }) {
-    return this.portalRepo.createTicket({
-      user: { connect: { id: userId } },
-      subject: input.subject,
-      description: input.description,
-      priority: input.priority ?? "medium",
-      category: input.category,
-      ...(input.attachmentFileId
-        ? { attachment: { connect: { id: input.attachmentFileId } } }
-        : {}),
-    });
+    return ticketService.createTicket(userId, input);
+  }
+
+  replyToTicket(
+    ticketId: string,
+    userId: string,
+    body: string,
+    attachmentFileId?: string,
+  ) {
+    return ticketService.addEmployeeReply(ticketId, userId, body, attachmentFileId);
   }
 
   async listMyAssets(userId: string) {
@@ -441,8 +546,12 @@ export class PortalService {
     return this.hrRepo.listAssets({ employeeId: employee.id });
   }
 
-  listPublishedPolicies() {
-    return this.hrRepo.listPolicies({ status: "PUBLISHED" });
+  listPortalPolicies(userId: string) {
+    return policyService.listPortalPolicies(userId);
+  }
+
+  acknowledgePolicy(policyId: string, userId: string) {
+    return policyService.acknowledgePolicy(policyId, userId);
   }
 }
 

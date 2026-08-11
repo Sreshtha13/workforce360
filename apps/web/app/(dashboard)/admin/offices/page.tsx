@@ -66,16 +66,18 @@ export default function OfficesPage() {
   const canDelete = hasPermission("office.delete");
   const canReadUsers = hasPermission("user.read");
   const canAssignUsers = hasPermission("user.update");
+  const canView = hasPermission("office.read") || canCreate || canUpdate || canDelete;
 
   const query = useQuery({
     queryKey: ["offices"],
     queryFn: async () => (await apiClient.organization.offices.list()).data ?? [],
+    enabled: canView,
   });
 
   const usersQuery = useQuery({
     queryKey: ["office-assign-users", assignTarget?.id],
     queryFn: async () => (await apiClient.users.list()).data ?? [],
-    enabled: !!assignTarget && canReadUsers,
+    enabled: !!assignTarget && canReadUsers && canView,
   });
 
   const allUsers = (usersQuery.data ?? []) as User[];
@@ -175,6 +177,9 @@ export default function OfficesPage() {
     );
   };
 
+  if (!canView) {
+    return <ErrorState message="You do not have permission to view offices." />;
+  }
   if (query.isLoading) return <LoadingState />;
   if (query.isError) {
     return <ErrorState message="Failed to load offices" onRetry={() => query.refetch()} />;

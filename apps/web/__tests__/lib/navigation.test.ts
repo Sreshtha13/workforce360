@@ -3,6 +3,8 @@ import {
   filterNavByPermissions,
   mainNav,
   adminNav,
+  candidateNav,
+  canAccessCandidateApplications,
 } from "@/lib/navigation";
 
 describe("filterNavByPermissions", () => {
@@ -22,8 +24,8 @@ describe("filterNavByPermissions", () => {
     expect(filtered.some((item) => item.label === "Users")).toBe(true);
   });
 
-  it("shows Roles when user has one of role permissions", () => {
-    const filtered = filterNavByPermissions(adminNav, ["role.update"]);
+  it("shows Roles when user has role.read", () => {
+    const filtered = filterNavByPermissions(adminNav, ["role.read"]);
     expect(filtered.some((item) => item.label === "Roles")).toBe(true);
   });
 
@@ -43,6 +45,39 @@ describe("filterNavByPermissions", () => {
     ];
     const filtered = filterNavByPermissions(items, []);
     expect(filtered).toHaveLength(1);
+  });
+});
+
+describe("candidateNav role gating", () => {
+  it("hides My Applications for Super Admin even with portal.read", () => {
+    const filtered = filterNavByPermissions(candidateNav, {
+      permissions: ["portal.read", "user.read"],
+      roles: [{ code: "super_admin" }],
+    });
+    expect(filtered).toHaveLength(0);
+  });
+
+  it("hides My Applications for Admin/HR without candidate role", () => {
+    const filtered = filterNavByPermissions(candidateNav, {
+      permissions: ["portal.read"],
+      roles: [{ code: "admin" }, { code: "hr" }],
+    });
+    expect(filtered).toHaveLength(0);
+  });
+
+  it("shows My Applications only for candidate role", () => {
+    const filtered = filterNavByPermissions(candidateNav, {
+      permissions: [],
+      roles: [{ code: "candidate" }],
+    });
+    expect(filtered).toHaveLength(1);
+    expect(filtered[0].href).toBe("/candidate/dashboard");
+  });
+
+  it("canAccessCandidateApplications reflects candidate role only", () => {
+    expect(canAccessCandidateApplications({ roles: [{ code: "super_admin" }] })).toBe(false);
+    expect(canAccessCandidateApplications({ roles: [{ code: "candidate" }] })).toBe(true);
+    expect(canAccessCandidateApplications(null)).toBe(false);
   });
 });
 

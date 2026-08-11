@@ -3,8 +3,10 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { useState } from "react";
+import { FileText, Mail, MapPin, Phone } from "lucide-react";
 import { apiClient, ApiClientError } from "@/lib/api-client";
 import { useAuth } from "@/lib/auth-context";
+import { getAllowedPipelineTransitions } from "@/lib/pipeline-stage";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { LoadingState, ErrorState, AlertBanner, EmptyState } from "@/components/admin/admin-states";
 import { Badge } from "@/components/ui/badge";
@@ -16,35 +18,17 @@ import {
   type PipelineStatus,
 } from "@/types/phase2";
 
-function getMoveTargets(
-  current: PipelineStatus,
-  canOverride: boolean,
-): PipelineStatus[] {
-  const currentIndex = PIPELINE_STATUSES.indexOf(current);
-  const isFinalized = current === "HIRED" || current === "REJECTED";
-
-  if (isFinalized) {
-    if (!canOverride) return [];
-    return PIPELINE_STATUSES.filter((_, i) => i < currentIndex);
-  }
-
-  return PIPELINE_STATUSES.filter((status) => {
-    if (status === current) return false;
-    const idx = PIPELINE_STATUSES.indexOf(status);
-    if (idx > currentIndex) return true; // forward
-    if (status === "REJECTED") return true;
-    if (canOverride && idx < currentIndex) return true; // backward with override
-    return false;
-  });
-}
-
-function latestInterviewStatus(app: JobApplication): string | null {
+function latestInterview(app: JobApplication) {
   const interviews = app.interviews ?? [];
   if (interviews.length === 0) return null;
-  const latest = [...interviews].sort(
+  return [...interviews].sort(
     (a, b) => new Date(b.scheduledAt).getTime() - new Date(a.scheduledAt).getTime(),
   )[0];
-  return latest?.status ?? null;
+}
+
+function display(value: string | null | undefined): string | null {
+  const trimmed = value?.trim();
+  return trimmed ? trimmed : null;
 }
 
 export default function HrPipelinePage() {
@@ -53,6 +37,7 @@ export default function HrPipelinePage() {
   const [feedback, setFeedback] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  const canUpdate = hasPermission("application.update");
   const canOverride =
     hasPermission("application.override_stage") || isSuperAdmin;
 
@@ -101,7 +86,7 @@ export default function HrPipelinePage() {
     <div className="space-y-6">
       <AdminPageHeader
         title="Recruitment pipeline"
-        description="Move candidates through Applied → Screening → Interview → Offer → Hired/Rejected."
+        description="Forward-only workflow: Applied → Screening → Interview → Offer → Hired. Rejection is always available."
       />
 
       {feedback && <AlertBanner variant="success" message={feedback} />}
@@ -125,9 +110,19 @@ export default function HrPipelinePage() {
               </div>
               <div className="space-y-3">
                 {grouped[status].map((app) => {
-                  const interviewStatus = latestInterviewStatus(app);
-                  const moveTargets = getMoveTargets(app.status, canOverride);
+                  const interview = latestInterview(app);
+                  const moveTargets = canUpdate
+                    ? getAllowedPipelineTransitions(app.status, canOverride)
+                    : [];
                   const candidateId = app.candidate?.id;
+                  const email = display(app.candidate?.email);
+                  const phone = display(app.candidate?.phone);
+                  const location = display(app.jobPosting?.location);
+                  const department = display(app.jobPosting?.department?.name);
+                  const resumeName = display(app.candidate?.resumeFile?.originalName);
+                  const interviewer = interview?.interviewer
+                    ? `${interview.interviewer.firstName} ${interview.interviewer.lastName}`.trim()
+                    : null;
 
                   return (
                     <div
@@ -146,15 +141,51 @@ export default function HrPipelinePage() {
                           {app.candidate?.firstName} {app.candidate?.lastName}
                         </p>
                       )}
-                      <p className="mt-0.5 text-xs text-muted-foreground">
+
+                      <p className="mt-0.5 text-xs font-medium text-foreground/80">
                         {app.jobPosting?.title ?? "No position"}
                       </p>
+
+                      <div className="mt-2 space-y-1 text-xs text-muted-foreground">
+                        {email && (
+                          <p className="flex items-center gap-1.5 truncate">
+                            <Mail className="size-3 shrink-0" />
+                            {email}
+                          </p>
+                        )}
+                        {phone && (
+                          <p className="flex items-center gap-1.5">
+                            <Phone className="size-3 shrink-0" />
+                            {phone}
+                          </p>
+                        )}
+                        {department && <p>Dept: {department}</p>}
+                        {location && (
+                          <p className="flex items-center gap-1.5">
+                            <MapPin className="size-3 shrink-0" />
+                            {location}
+                          </p>
+                        )}
+                        <p>Applied {new Date(app.appliedAt).toLocaleDateString()}</p>
+                        {resumeName && (
+                          <p className="flex items-center gap-1.5 truncate">
+                            <FileText className="size-3 shrink-0" />
+                            {resumeName}
+                          </p>
+                        )}
+                        {interviewer && <p>Recruiter: {interviewer}</p>}
+                      </div>
+
                       <div className="mt-2 flex flex-wrap gap-1.5">
                         <Badge variant="secondary">{PIPELINE_LABELS[app.status]}</Badge>
-                        {interviewStatus && (
-                          <Badge variant="outline">Interview: {interviewStatus}</Badge>
+                        {interview?.status && (
+                          <Badge variant="outline">Interview: {interview.status}</Badge>
+                        )}
+                        {app.candidate?.resumeFile && (
+                          <Badge variant="outline">Resume</Badge>
                         )}
                       </div>
+
                       {moveTargets.length > 0 && (
                         <div className="mt-3 flex flex-wrap gap-1">
                           {moveTargets.map((next) => (

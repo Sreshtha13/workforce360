@@ -74,6 +74,7 @@ model Department {
   users         User[]
   designations  Designation[]
   jobPostings   JobPosting[]
+  policyAssignments PolicyAssignment[]
 
   @@unique([companyId, code])
   @@index([companyId])
@@ -97,6 +98,7 @@ model Team {
   department   Department   @relation(fields: [departmentId], references: [id], onDelete: Cascade)
   lead         User?        @relation("TeamLead", fields: [leadId], references: [id])
   members      TeamMember[]
+  policyAssignments PolicyAssignment[]
 
   @@unique([departmentId, code])
   @@index([departmentId])
@@ -128,7 +130,7 @@ model Designation {
   id           String    @id @default(cuid())
   departmentId String    @map("department_id")
   name         String
-  code         String?   @unique
+  code         String?
   level        Int
   /// Approved position capacity for this title (vacant = headcount − assigned users).
   headcount    Int       @default(1)
@@ -142,6 +144,7 @@ model Designation {
   users        User[]
   jobPostings  JobPosting[]
 
+  @@unique([departmentId, code])
   @@index([departmentId])
   @@map("designations")
 }
@@ -257,8 +260,13 @@ model User {
   employeeMaster     Employee?
   conductedInterviews Interview[] @relation("InterviewInterviewer")
   publishedPolicies  CompanyPolicy[] @relation("PolicyPublisher")
+  policyAssignments  PolicyAssignment[] @relation("PolicyAssignmentTargetUser")
+  policyAssignmentsCreated PolicyAssignment[] @relation("PolicyAssignmentCreator")
+  policyAcknowledgements PolicyAcknowledgement[]
   notifications      Notification[]
-  supportTickets     SupportTicket[]
+  supportTickets     SupportTicket[] @relation("TicketRequester")
+  assignedTickets    SupportTicket[] @relation("TicketAssignee")
+  ticketMessages     SupportTicketMessage[]
   uploadedFiles      StoredFile[] @relation("FileUploader")
 
   @@index([email])
@@ -473,6 +481,13 @@ enum PolicyStatus {
   ARCHIVED
 }
 
+enum PolicyAssignmentTarget {
+  ALL
+  USER
+  DEPARTMENT
+  TEAM
+}
+
 enum AssetStatus {
   AVAILABLE
   ASSIGNED
@@ -483,8 +498,15 @@ enum AssetStatus {
 enum SupportTicketStatus {
   OPEN
   IN_PROGRESS
+  WAITING_FOR_EMPLOYEE
   RESOLVED
   CLOSED
+}
+
+enum SupportTicketMessageAuthor {
+  EMPLOYEE
+  STAFF
+  SYSTEM
 }
 
 enum StoredFilePurpose {
@@ -514,6 +536,7 @@ model StoredFile {
   offerLetters OfferLetter[]
   policies     CompanyPolicy[]
   supportTickets SupportTicket[]
+  ticketMessages SupportTicketMessage[]
 
   @@index([uploadedById])
   @@index([entityType, entityId])
@@ -679,6 +702,15 @@ model PreOnboardingChecklistItem {
   @@map("pre_onboarding_checklist_items")
 }
 
+/// Atomic counter for EMP### employee ID generation (single row, id = "default").
+model EmployeeIdSequence {
+  id        String   @id @default("default")
+  lastValue Int      @default(0) @map("last_value")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("employee_id_sequences")
+}
+
 model Employee {
   id                    String                 @id @default(cuid())
   userId                String                 @unique @map("user_id")
@@ -720,23 +752,71 @@ model EmployeeLifecycleEvent {
 }
 
 model CompanyPolicy {
-  id            String       @id @default(cuid())
-  title         String
-  description   String?
-  version       String       @default("1.0")
-  status        PolicyStatus @default(DRAFT)
-  fileId        String?      @map("file_id")
-  publishedAt   DateTime?    @map("published_at")
-  publishedById String?      @map("published_by_id")
-  createdAt     DateTime     @default(now()) @map("created_at")
-  updatedAt     DateTime     @updatedAt @map("updated_at")
-  deletedAt     DateTime?    @map("deleted_at")
+  id                String       @id @default(cuid())
+  /// Groups all versions of the same logical policy document.
+  familyId          String       @map("family_id")
+  previousVersionId String?      @unique @map("previous_version_id")
+  title             String
+  description       String?
+  version           String       @default("1.0")
+  status            PolicyStatus @default(DRAFT)
+  fileId            String?      @map("file_id")
+  publishedAt       DateTime?    @map("published_at")
+  publishedById     String?      @map("published_by_id")
+  createdAt         DateTime     @default(now()) @map("created_at")
+  updatedAt         DateTime     @updatedAt @map("updated_at")
+  deletedAt         DateTime?    @map("deleted_at")
 
-  file          StoredFile?  @relation(fields: [fileId], references: [id])
-  publishedBy   User?        @relation("PolicyPublisher", fields: [publishedById], references: [id])
+  file              StoredFile?  @relation(fields: [fileId], references: [id])
+  publishedBy       User?        @relation("PolicyPublisher", fields: [publishedById], references: [id])
+  previousVersion   CompanyPolicy? @relation("PolicyVersionChain", fields: [previousVersionId], references: [id])
+  nextVersion       CompanyPolicy? @relation("PolicyVersionChain")
+  acknowledgements  PolicyAcknowledgement[]
 
+  @@index([familyId])
   @@index([status])
   @@map("company_policies")
+}
+
+model PolicyAssignment {
+  id           String                 @id @default(cuid())
+  /// Matches CompanyPolicy.familyId — all versions of a policy series.
+  familyId     String                 @map("family_id")
+  targetType   PolicyAssignmentTarget @map("target_type")
+  userId       String?                @map("user_id")
+  departmentId String?                @map("department_id")
+  teamId       String?                @map("team_id")
+  assignedById String?                @map("assigned_by_id")
+  createdAt    DateTime               @default(now()) @map("created_at")
+  updatedAt    DateTime               @updatedAt @map("updated_at")
+  deletedAt    DateTime?              @map("deleted_at")
+
+  user         User?         @relation("PolicyAssignmentTargetUser", fields: [userId], references: [id])
+  department   Department?   @relation(fields: [departmentId], references: [id])
+  team         Team?         @relation(fields: [teamId], references: [id])
+  assignedBy   User?         @relation("PolicyAssignmentCreator", fields: [assignedById], references: [id])
+
+  @@index([familyId])
+  @@index([userId])
+  @@index([departmentId])
+  @@index([teamId])
+  @@map("policy_assignments")
+}
+
+model PolicyAcknowledgement {
+  id              String   @id @default(cuid())
+  policyId        String   @map("policy_id")
+  userId          String   @map("user_id")
+  acknowledgedAt  DateTime @default(now()) @map("acknowledged_at")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  policy          CompanyPolicy @relation(fields: [policyId], references: [id], onDelete: Cascade)
+  user            User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([policyId, userId])
+  @@index([userId])
+  @@map("policy_acknowledgements")
 }
 
 model Asset {
@@ -779,23 +859,49 @@ model Notification {
 }
 
 model SupportTicket {
-  id          String              @id @default(cuid())
-  userId      String              @map("user_id")
-  subject     String
-  description String
-  status      SupportTicketStatus @default(OPEN)
-  priority    String              @default("medium")
-  category    String?
-  latestReply String?             @map("latest_reply")
-  attachmentFileId String?        @map("attachment_file_id")
-  createdAt   DateTime            @default(now()) @map("created_at")
-  updatedAt   DateTime            @updatedAt @map("updated_at")
-  deletedAt   DateTime?           @map("deleted_at")
+  id               String              @id @default(cuid())
+  userId           String              @map("user_id")
+  assignedToId     String?             @map("assigned_to_id")
+  subject          String
+  description      String
+  status           SupportTicketStatus @default(OPEN)
+  priority         String              @default("medium")
+  category         String?
+  latestReply      String?             @map("latest_reply")
+  attachmentFileId String?             @map("attachment_file_id")
+  resolvedAt       DateTime?           @map("resolved_at")
+  closedAt         DateTime?           @map("closed_at")
+  createdAt        DateTime            @default(now()) @map("created_at")
+  updatedAt        DateTime            @updatedAt @map("updated_at")
+  deletedAt        DateTime?           @map("deleted_at")
 
-  user        User                @relation(fields: [userId], references: [id], onDelete: Cascade)
-  attachment  StoredFile?         @relation(fields: [attachmentFileId], references: [id])
+  user             User                @relation("TicketRequester", fields: [userId], references: [id], onDelete: Cascade)
+  assignedTo       User?               @relation("TicketAssignee", fields: [assignedToId], references: [id])
+  attachment       StoredFile?         @relation(fields: [attachmentFileId], references: [id])
+  messages         SupportTicketMessage[]
 
   @@index([userId])
+  @@index([assignedToId])
   @@index([status])
   @@map("support_tickets")
+}
+
+model SupportTicketMessage {
+  id               String                      @id @default(cuid())
+  ticketId         String                      @map("ticket_id")
+  authorId         String?                     @map("author_id")
+  authorType       SupportTicketMessageAuthor  @map("author_type")
+  body             String
+  attachmentFileId String?                     @map("attachment_file_id")
+  createdAt        DateTime                    @default(now()) @map("created_at")
+  updatedAt        DateTime                    @updatedAt @map("updated_at")
+  deletedAt        DateTime?                   @map("deleted_at")
+
+  ticket           SupportTicket               @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  author           User?                       @relation(fields: [authorId], references: [id])
+  attachment       StoredFile?                 @relation(fields: [attachmentFileId], references: [id])
+
+  @@index([ticketId])
+  @@index([authorId])
+  @@map("support_ticket_messages")
 }

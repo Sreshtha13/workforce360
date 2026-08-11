@@ -43,7 +43,7 @@ async function main() {
       "assessment",
       "offer",
     ]);
-    const hrResources = new Set(["employee", "policy", "asset", "hr"]);
+    const hrResources = new Set(["employee", "policy", "asset", "hr", "ticket"]);
     const portalResources = new Set(["portal"]);
     const label = resource
       .split("_")
@@ -55,6 +55,9 @@ async function main() {
     }
     if (adminResources.has(resource)) {
       return { module: "Administration", feature: label };
+    }
+    if (resource === "dashboard") {
+      return { module: "Administration", feature: "Dashboard" };
     }
     if (recruitmentResources.has(resource)) {
       return { module: "Recruitment", feature: label };
@@ -74,6 +77,8 @@ async function main() {
     { name: "Update Users", code: "user.update", resource: "user", action: "update" },
     { name: "Delete Users", code: "user.delete", resource: "user", action: "delete" },
     { name: "Assign Role", code: "user.assign_role", resource: "user", action: "assign_role" },
+
+    { name: "Admin Dashboard", code: "dashboard.read", resource: "dashboard", action: "read" },
     
     { name: "Read Roles", code: "role.read", resource: "role", action: "read" },
     { name: "Create Roles", code: "role.create", resource: "role", action: "create" },
@@ -148,6 +153,10 @@ async function main() {
     { name: "Read Assets", code: "asset.read", resource: "asset", action: "read" },
     { name: "Create Assets", code: "asset.create", resource: "asset", action: "create" },
     { name: "Update Assets", code: "asset.update", resource: "asset", action: "update" },
+
+    { name: "Read Support Tickets", code: "ticket.read", resource: "ticket", action: "read" },
+    { name: "Create Support Tickets", code: "ticket.create", resource: "ticket", action: "create" },
+    { name: "Manage Support Tickets", code: "ticket.manage", resource: "ticket", action: "manage" },
 
     { name: "Portal Read", code: "portal.read", resource: "portal", action: "read" },
     { name: "Portal Update", code: "portal.update", resource: "portal", action: "update" },
@@ -227,6 +236,23 @@ async function main() {
       isSystem: true,
     },
   });
+
+  const developerRole = await prisma.role.upsert({
+    where: { code: "developer" },
+    update: {
+      name: "Developer",
+      description:
+        "Engineering contributor with portal access and team-scoped employee visibility",
+      isSystem: true,
+    },
+    create: {
+      name: "Developer",
+      code: "developer",
+      description:
+        "Engineering contributor with portal access and team-scoped employee visibility",
+      isSystem: true,
+    },
+  });
   
   console.log("✅ Roles created");
   
@@ -262,6 +288,7 @@ async function main() {
       "hr",
       "policy",
       "asset",
+      "ticket",
     ].includes(p.resource),
   );
   
@@ -301,8 +328,8 @@ async function main() {
     });
   }
 
-  const employeePermissions = createdPermissions.filter((p) =>
-    ["portal"].includes(p.resource),
+  const employeePermissions = createdPermissions.filter(
+    (p) => ["portal"].includes(p.resource) || p.code === "ticket.create",
   );
   for (const permission of employeePermissions) {
     await prisma.rolePermission.upsert({
@@ -315,6 +342,33 @@ async function main() {
       update: {},
       create: {
         roleId: employeeRole.id,
+        permissionId: permission.id,
+      },
+    });
+  }
+
+  /** Developer: portal + read-only org context + scoped people lists + tickets. No HR/admin writes. */
+  const developerPermissionCodes = new Set([
+    "portal.read",
+    "portal.update",
+    "user.read",
+    "employee.read",
+    "team.read",
+    "department.read",
+    "designation.read",
+    "ticket.create",
+  ]);
+  const developerPermissions = createdPermissions.filter((p) =>
+    developerPermissionCodes.has(p.code),
+  );
+
+  await prisma.rolePermission.deleteMany({
+    where: { roleId: developerRole.id },
+  });
+  for (const permission of developerPermissions) {
+    await prisma.rolePermission.create({
+      data: {
+        roleId: developerRole.id,
         permissionId: permission.id,
       },
     });
@@ -460,6 +514,17 @@ async function main() {
   console.log("✅ Super admin user created");
   console.log(`📧 Email: ${superAdminEmail}`);
   console.log(`🔑 Password: ${superAdminPassword}`);
+
+  await prisma.employee.upsert({
+    where: { userId: superAdminUser.id },
+    update: { employeeCode: superAdminUser.employeeId ?? "EMP001", lifecycleState: "ACTIVE" },
+    create: {
+      userId: superAdminUser.id,
+      employeeCode: superAdminUser.employeeId ?? "EMP001",
+      lifecycleState: "ACTIVE",
+      hiredAt: new Date(),
+    },
+  });
 
   const hrUserEmail = "hr@workforce360.com";
   const activeEmploymentStatus = await prisma.employmentStatus.findUnique({

@@ -116,16 +116,39 @@ export class RecruitmentRepository {
       where: { id, deletedAt: null },
       include: {
         resumeFile: true,
-        user: { select: { id: true, email: true, firstName: true, lastName: true } },
+        user: {
+          select: {
+            id: true,
+            email: true,
+            firstName: true,
+            lastName: true,
+            phone: true,
+            avatar: true,
+          },
+        },
         applications: {
           where: { deletedAt: null },
           include: {
-            jobPosting: true,
-            interviews: { where: { deletedAt: null } },
-            assessments: { where: { deletedAt: null } },
-            offerLetters: { where: { deletedAt: null } },
+            jobPosting: {
+              include: {
+                department: { select: { id: true, name: true, code: true } },
+                designation: { select: { id: true, name: true } },
+              },
+            },
+            interviews: {
+              where: { deletedAt: null },
+              orderBy: { scheduledAt: "desc" },
+              include: {
+                interviewer: {
+                  select: { id: true, firstName: true, lastName: true, email: true },
+                },
+              },
+            },
+            assessments: { where: { deletedAt: null }, orderBy: { createdAt: "desc" } },
+            offerLetters: { where: { deletedAt: null }, orderBy: { createdAt: "desc" } },
             checklistItems: { where: { deletedAt: null }, orderBy: { sortOrder: "asc" } },
           },
+          orderBy: { appliedAt: "desc" },
         },
         employee: true,
       },
@@ -192,8 +215,37 @@ export class RecruitmentRepository {
     return prisma.jobApplication.findMany({
       where,
       include: {
-        candidate: { include: { resumeFile: true } },
-        jobPosting: { select: { id: true, title: true, slug: true } },
+        candidate: {
+          select: {
+            id: true,
+            email: true,
+            firstName: true,
+            lastName: true,
+            phone: true,
+            linkedInUrl: true,
+            notes: true,
+            pipelineStatus: true,
+            resumeFile: {
+              select: {
+                id: true,
+                originalName: true,
+                mimeType: true,
+                sizeBytes: true,
+              },
+            },
+          },
+        },
+        jobPosting: {
+          select: {
+            id: true,
+            title: true,
+            slug: true,
+            location: true,
+            employmentType: true,
+            department: { select: { id: true, name: true, code: true } },
+            designation: { select: { id: true, name: true } },
+          },
+        },
         checklistItems: { where: { deletedAt: null }, orderBy: { sortOrder: "asc" } },
         interviews: {
           where: { deletedAt: null },
@@ -258,10 +310,17 @@ export class RecruitmentRepository {
 }
 
 export class HrRepository {
-  listEmployees(filters?: { lifecycleState?: string; search?: string }) {
+  listEmployees(filters?: { lifecycleState?: string; search?: string; userIds?: string[] }) {
+    if (filters?.userIds && filters.userIds.length === 0) {
+      return Promise.resolve([]);
+    }
+
     const where: Prisma.EmployeeWhereInput = { deletedAt: null };
     if (filters?.lifecycleState) {
       where.lifecycleState = filters.lifecycleState as Prisma.EnumEmployeeLifecycleStateFilter["equals"];
+    }
+    if (filters?.userIds) {
+      where.userId = { in: filters.userIds };
     }
     if (filters?.search) {
       where.OR = [
@@ -287,6 +346,8 @@ export class HrRepository {
             department: { select: { id: true, name: true } },
             designation: { select: { id: true, name: true } },
             office: { select: { id: true, name: true } },
+            employeeType: { select: { id: true, name: true, code: true } },
+            employmentStatus: { select: { id: true, name: true } },
           },
         },
         candidate: { select: { id: true, email: true } },
