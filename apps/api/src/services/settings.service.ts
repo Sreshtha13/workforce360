@@ -3,6 +3,7 @@ import { AppError } from "../lib/app-error";
 import { writeAuditLog } from "../lib/audit";
 import { userIsSuperAdmin } from "../lib/super-admin";
 import { renderTemplate } from "../lib/template-render";
+import { listAllIntegrations } from "../lib/integrations/registry";
 
 export class SettingsService {
   async listSettings(actorId: string) {
@@ -207,16 +208,7 @@ export class SettingsService {
   }
 
   listIntegrationsPlaceholder() {
-    return [
-      { id: "teams", name: "Microsoft Teams", status: "coming_soon" as const, phase: 13 },
-      { id: "slack", name: "Slack", status: "coming_soon" as const, phase: 13 },
-      { id: "github", name: "GitHub", status: "coming_soon" as const, phase: 13 },
-      { id: "gitlab", name: "GitLab", status: "coming_soon" as const, phase: 13 },
-      { id: "jira", name: "Jira", status: "coming_soon" as const, phase: 13 },
-      { id: "zoom", name: "Zoom", status: "coming_soon" as const, phase: 13 },
-      { id: "quickbooks", name: "QuickBooks", status: "coming_soon" as const, phase: 13 },
-      { id: "azure_ad", name: "Azure AD / SAML", status: "coming_soon" as const, phase: 13 },
-    ];
+    return listAllIntegrations();
   }
 }
 

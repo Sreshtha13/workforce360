@@ -447,6 +447,15 @@ export const apiClient = {
         body: JSON.stringify({ email, password }),
       }),
 
+    getGoogleAuthUrl: () =>
+      request<{ enabled: boolean; url?: string }>("/api/auth/google/url"),
+
+    googleLogin: (code: string) =>
+      request<LoginResult>("/api/auth/google", {
+        method: "POST",
+        body: JSON.stringify({ code }),
+      }),
+
     logout: () =>
       request<{ message: string }>("/api/auth/logout", {
         method: "POST",
@@ -1181,10 +1190,21 @@ export const apiClient = {
       recordManual: (data: RecordManualPaymentInput) =>
         request<Payment>("/api/finance/payments/manual", { method: "POST", body: JSON.stringify(data) }),
       createCheckoutSession: (invoiceId: string, provider: "STRIPE" | "RAZORPAY") =>
-        request<{ payment: Payment; session: { sessionId: string; url?: string } }>(
-          "/api/finance/payments/checkout-session",
-          { method: "POST", body: JSON.stringify({ invoiceId, provider }) },
-        ),
+        request<{
+          payment: Payment;
+          session: {
+            provider: "STRIPE" | "RAZORPAY";
+            sessionId: string;
+            checkoutUrl?: string;
+            razorpayOrderId?: string;
+            amount: number;
+            currency: string;
+            publishableKey?: string;
+          };
+        }>("/api/finance/payments/checkout-session", {
+          method: "POST",
+          body: JSON.stringify({ invoiceId, provider }),
+        }),
     },
 
     reimbursements: {

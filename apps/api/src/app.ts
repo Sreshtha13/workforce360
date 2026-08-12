@@ -4,6 +4,7 @@ import express from "express";
 import helmet from "helmet";
 import { env, isAllowedCorsOrigin } from "./lib/env";
 import { errorHandler, notFoundHandler } from "./middleware/error-handler";
+import { requestLogger } from "./middleware/request-logger";
 import { apiRouter } from "./routes";
 
 import { StorageController } from "./controllers/storage.controller";
@@ -54,6 +55,7 @@ export function createApp() {
   );
   app.use(express.json({ limit: "1mb" }));
   app.use(cookieParser());
+  app.use(requestLogger);
 
   app.get("/", (_req, res) => {
     res.json({

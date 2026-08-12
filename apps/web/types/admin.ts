@@ -100,12 +100,17 @@ export type MasterDataSummary = {
   permissions: number;
 };
 
-export type IntegrationPlaceholder = {
+export type IntegrationInfo = {
   id: string;
   name: string;
-  status: "coming_soon";
-  phase: number;
+  category: "mvp" | "future";
+  status: "active" | "configured" | "not_configured" | "coming_soon";
+  description: string;
+  phase?: number;
 };
+
+/** @deprecated Use IntegrationInfo */
+export type IntegrationPlaceholder = IntegrationInfo;
 
 export type SecurityEvent = {
   id: string;

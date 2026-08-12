@@ -13,6 +13,7 @@ import { GlassCard } from "@/components/dashboard/glass-card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { invoiceStatusVariant, paymentStatusVariant, formatMoney } from "@/lib/phase4-status";
+import { openRazorpayCheckout } from "@/lib/razorpay-checkout";
 
 function formatDate(value: string | null | undefined): string {
   if (!value) return "—";
@@ -36,6 +37,15 @@ export default function InvoiceDetailPage() {
   const [paymentAmount, setPaymentAmount] = useState("");
   const [paymentMethod, setPaymentMethod] = useState("");
   const [paymentNotes, setPaymentNotes] = useState("");
+  const [checkoutLoading, setCheckoutLoading] = useState<"STRIPE" | "RAZORPAY" | null>(null);
+
+  const paymentConfigQuery = useQuery({
+    queryKey: ["finance", "payment-config"],
+    queryFn: async () => {
+      const res = await apiClient.finance.getPaymentConfig();
+      return res.data!;
+    },
+  });
 
   const query = useQuery({
     queryKey: ["finance", "invoices", invoiceId],
@@ -135,6 +145,40 @@ export default function InvoiceDetailPage() {
     onError: (err) => setError(err instanceof ApiClientError ? err.message : "Failed to record payment"),
   });
 
+  async function handleOnlineCheckout(provider: "STRIPE" | "RAZORPAY") {
+    setError(null);
+    setCheckoutLoading(provider);
+    try {
+      const res = await apiClient.finance.payments.createCheckoutSession(invoiceId, provider);
+      const session = res.data?.session;
+      if (!session) throw new Error("Empty checkout session");
+
+      if (provider === "STRIPE" && session.checkoutUrl) {
+        window.location.href = session.checkoutUrl;
+        return;
+      }
+
+      if (provider === "RAZORPAY" && session.razorpayOrderId && session.publishableKey) {
+        await openRazorpayCheckout({
+          keyId: session.publishableKey,
+          orderId: session.razorpayOrderId,
+          amount: session.amount,
+          currency: session.currency,
+          description: `Invoice ${query.data?.invoiceNumber ?? invoiceId}`,
+        });
+        invalidate();
+        setFeedback("Payment initiated. Status updates when Razorpay confirms via webhook.");
+        return;
+      }
+
+      throw new Error("Payment provider is not fully configured");
+    } catch (err) {
+      setError(err instanceof ApiClientError ? err.message : err instanceof Error ? err.message : "Checkout failed");
+    } finally {
+      setCheckoutLoading(null);
+    }
+  }
+
   if (query.isLoading) return <LoadingState message="Loading invoice..." />;
   if (query.isError) return <ErrorState message="Failed to load invoice." onRetry={() => query.refetch()} />;
 
@@ -143,6 +187,9 @@ export default function InvoiceDetailPage() {
   const canManage = hasPermission("invoice.manage");
   const canApprove = hasPermission("invoice.approve");
   const canRecordPayment = hasPermission("payment.manage");
+  const paymentConfig = paymentConfigQuery.data;
+  const stripeEnabled = paymentConfig?.stripe?.enabled ?? false;
+  const razorpayEnabled = paymentConfig?.razorpay?.enabled ?? false;
 
   return (
     <div className="space-y-6">
@@ -178,9 +225,29 @@ export default function InvoiceDetailPage() {
           </Button>
         )}
         {canRecordPayment && !["PAID", "CANCELLED", "DRAFT"].includes(invoice.status) && amountDue > 0 && (
-          <Button variant="outline" onClick={() => setPaymentOpen(true)}>
-            Record payment
-          </Button>
+          <>
+            {stripeEnabled && (
+              <Button
+                variant="outline"
+                disabled={checkoutLoading !== null}
+                onClick={() => handleOnlineCheckout("STRIPE")}
+              >
+                {checkoutLoading === "STRIPE" ? "Redirecting..." : "Pay with Stripe"}
+              </Button>
+            )}
+            {razorpayEnabled && (
+              <Button
+                variant="outline"
+                disabled={checkoutLoading !== null}
+                onClick={() => handleOnlineCheckout("RAZORPAY")}
+              >
+                {checkoutLoading === "RAZORPAY" ? "Opening..." : "Pay with Razorpay"}
+              </Button>
+            )}
+            <Button variant="outline" onClick={() => setPaymentOpen(true)}>
+              Record payment
+            </Button>
+          </>
         )}
         {canManage && !["PAID", "CANCELLED"].includes(invoice.status) && (
           <Button variant="ghost" onClick={() => cancelMutation.mutate()} disabled={cancelMutation.isPending}>

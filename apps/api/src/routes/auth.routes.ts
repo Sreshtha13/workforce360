@@ -93,6 +93,9 @@ router.post("/login", validate(loginSchema), authController.login);
  */
 router.post("/google", validate(googleLoginSchema), authController.googleLogin);
 
+router.get("/google/url", authController.googleAuthUrl);
+router.get("/google/callback", authController.googleCallback);
+
 /**
  * @swagger
  * /api/auth/refresh:

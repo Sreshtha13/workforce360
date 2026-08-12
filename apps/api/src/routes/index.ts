@@ -30,6 +30,7 @@ import {
   adminExtrasRouter,
 } from "./settings.routes";
 import { securityRouter } from "./security.routes";
+import { integrationRouter } from "./integration.routes";
 
 const apiRouter = Router();
 
@@ -62,5 +63,6 @@ apiRouter.use("/settings", settingsRouter);
 apiRouter.use("/notification-templates", templateRouter);
 apiRouter.use("/admin", adminExtrasRouter);
 apiRouter.use("/security-events", securityRouter);
+apiRouter.use("/integrations", integrationRouter);
 
 export { apiRouter };

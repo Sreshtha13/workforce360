@@ -8,17 +8,54 @@ export type SendEmailInput = {
   text?: string;
 };
 
+export type SendEmailResult = {
+  sent: boolean;
+  mode: "resend" | "smtp" | "console";
+};
+
+function emailFromAddress(): string {
+  return env.SMTP_FROM ?? "noreply@workforce360.local";
+}
+
 function isSmtpConfigured(): boolean {
   return Boolean(env.SMTP_HOST && env.SMTP_PORT && env.SMTP_FROM);
 }
 
+function isResendConfigured(): boolean {
+  return Boolean(env.RESEND_API_KEY && env.SMTP_FROM);
+}
+
 /**
- * Sends an email via SMTP (nodemailer) when configured.
- * Otherwise logs to console (dev / test fallback).
+ * Sends email via Resend API, SMTP (nodemailer), or console fallback.
+ * Resend is preferred when RESEND_API_KEY is set; SMTP is the secondary option.
  */
-export async function sendEmail(input: SendEmailInput): Promise<{ sent: boolean; mode: "smtp" | "console" }> {
-  const from = env.SMTP_FROM ?? "noreply@workforce360.local";
+export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult> {
+  const from = emailFromAddress();
   const text = input.text ?? (input.html ? input.html.replace(/<[^>]+>/g, " ") : "");
+
+  if (isResendConfigured()) {
+    const response = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${env.RESEND_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        from,
+        to: [input.to],
+        subject: input.subject,
+        html: input.html,
+        text,
+      }),
+    });
+
+    if (!response.ok) {
+      const body = await response.text();
+      throw new Error(`Resend error ${response.status}: ${body.slice(0, 200)}`);
+    }
+
+    return { sent: true, mode: "resend" };
+  }
 
   if (!isSmtpConfigured()) {
     console.info("[email:console]", {

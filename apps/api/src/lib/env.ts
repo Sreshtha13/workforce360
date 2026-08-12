@@ -70,7 +70,7 @@ const envSchema = z.object({
   SMTP_USER: z.string().optional(),
   SMTP_PASS: z.string().optional(),
   SMTP_FROM: z.string().optional(),
-  SENDGRID_API_KEY: z.string().optional(),
+  RESEND_API_KEY: z.string().optional(),
 
   // MFA (Phase 12)
   MFA_ISSUER: z.string().default("Workforce360"),

@@ -5,6 +5,8 @@ import { authCookieOptions, clearAuthCookieOptions } from "../lib/cookies";
 import { getAccessTokenMaxAgeMs, getRefreshTokenMaxAgeMs } from "../lib/token-expiry";
 import { sendSuccess, sendError } from "../lib/response";
 import { AppError } from "../lib/app-error";
+import { env } from "../lib/env";
+import { getGoogleOAuthStatus } from "../lib/integrations/registry";
 import type {
   LoginInput,
   GoogleLoginInput,
@@ -84,7 +86,7 @@ export class AuthController {
       const { code } = req.body as GoogleLoginInput;
       const ipAddress = req.ip;
       const userAgent = req.get("user-agent");
-      
+
       const result = await this.authService.googleLogin(
         code,
         ipAddress,
@@ -100,18 +102,56 @@ export class AuthController {
         });
         return;
       }
-      
+
       this.setSessionCookies(res, {
         accessToken: result.accessToken!,
         refreshToken: result.refreshToken!,
       });
-      
+
       sendSuccess(res, { mfaRequired: false, user: result.user });
     } catch (error) {
       sendError(res, 401, {
         code: "GOOGLE_LOGIN_FAILED",
         message: error instanceof Error ? error.message : "Google login failed",
       });
+    }
+  };
+
+  googleAuthUrl = async (_req: Request, res: Response): Promise<void> => {
+    const status = getGoogleOAuthStatus();
+    sendSuccess(res, status);
+  };
+
+  googleCallback = async (req: Request, res: Response): Promise<void> => {
+    const code = req.query.code as string | undefined;
+    const baseUrl = env.APP_PUBLIC_BASE_URL;
+
+    if (!code) {
+      res.redirect(`${baseUrl}/login?error=google_missing_code`);
+      return;
+    }
+
+    try {
+      const ipAddress = req.ip;
+      const userAgent = req.get("user-agent");
+      const result = await this.authService.googleLogin(code, ipAddress, userAgent);
+
+      if ("mfaRequired" in result && result.mfaRequired) {
+        const params = new URLSearchParams({
+          mfaToken: result.mfaToken,
+          mfaSetupRequired: String(result.mfaSetupRequired ?? false),
+        });
+        res.redirect(`${baseUrl}/login?${params.toString()}`);
+        return;
+      }
+
+      this.setSessionCookies(res, {
+        accessToken: result.accessToken!,
+        refreshToken: result.refreshToken!,
+      });
+      res.redirect(`${baseUrl}/dashboard`);
+    } catch {
+      res.redirect(`${baseUrl}/login?error=google_login_failed`);
     }
   };
   

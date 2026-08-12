@@ -162,7 +162,7 @@ export class AuthService {
     
     if (!user) {
       user = await this.authRepo.findUserByEmail(googleUser.email);
-      
+
       if (!user) {
         user = await this.authRepo.createUser({
           email: googleUser.email,
@@ -172,6 +172,8 @@ export class AuthService {
           googleId: googleUser.id,
           emailVerified: true,
         });
+      } else if (!user.googleId) {
+        user = await this.authRepo.linkGoogleId(user.id, googleUser.id);
       }
     }
     

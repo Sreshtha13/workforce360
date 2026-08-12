@@ -46,6 +46,18 @@ jobs:
       - name: Generate Prisma Client
         run: npm run db:generate -w api
 
+      - name: Lint API
+        run: npm run lint:api
+
+      - name: Lint web
+        run: npm run lint:web
+
+      - name: Typecheck API
+        run: npm run typecheck:api
+
+      - name: Typecheck web
+        run: npm run typecheck:web
+
       - name: Build API
         run: npm run build:api
 

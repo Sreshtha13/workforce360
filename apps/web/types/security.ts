@@ -71,3 +71,32 @@ export type DevicesListResult = {
   devices: TrustedDevice[];
   refreshTokens: DeviceSession[];
 };
+
+export type SecurityEvent = {
+  id: string;
+  userId?: string | null;
+  eventType: string;
+  severity: string;
+  message?: string | null;
+  ipAddress?: string | null;
+  userAgent?: string | null;
+  metadata?: unknown;
+  createdAt: string;
+  user?: {
+    id: string;
+    email: string;
+    firstName: string;
+    lastName: string;
+  } | null;
+};
+
+export type SecurityEventQuery = {
+  userId?: string;
+  eventType?: string;
+  severity?: "INFO" | "WARN" | "CRITICAL";
+  dateFrom?: string;
+  dateTo?: string;
+  search?: string;
+  page?: number;
+  pageSize?: number;
+};

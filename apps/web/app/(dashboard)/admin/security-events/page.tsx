@@ -5,19 +5,13 @@ import { useQuery } from "@tanstack/react-query";
 import { apiClient } from "@/lib/api-client";
 import { useAuth } from "@/lib/auth-context";
 import { useDebouncedValue } from "@/lib/use-debounced-value";
-import type { SecurityEvent } from "@/types/admin";
+import type { SecurityEvent } from "@/types/security";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
-import { ErrorState, LoadingState, EmptyState } from "@/components/admin/admin-states";
+import { EmptyState, ErrorState, LoadingState } from "@/components/admin/admin-states";
 import { DataTable } from "@/components/admin/data-table";
 import { FormField, FormSelect } from "@/components/admin/form-fields";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-
-function severityVariant(severity: string): "default" | "secondary" | "destructive" | "warning" | "success" {
-  if (severity === "CRITICAL") return "destructive";
-  if (severity === "WARN") return "warning";
-  return "secondary";
-}
 
 export default function SecurityEventsPage() {
   const { hasPermission } = useAuth();
@@ -40,7 +34,7 @@ export default function SecurityEventsPage() {
       const res = await apiClient.securityEvents.list({
         userId: userId || undefined,
         eventType: eventType || undefined,
-        severity: severity || undefined,
+        severity: (severity as "INFO" | "WARN" | "CRITICAL") || undefined,
         dateFrom: dateFrom || undefined,
         dateTo: dateTo || undefined,
         search: debouncedSearch || undefined,
@@ -78,7 +72,7 @@ export default function SecurityEventsPage() {
             setSearch(v);
             setPage(1);
           }}
-          placeholder="Message, type, user…"
+          placeholder="Message or type…"
         />
         <FormField
           label="User ID"
@@ -108,10 +102,10 @@ export default function SecurityEventsPage() {
             setPage(1);
           }}
           options={[
-            { value: "", label: "All" },
-            { value: "INFO", label: "Info" },
-            { value: "WARN", label: "Warning" },
-            { value: "CRITICAL", label: "Critical" },
+            { value: "", label: "Any" },
+            { value: "INFO", label: "INFO" },
+            { value: "WARN", label: "WARN" },
+            { value: "CRITICAL", label: "CRITICAL" },
           ]}
         />
         <FormField
@@ -141,7 +135,7 @@ export default function SecurityEventsPage() {
       ) : query.isError ? (
         <ErrorState message="Failed to load security events." onRetry={() => query.refetch()} />
       ) : items.length === 0 ? (
-        <EmptyState title="No security events" description="Try adjusting filters." />
+        <EmptyState title="No events" description="Try adjusting filters." />
       ) : (
         <>
           <DataTable
@@ -157,25 +151,30 @@ export default function SecurityEventsPage() {
                 key: "severity",
                 header: "Severity",
                 render: (r) => (
-                  <Badge variant={severityVariant(r.severity)}>{r.severity}</Badge>
+                  <Badge
+                    variant={
+                      r.severity === "CRITICAL"
+                        ? "destructive"
+                        : r.severity === "WARN"
+                          ? "warning"
+                          : "secondary"
+                    }
+                  >
+                    {r.severity}
+                  </Badge>
                 ),
               },
               { key: "type", header: "Type", render: (r) => r.eventType },
-              { key: "message", header: "Message", render: (r) => r.message },
               {
                 key: "user",
                 header: "User",
                 render: (r) =>
-                  r.user
-                    ? `${r.user.firstName} ${r.user.lastName}`
-                    : r.userId ?? "—",
+                  r.user ? `${r.user.firstName} ${r.user.lastName}` : r.userId ?? "—",
               },
               {
-                key: "ip",
-                header: "IP",
-                render: (r) => (
-                  <span className="font-mono text-xs">{r.ipAddress ?? "—"}</span>
-                ),
+                key: "message",
+                header: "Message",
+                render: (r) => r.message ?? "—",
               },
             ]}
           />
