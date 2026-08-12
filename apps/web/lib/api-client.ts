@@ -13,6 +13,65 @@ import type {
   UpdateRoleInput,
 } from "@/types/rbac";
 import type {
+  AttendanceRecord,
+  CheckInInput,
+  CheckOutInput,
+  CreateLeaveApplicationInput,
+  CreateTimesheetEntryInput,
+  LeaveApplication,
+  LeaveBalance,
+  LeavePolicy,
+  ReviewLeaveApplicationInput,
+  TimesheetEntry,
+  UpdateTimesheetEntryInput,
+} from "@/types/attendance";
+import type {
+  CreateFinanceClientInput,
+  CreateInvoiceInput,
+  CreateReimbursementInput,
+  FinanceClient,
+  Invoice,
+  Payment,
+  RecordPaymentInput,
+  Reimbursement,
+  ReviewReimbursementInput,
+  UpdateFinanceClientInput,
+  UpdateInvoiceInput,
+} from "@/types/finance";
+import type {
+  CreatePayrollRunInput,
+  CreateSalaryStructureInput,
+  PayrollRun,
+  Payslip,
+  SalaryRevision,
+  SalaryStructure,
+  UpdatePayrollRunInput,
+  UpdateSalaryStructureInput,
+} from "@/types/payroll";
+import type {
+  CodeReview,
+  CreateCodeReviewInput,
+  CreateDocumentationInput,
+  CreateReleaseInput,
+  CreateTestCaseInput,
+  CreateTrainingInput,
+  Documentation,
+  EngineeringMetrics,
+  EnrollTrainingInput,
+  ExecuteTestCaseInput,
+  Release,
+  SprintDashboard,
+  TechTraining,
+  TestCase,
+  TrainingEnrollment,
+  UpdateCodeReviewInput,
+  UpdateDocumentationInput,
+  UpdateEnrollmentInput,
+  UpdateReleaseInput,
+  UpdateTestCaseInput,
+  UpdateTrainingInput,
+} from "@/types/engineering";
+import type {
   AuthUser,
   CreateDepartmentInput,
   CreateDesignationInput,
@@ -58,6 +117,52 @@ import type {
   DashboardEmployeePreview,
 } from "@/types/phase2";
 import type {
+  Contact,
+  Lead,
+  Bid,
+  Proposal,
+  ClientCommunication,
+  PortfolioItem,
+  PipelineSummary,
+  CreateContactInput,
+  UpdateContactInput,
+  CreateLeadInput,
+  UpdateLeadInput,
+  CreateBidInput,
+  UpdateBidInput,
+  CreateProposalInput,
+  UpdateProposalInput,
+  CreateCommunicationInput,
+  CreatePortfolioItemInput,
+  UpdatePortfolioItemInput,
+} from "@/types/bd";
+import type {
+  Project,
+  Milestone,
+  Task,
+  Sprint,
+  TaskTimeEntry,
+  TaskComment,
+  ProjectTeamAllocation,
+  ProjectBudgetEntry,
+  ProjectReport,
+  CreateProjectInput,
+  UpdateProjectInput,
+  CreateMilestoneInput,
+  UpdateMilestoneInput,
+  CreateTaskInput,
+  UpdateTaskInput,
+  CreateSprintInput,
+  UpdateSprintInput,
+  CreateTimeEntryInput,
+  UpdateTimeEntryInput,
+  CreateTaskCommentInput,
+  AllocateTeamMemberInput,
+  UpdateTeamAllocationInput,
+  CreateBudgetEntryInput,
+  UpdateBudgetEntryInput,
+} from "@/types/pm";
+import type {
   Client,
   CreateClientInput,
   UpdateClientInput,
@@ -67,8 +172,6 @@ import type {
   Payment,
   RecordManualPaymentInput,
   PublicPaymentConfig,
-  Reimbursement,
-  CreateReimbursementInput,
   FinanceDashboard,
   SalaryStructure,
   CreateSalaryStructureInput,
@@ -1040,6 +1143,538 @@ export const apiClient = {
     payslips: {
       list: (params?: { employeeId?: string; year?: string }) =>
         request<Payslip[]>(`/api/payroll/payslips${buildQuery(params)}`),
+    },
+  },
+
+  // Phase 3: Attendance & Leave Management
+  attendance: {
+    list: (params?: { userId?: string; startDate?: string; endDate?: string }) =>
+      request<AttendanceRecord[]>(
+        `/api/attendance${buildQuery({
+          userId: params?.userId,
+          startDate: params?.startDate,
+          endDate: params?.endDate,
+        })}`,
+      ),
+    get: (id: string) => request<AttendanceRecord>(`/api/attendance/${id}`),
+    checkIn: (data: CheckInInput) =>
+      request<AttendanceRecord>("/api/attendance/check-in", {
+        method: "POST",
+        body: JSON.stringify(data),
+      }),
+    checkOut: (data: CheckOutInput) =>
+      request<AttendanceRecord>("/api/attendance/check-out", {
+        method: "POST",
+        body: JSON.stringify(data),
+      }),
+    getToday: () => request<AttendanceRecord | null>("/api/attendance/today"),
+  },
+
+  leave: {
+    policies: {
+      list: () => request<LeavePolicy[]>("/api/leave/policies"),
+      get: (id: string) => request<LeavePolicy>(`/api/leave/policies/${id}`),
+    },
+    applications: {
+      list: (params?: { userId?: string; status?: string; startDate?: string }) =>
+        request<LeaveApplication[]>(
+          `/api/leave/applications${buildQuery({
+            userId: params?.userId,
+            status: params?.status,
+            startDate: params?.startDate,
+          })}`,
+        ),
+      get: (id: string) => request<LeaveApplication>(`/api/leave/applications/${id}`),
+      create: (data: CreateLeaveApplicationInput) =>
+        request<LeaveApplication>("/api/leave/applications", {
+          method: "POST",
+          body: JSON.stringify(data),
+        }),
+      cancel: (id: string) =>
+        request<LeaveApplication>(`/api/leave/applications/${id}/cancel`, {
+          method: "POST",
+        }),
+      review: (id: string, data: ReviewLeaveApplicationInput) =>
+        request<LeaveApplication>(`/api/leave/applications/${id}/review`, {
+          method: "POST",
+          body: JSON.stringify(data),
+        }),
+    },
+    balance: (userId?: string) =>
+      request<LeaveBalance[]>(`/api/leave/balance${buildQuery({ userId })}`),
+  },
+
+  timesheets: {
+    list: (params?: { userId?: string; startDate?: string; endDate?: string; projectId?: string }) =>
+      request<TimesheetEntry[]>(
+        `/api/timesheets${buildQuery({
+          userId: params?.userId,
+          startDate: params?.startDate,
+          endDate: params?.endDate,
+          projectId: params?.projectId,
+        })}`,
+      ),
+    get: (id: string) => request<TimesheetEntry>(`/api/timesheets/${id}`),
+    create: (data: CreateTimesheetEntryInput) =>
+      request<TimesheetEntry>("/api/timesheets", {
+        method: "POST",
+        body: JSON.stringify(data),
+      }),
+    update: (id: string, data: UpdateTimesheetEntryInput) =>
+      request<TimesheetEntry>(`/api/timesheets/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify(data),
+      }),
+    delete: (id: string) =>
+      request<{ ok: boolean }>(`/api/timesheets/${id}`, {
+        method: "DELETE",
+      }),
+  },
+
+  // Business Development Module
+  bd: {
+    contacts: {
+      list: (params?: { search?: string }) =>
+        request<Contact[]>(`/api/bd/contacts${buildQuery({ search: params?.search })}`),
+      get: (id: string) => request<Contact>(`/api/bd/contacts/${id}`),
+      create: (data: CreateContactInput) =>
+        request<Contact>("/api/bd/contacts", {
+          method: "POST",
+          body: JSON.stringify(data),
+        }),
+      update: (id: string, data: UpdateContactInput) =>
+        request<Contact>(`/api/bd/contacts/${id}`, {
+          method: "PATCH",
+          body: JSON.stringify(data),
+        }),
+    },
+
+    leads: {
+      list: (params?: { status?: string; assignedToId?: string; search?: string }) =>
+        request<Lead[]>(
+          `/api/bd/leads${buildQuery({
+            status: params?.status,
+            assignedToId: params?.assignedToId,
+            search: params?.search,
+          })}`,
+        ),
+      get: (id: string) => request<Lead>(`/api/bd/leads/${id}`),
+      create: (data: CreateLeadInput) =>
+        request<Lead>("/api/bd/leads", {
+          method: "POST",
+          body: JSON.stringify(data),
+        }),
+      update: (id: string, data: UpdateLeadInput) =>
+        request<Lead>(`/api/bd/leads/${id}`, {
+          method: "PATCH",
+          body: JSON.stringify(data),
+        }),
+      getPipeline: () => request<PipelineSummary[]>("/api/bd/pipeline"),
+    },
+
+    bids: {
+      list: (params?: { leadId?: string; status?: string }) =>
+        request<Bid[]>(
+          `/api/bd/bids${buildQuery({
+            leadId: params?.leadId,
+            status: params?.status,
+          })}`,
+        ),
+      get: (id: string) => request<Bid>(`/api/bd/bids/${id}`),
+      create: (data: CreateBidInput) =>
+        request<Bid>("/api/bd/bids", {
+          method: "POST",
+          body: JSON.stringify(data),
+        }),
+      update: (id: string, data: UpdateBidInput) =>
+        request<Bid>(`/api/bd/bids/${id}`, {
+          method: "PATCH",
+          body: JSON.stringify(data),
+        }),
+    },
+
+    proposals: {
+      list: (params?: { leadId?: string; bidId?: string; status?: string }) =>
+        request<Proposal[]>(
+          `/api/bd/proposals${buildQuery({
+            leadId: params?.leadId,
+            bidId: params?.bidId,
+            status: params?.status,
+          })}`,
+        ),
+      get: (id: string) => request<Proposal>(`/api/bd/proposals/${id}`),
+      create: (data: CreateProposalInput) =>
+        request<Proposal>("/api/bd/proposals", {
+          method: "POST",
+          body: JSON.stringify(data),
+        }),
+      update: (id: string, data: UpdateProposalInput) =>
+        request<Proposal>(`/api/bd/proposals/${id}`, {
+          method: "PATCH",
+          body: JSON.stringify(data),
+        }),
+    },
+
+    communications: {
+      list: (params?: { leadId?: string; contactId?: string }) =>
+        request<ClientCommunication[]>(
+          `/api/bd/communications${buildQuery({
+            leadId: params?.leadId,
+            contactId: params?.contactId,
+          })}`,
+        ),
+      create: (data: CreateCommunicationInput) =>
+        request<ClientCommunication>("/api/bd/communications", {
+          method: "POST",
+          body: JSON.stringify(data),
+        }),
+    },
+
+    portfolio: {
+      list: (params?: { isPublished?: boolean; category?: string }) =>
+        request<PortfolioItem[]>(
+          `/api/bd/portfolio${buildQuery({
+            isPublished: params?.isPublished ? "true" : undefined,
+            category: params?.category,
+          })}`,
+        ),
+      get: (id: string) => request<PortfolioItem>(`/api/bd/portfolio/${id}`),
+      create: (data: CreatePortfolioItemInput) =>
+        request<PortfolioItem>("/api/bd/portfolio", {
+          method: "POST",
+          body: JSON.stringify(data),
+        }),
+      update: (id: string, data: UpdatePortfolioItemInput) =>
+        request<PortfolioItem>(`/api/bd/portfolio/${id}`, {
+          method: "PATCH",
+          body: JSON.stringify(data),
+        }),
+    },
+  },
+
+  // Project Management Module
+  pm: {
+    projects: {
+      list: (params?: { status?: string; managerId?: string; search?: string }) =>
+        request<Project[]>(
+          `/api/pm/projects${buildQuery({
+            status: params?.status,
+            managerId: params?.managerId,
+            search: params?.search,
+          })}`,
+        ),
+      get: (id: string) => request<Project>(`/api/pm/projects/${id}`),
+      create: (data: CreateProjectInput) =>
+        request<Project>("/api/pm/projects", {
+          method: "POST",
+          body: JSON.stringify(data),
+        }),
+      update: (id: string, data: UpdateProjectInput) =>
+        request<Project>(`/api/pm/projects/${id}`, {
+          method: "PATCH",
+          body: JSON.stringify(data),
+        }),
+      getReport: (projectId: string) => request<ProjectReport>(`/api/pm/projects/${projectId}/report`),
+    },
+
+    milestones: {
+      list: (params?: { projectId?: string }) =>
+        request<Milestone[]>(
+          `/api/pm/milestones${buildQuery({
+            projectId: params?.projectId,
+          })}`,
+        ),
+      get: (id: string) => request<Milestone>(`/api/pm/milestones/${id}`),
+      create: (data: CreateMilestoneInput) =>
+        request<Milestone>("/api/pm/milestones", {
+          method: "POST",
+          body: JSON.stringify(data),
+        }),
+      update: (id: string, data: UpdateMilestoneInput) =>
+        request<Milestone>(`/api/pm/milestones/${id}`, {
+          method: "PATCH",
+          body: JSON.stringify(data),
+        }),
+    },
+
+    tasks: {
+      list: (params?: {
+        projectId?: string;
+        milestoneId?: string;
+        sprintId?: string;
+        assigneeId?: string;
+        status?: string;
+        search?: string;
+      }) =>
+        request<Task[]>(
+          `/api/pm/tasks${buildQuery({
+            projectId: params?.projectId,
+            milestoneId: params?.milestoneId,
+            sprintId: params?.sprintId,
+            assigneeId: params?.assigneeId,
+            status: params?.status,
+            search: params?.search,
+          })}`,
+        ),
+      get: (id: string) => request<Task>(`/api/pm/tasks/${id}`),
+      create: (data: CreateTaskInput) =>
+        request<Task>("/api/pm/tasks", {
+          method: "POST",
+          body: JSON.stringify(data),
+        }),
+      update: (id: string, data: UpdateTaskInput) =>
+        request<Task>(`/api/pm/tasks/${id}`, {
+          method: "PATCH",
+          body: JSON.stringify(data),
+        }),
+      addComment: (data: CreateTaskCommentInput) =>
+        request<TaskComment>("/api/pm/tasks/comments", {
+          method: "POST",
+          body: JSON.stringify(data),
+        }),
+    },
+
+    sprints: {
+      list: (params?: { projectId?: string; status?: string }) =>
+        request<Sprint[]>(
+          `/api/pm/sprints${buildQuery({
+            projectId: params?.projectId,
+            status: params?.status,
+          })}`,
+        ),
+      get: (id: string) => request<Sprint>(`/api/pm/sprints/${id}`),
+      create: (data: CreateSprintInput) =>
+        request<Sprint>("/api/pm/sprints", {
+          method: "POST",
+          body: JSON.stringify(data),
+        }),
+      update: (id: string, data: UpdateSprintInput) =>
+        request<Sprint>(`/api/pm/sprints/${id}`, {
+          method: "PATCH",
+          body: JSON.stringify(data),
+        }),
+    },
+
+    timeEntries: {
+      list: (params?: { taskId?: string; userId?: string; startDate?: string; endDate?: string }) =>
+        request<TaskTimeEntry[]>(
+          `/api/pm/time-entries${buildQuery({
+            taskId: params?.taskId,
+            userId: params?.userId,
+            startDate: params?.startDate,
+            endDate: params?.endDate,
+          })}`,
+        ),
+      create: (data: CreateTimeEntryInput) =>
+        request<TaskTimeEntry>("/api/pm/time-entries", {
+          method: "POST",
+          body: JSON.stringify(data),
+        }),
+      update: (id: string, data: UpdateTimeEntryInput) =>
+        request<TaskTimeEntry>(`/api/pm/time-entries/${id}`, {
+          method: "PATCH",
+          body: JSON.stringify(data),
+        }),
+    },
+
+    teamAllocations: {
+      list: (params?: { projectId?: string; userId?: string }) =>
+        request<ProjectTeamAllocation[]>(
+          `/api/pm/team-allocations${buildQuery({
+            projectId: params?.projectId,
+            userId: params?.userId,
+          })}`,
+        ),
+      create: (data: AllocateTeamMemberInput) =>
+        request<ProjectTeamAllocation>("/api/pm/team-allocations", {
+          method: "POST",
+          body: JSON.stringify(data),
+        }),
+      update: (id: string, data: UpdateTeamAllocationInput) =>
+        request<ProjectTeamAllocation>(`/api/pm/team-allocations/${id}`, {
+          method: "PATCH",
+          body: JSON.stringify(data),
+        }),
+    },
+
+    budget: {
+      list: (projectId: string) =>
+        request<ProjectBudgetEntry[]>(`/api/pm/projects/${projectId}/budget`),
+      create: (data: CreateBudgetEntryInput) =>
+        request<ProjectBudgetEntry>("/api/pm/budget", {
+          method: "POST",
+          body: JSON.stringify(data),
+        }),
+      update: (id: string, data: UpdateBudgetEntryInput) =>
+        request<ProjectBudgetEntry>(`/api/pm/budget/${id}`, {
+          method: "PATCH",
+          body: JSON.stringify(data),
+        }),
+    },
+  },
+
+  // Phase 7: Development & QA Module
+  engineering: {
+    releases: {
+      list: (params?: { projectId?: string; status?: string }) =>
+        request<Release[]>(
+          `/api/engineering/releases${buildQuery({
+            projectId: params?.projectId,
+            status: params?.status,
+          })}`,
+        ),
+      get: (id: string) => request<Release>(`/api/engineering/releases/${id}`),
+      create: (data: CreateReleaseInput) =>
+        request<Release>("/api/engineering/releases", {
+          method: "POST",
+          body: JSON.stringify(data),
+        }),
+      update: (id: string, data: UpdateReleaseInput) =>
+        request<Release>(`/api/engineering/releases/${id}`, {
+          method: "PATCH",
+          body: JSON.stringify(data),
+        }),
+      deploy: (id: string) =>
+        request<Release>(`/api/engineering/releases/${id}/deploy`, {
+          method: "POST",
+        }),
+      rollback: (id: string) =>
+        request<Release>(`/api/engineering/releases/${id}/rollback`, {
+          method: "POST",
+        }),
+    },
+
+    testCases: {
+      list: (params?: { projectId?: string; releaseId?: string; status?: string; assignedToId?: string }) =>
+        request<TestCase[]>(
+          `/api/engineering/test-cases${buildQuery({
+            projectId: params?.projectId,
+            releaseId: params?.releaseId,
+            status: params?.status,
+            assignedToId: params?.assignedToId,
+          })}`,
+        ),
+      get: (id: string) => request<TestCase>(`/api/engineering/test-cases/${id}`),
+      create: (data: CreateTestCaseInput) =>
+        request<TestCase>("/api/engineering/test-cases", {
+          method: "POST",
+          body: JSON.stringify(data),
+        }),
+      update: (id: string, data: UpdateTestCaseInput) =>
+        request<TestCase>(`/api/engineering/test-cases/${id}`, {
+          method: "PATCH",
+          body: JSON.stringify(data),
+        }),
+      execute: (id: string, data: ExecuteTestCaseInput) =>
+        request<TestCase>(`/api/engineering/test-cases/${id}/execute`, {
+          method: "POST",
+          body: JSON.stringify(data),
+        }),
+    },
+
+    documentation: {
+      list: (params?: { projectId?: string; category?: string; search?: string }) =>
+        request<Documentation[]>(
+          `/api/engineering/docs${buildQuery({
+            projectId: params?.projectId,
+            category: params?.category,
+            search: params?.search,
+          })}`,
+        ),
+      get: (id: string) => request<Documentation>(`/api/engineering/docs/${id}`),
+      create: (data: CreateDocumentationInput) =>
+        request<Documentation>("/api/engineering/docs", {
+          method: "POST",
+          body: JSON.stringify(data),
+        }),
+      update: (id: string, data: UpdateDocumentationInput) =>
+        request<Documentation>(`/api/engineering/docs/${id}`, {
+          method: "PATCH",
+          body: JSON.stringify(data),
+        }),
+      publish: (id: string) =>
+        request<Documentation>(`/api/engineering/docs/${id}/publish`, {
+          method: "POST",
+        }),
+    },
+
+    training: {
+      list: (params?: { category?: string; isRequired?: boolean }) =>
+        request<TechTraining[]>(
+          `/api/engineering/training${buildQuery({
+            category: params?.category,
+            isRequired: params?.isRequired,
+          })}`,
+        ),
+      get: (id: string) => request<TechTraining>(`/api/engineering/training/${id}`),
+      create: (data: CreateTrainingInput) =>
+        request<TechTraining>("/api/engineering/training", {
+          method: "POST",
+          body: JSON.stringify(data),
+        }),
+      update: (id: string, data: UpdateTrainingInput) =>
+        request<TechTraining>(`/api/engineering/training/${id}`, {
+          method: "PATCH",
+          body: JSON.stringify(data),
+        }),
+      myEnrollments: () => request<TrainingEnrollment[]>("/api/engineering/training/my-enrollments"),
+      enroll: (data: EnrollTrainingInput) =>
+        request<TrainingEnrollment>("/api/engineering/training/enroll", {
+          method: "POST",
+          body: JSON.stringify(data),
+        }),
+      updateEnrollment: (id: string, data: UpdateEnrollmentInput) =>
+        request<TrainingEnrollment>(`/api/engineering/training/enrollments/${id}`, {
+          method: "PATCH",
+          body: JSON.stringify(data),
+        }),
+    },
+
+    codeReviews: {
+      list: (params?: { projectId?: string; authorId?: string; reviewerId?: string; status?: string }) =>
+        request<CodeReview[]>(
+          `/api/engineering/code-reviews${buildQuery({
+            projectId: params?.projectId,
+            authorId: params?.authorId,
+            reviewerId: params?.reviewerId,
+            status: params?.status,
+          })}`,
+        ),
+      get: (id: string) => request<CodeReview>(`/api/engineering/code-reviews/${id}`),
+      create: (data: CreateCodeReviewInput) =>
+        request<CodeReview>("/api/engineering/code-reviews", {
+          method: "POST",
+          body: JSON.stringify(data),
+        }),
+      update: (id: string, data: UpdateCodeReviewInput) =>
+        request<CodeReview>(`/api/engineering/code-reviews/${id}`, {
+          method: "PATCH",
+          body: JSON.stringify(data),
+        }),
+      approve: (id: string) =>
+        request<CodeReview>(`/api/engineering/code-reviews/${id}/approve`, {
+          method: "POST",
+        }),
+      requestChanges: (id: string, notes: string) =>
+        request<CodeReview>(`/api/engineering/code-reviews/${id}/request-changes`, {
+          method: "POST",
+          body: JSON.stringify({ notes }),
+        }),
+    },
+
+    dashboard: {
+      mySprintDashboard: (sprintId?: string) =>
+        request<SprintDashboard>(
+          `/api/engineering/dashboard/my-sprint${buildQuery({ sprintId })}`,
+        ),
+      myMetrics: (period?: string) =>
+        request<EngineeringMetrics>(
+          `/api/engineering/dashboard/my-metrics${buildQuery({ period })}`,
+        ),
+      teamMetrics: (projectId?: string) =>
+        request<EngineeringMetrics[]>(
+          `/api/engineering/dashboard/team-metrics${buildQuery({ projectId })}`,
+        ),
     },
   },
 };
