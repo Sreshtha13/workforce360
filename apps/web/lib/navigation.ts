@@ -1,18 +1,28 @@
 import type { LucideIcon } from "lucide-react";
 import {
+  Bell,
   Building2,
   Briefcase,
+  ClipboardCheck,
   ClipboardList,
   CreditCard,
+  Database,
   DollarSign,
+  FileBarChart,
   FileText,
   Headphones,
   KeyRound,
   LayoutDashboard,
+  Link2,
   MapPin,
+  Megaphone,
+  BookOpen,
   Receipt,
+  ScrollText,
+  Settings,
   Shield,
   Tags,
+  Timer,
   UserCheck,
   UserCircle,
   Users,
@@ -50,6 +60,18 @@ export const mainNav: NavItem[] = [
     href: "/dashboard",
     icon: LayoutDashboard,
     public: true,
+  },
+  {
+    label: "Approvals",
+    href: "/approvals",
+    icon: ClipboardCheck,
+    permissions: ["approval.read", "approval.action", "approval.manage"],
+  },
+  {
+    label: "Delegations",
+    href: "/approvals/delegations",
+    icon: UserCheck,
+    permissions: ["approval.delegate", "approval.manage"],
   },
 ];
 
@@ -125,10 +147,28 @@ export const hrNav: NavItem[] = [
     permissions: ["asset.read"],
   },
   {
+    label: "Documents",
+    href: "/hr/documents",
+    icon: FileText,
+    permissions: ["document.read", "document.manage"],
+  },
+  {
     label: "Support Tickets",
     href: "/hr/tickets",
     icon: Headphones,
     permissions: ["ticket.read"],
+  },
+  {
+    label: "Knowledge Base",
+    href: "/hr/knowledge-base",
+    icon: BookOpen,
+    permissions: ["ticket.read", "ticket.manage"],
+  },
+  {
+    label: "SLA Policies",
+    href: "/hr/sla-policies",
+    icon: Timer,
+    permissions: ["ticket.manage"],
   },
 ];
 
@@ -167,6 +207,12 @@ export const financeNav: NavItem[] = [
 
 export const payrollNav: NavItem[] = [
   {
+    label: "Payroll Dashboard",
+    href: "/payroll/dashboard",
+    icon: LayoutDashboard,
+    permissions: ["payroll_run.read", "report.read", "dashboard.read"],
+  },
+  {
     label: "Salary Structures",
     href: "/payroll/salary-structures",
     icon: Wallet,
@@ -186,6 +232,36 @@ export const payrollNav: NavItem[] = [
   },
 ];
 
+export const reportsNav: NavItem[] = [
+  {
+    label: "Reports",
+    href: "/reports",
+    icon: FileBarChart,
+    permissions: ["report.read"],
+  },
+  {
+    label: "Report schedules",
+    href: "/reports/schedules",
+    icon: Timer,
+    permissions: ["report.schedule.manage"],
+  },
+];
+
+export const pmNav: NavItem[] = [
+  {
+    label: "PM Dashboard",
+    href: "/pm/dashboard",
+    icon: LayoutDashboard,
+    permissions: ["project.read", "report.read", "dashboard.read"],
+  },
+  {
+    label: "Projects",
+    href: "/pm/projects",
+    icon: Briefcase,
+    permissions: ["project.read", "project.manage"],
+  },
+];
+
 export const portalNav: NavItem[] = [
   {
     label: "Portal Home",
@@ -197,6 +273,12 @@ export const portalNav: NavItem[] = [
     label: "My Profile",
     href: "/portal/profile",
     icon: UserCircle,
+    permissions: ["portal.read"],
+  },
+  {
+    label: "Security",
+    href: "/portal/security",
+    icon: Shield,
     permissions: ["portal.read"],
   },
   {
@@ -239,7 +321,7 @@ export const portalNav: NavItem[] = [
     label: "Documents",
     href: "/portal/documents",
     icon: FileText,
-    permissions: ["portal.read"],
+    permissions: ["document.read", "portal.read"],
   },
   {
     label: "Policies",
@@ -250,7 +332,13 @@ export const portalNav: NavItem[] = [
   {
     label: "Notifications",
     href: "/portal/notifications",
-    icon: ClipboardList,
+    icon: Bell,
+    permissions: ["portal.read"],
+  },
+  {
+    label: "Notification preferences",
+    href: "/portal/notification-preferences",
+    icon: Bell,
     permissions: ["portal.read"],
   },
   {
@@ -279,6 +367,12 @@ export const adminNav: NavItem[] = [
     href: "/admin/permissions",
     icon: KeyRound,
     permissions: ["permission.read"],
+  },
+  {
+    label: "Master Data",
+    href: "/admin/master-data",
+    icon: Database,
+    permissions: ["settings.manage", "dashboard.read", "department.read"],
   },
   {
     label: "Departments",
@@ -320,6 +414,48 @@ export const adminNav: NavItem[] = [
       "employment_status.update",
       "employment_status.delete",
     ],
+  },
+  {
+    label: "Approval Workflows",
+    href: "/admin/approval-workflows",
+    icon: Workflow,
+    permissions: ["approval.read", "approval.manage"],
+  },
+  {
+    label: "Announcements",
+    href: "/admin/announcements",
+    icon: Megaphone,
+    permissions: ["announcement.manage"],
+  },
+  {
+    label: "Audit Logs",
+    href: "/admin/audit-logs",
+    icon: ScrollText,
+    permissions: ["audit.read"],
+  },
+  {
+    label: "Security Events",
+    href: "/admin/security-events",
+    icon: Shield,
+    permissions: ["security.read"],
+  },
+  {
+    label: "Notification Templates",
+    href: "/admin/notification-templates",
+    icon: Bell,
+    permissions: ["template.manage"],
+  },
+  {
+    label: "System Settings",
+    href: "/admin/settings",
+    icon: Settings,
+    permissions: ["settings.manage"],
+  },
+  {
+    label: "Integrations",
+    href: "/admin/integrations",
+    icon: Link2,
+    permissions: ["settings.manage", "dashboard.read"],
   },
 ];
 

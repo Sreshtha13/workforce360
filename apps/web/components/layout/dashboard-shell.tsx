@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { type ReactNode, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import {
   Bell,
   ChevronDown,
@@ -11,6 +12,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
+import { apiClient } from "@/lib/api-client";
 import {
   adminNav,
   candidateNav,
@@ -19,7 +21,9 @@ import {
   hrNav,
   mainNav,
   payrollNav,
+  pmNav,
   portalNav,
+  reportsNav,
 } from "@/lib/navigation";
 import { glass, iconSize, motion } from "@/lib/design-system";
 import { typographyScale } from "@/lib/design-tokens";
@@ -46,7 +50,16 @@ export function DashboardShell({ children }: { children: ReactNode }) {
   const [hrExpanded, setHrExpanded] = useState(true);
   const [financeExpanded, setFinanceExpanded] = useState(true);
   const [payrollExpanded, setPayrollExpanded] = useState(true);
+  const [reportsExpanded, setReportsExpanded] = useState(true);
+  const [pmExpanded, setPmExpanded] = useState(true);
   const [portalExpanded, setPortalExpanded] = useState(true);
+
+  const unreadQuery = useQuery({
+    queryKey: ["notifications", "unread-count"],
+    queryFn: async () => (await apiClient.notifications.unreadCount()).data?.count ?? 0,
+    enabled: Boolean(user),
+    refetchInterval: 60_000,
+  });
 
   if (!user) return null;
 
@@ -56,10 +69,13 @@ export function DashboardShell({ children }: { children: ReactNode }) {
   const visibleHr = filterNavByPermissions(hrNav, navUser);
   const visibleFinance = filterNavByPermissions(financeNav, navUser);
   const visiblePayroll = filterNavByPermissions(payrollNav, navUser);
+  const visibleReports = filterNavByPermissions(reportsNav, navUser);
+  const visiblePm = filterNavByPermissions(pmNav, navUser);
   const visiblePortal = filterNavByPermissions(portalNav, navUser);
   const visibleAdmin = filterNavByPermissions(adminNav, navUser);
   const breadcrumbs = buildBreadcrumbs(pathname);
   const initials = `${user.firstName[0] ?? ""}${user.lastName[0] ?? ""}`;
+  const unreadCount = unreadQuery.data ?? 0;
 
   const sidebar = (
     <>
@@ -218,6 +234,72 @@ export function DashboardShell({ children }: { children: ReactNode }) {
           </div>
         )}
 
+        {visibleReports.length > 0 && (
+          <div className="mt-4">
+            <button
+              type="button"
+              onClick={() => setReportsExpanded((v) => !v)}
+              className={cn(
+                typographyScale.overline.className,
+                "flex w-full items-center justify-between px-2 py-2 text-sidebar-foreground/70",
+              )}
+            >
+              Reports
+              <ChevronDown
+                className={cn(
+                  iconSize.sm,
+                  "transition-transform",
+                  reportsExpanded ? "rotate-0" : "-rotate-90",
+                )}
+              />
+            </button>
+            {reportsExpanded &&
+              visibleReports.map((item) => (
+                <SidebarLink
+                  key={item.href}
+                  href={item.href}
+                  label={item.label}
+                  icon={item.icon}
+                  active={pathname === item.href || pathname.startsWith(`${item.href}/`)}
+                  onNavigate={() => setMobileOpen(false)}
+                />
+              ))}
+          </div>
+        )}
+
+        {visiblePm.length > 0 && (
+          <div className="mt-4">
+            <button
+              type="button"
+              onClick={() => setPmExpanded((v) => !v)}
+              className={cn(
+                typographyScale.overline.className,
+                "flex w-full items-center justify-between px-2 py-2 text-sidebar-foreground/70",
+              )}
+            >
+              Projects
+              <ChevronDown
+                className={cn(
+                  iconSize.sm,
+                  "transition-transform",
+                  pmExpanded ? "rotate-0" : "-rotate-90",
+                )}
+              />
+            </button>
+            {pmExpanded &&
+              visiblePm.map((item) => (
+                <SidebarLink
+                  key={item.href}
+                  href={item.href}
+                  label={item.label}
+                  icon={item.icon}
+                  active={pathname === item.href || pathname.startsWith(`${item.href}/`)}
+                  onNavigate={() => setMobileOpen(false)}
+                />
+              ))}
+          </div>
+        )}
+
         {visiblePortal.length > 0 && (
           <div className="mt-4">
             <button
@@ -348,15 +430,22 @@ export function DashboardShell({ children }: { children: ReactNode }) {
           <div className="ml-auto flex items-center gap-1 sm:gap-2">
             <ThemeToggle />
 
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              disabled
-              aria-label="Notifications (coming soon)"
-              className="relative"
+            <Link
+              href="/portal/notifications"
+              aria-label={
+                unreadCount > 0
+                  ? `${unreadCount} unread notifications`
+                  : "Notifications"
+              }
+              className="relative inline-flex size-8 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground"
             >
               <Bell className={iconSize.md} />
-            </Button>
+              {unreadCount > 0 && (
+                <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-brand-600 px-1 text-[10px] font-semibold text-white">
+                  {unreadCount > 99 ? "99+" : unreadCount}
+                </span>
+              )}
+            </Link>
 
             <Separator orientation="vertical" className="mx-1 hidden h-6 sm:block" />
 

@@ -104,6 +104,8 @@ export const applyLeaveSchema = z.object({
   startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Invalid date format (YYYY-MM-DD)"),
   endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Invalid date format (YYYY-MM-DD)"),
   reason: z.string().min(1).max(1000),
+  /** Optional multi-level approvers — creates ApprovalRequest and links approvalRequestId. */
+  approverIds: z.array(z.string().min(1)).min(1).optional(),
 }).refine(
   (data) => new Date(data.startDate) <= new Date(data.endDate),
   { message: "Start date must be before or equal to end date", path: ["endDate"] }

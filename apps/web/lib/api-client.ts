@@ -26,29 +26,6 @@ import type {
   UpdateTimesheetEntryInput,
 } from "@/types/attendance";
 import type {
-  CreateFinanceClientInput,
-  CreateInvoiceInput,
-  CreateReimbursementInput,
-  FinanceClient,
-  Invoice,
-  Payment,
-  RecordPaymentInput,
-  Reimbursement,
-  ReviewReimbursementInput,
-  UpdateFinanceClientInput,
-  UpdateInvoiceInput,
-} from "@/types/finance";
-import type {
-  CreatePayrollRunInput,
-  CreateSalaryStructureInput,
-  PayrollRun,
-  Payslip,
-  SalaryRevision,
-  SalaryStructure,
-  UpdatePayrollRunInput,
-  UpdateSalaryStructureInput,
-} from "@/types/payroll";
-import type {
   CodeReview,
   CreateCodeReviewInput,
   CreateDocumentationInput,
@@ -117,6 +94,39 @@ import type {
   DashboardEmployeePreview,
 } from "@/types/phase2";
 import type {
+  CreateKbArticleInput,
+  EscalateTicketInput,
+  KnowledgeBaseArticle,
+  SlaPolicy,
+  UpdateKbArticleInput,
+  UpsertSlaPolicyInput,
+} from "@/types/helpdesk";
+import type {
+  Announcement,
+  AppNotification,
+  CreateAnnouncementInput,
+  NotificationPreference,
+  UpdateAnnouncementInput,
+  UpdatePreferenceInput,
+} from "@/types/notifications";
+import type {
+  ApprovalDelegation,
+  ApprovalRequest,
+  ApprovalStats,
+  ApprovalWorkflow,
+  CreateDelegationInput,
+  CreateWorkflowInput,
+  UpdateWorkflowInput,
+} from "@/types/approvals";
+import type {
+  CreateDocumentCategoryInput,
+  CreateDocumentInput,
+  DocumentCategory,
+  DocumentContext,
+  ManagedDocument,
+  SetDocumentPermissionsInput,
+} from "@/types/documents";
+import type {
   Contact,
   Lead,
   Bid,
@@ -165,22 +175,58 @@ import type {
 import type {
   Client,
   CreateClientInput,
-  UpdateClientInput,
-  Invoice,
   CreateInvoiceInput,
-  UpdateInvoiceInput,
-  Payment,
-  RecordManualPaymentInput,
-  PublicPaymentConfig,
-  FinanceDashboard,
-  SalaryStructure,
-  CreateSalaryStructureInput,
-  SalaryRevision,
-  RequestSalaryRevisionInput,
-  PayrollRun,
   CreatePayrollRunInput,
+  CreateReimbursementInput,
+  CreateSalaryStructureInput,
+  FinanceDashboard,
+  Invoice,
+  Payment,
+  PayrollRun,
   Payslip,
+  PublicPaymentConfig,
+  RecordManualPaymentInput,
+  Reimbursement,
+  RequestSalaryRevisionInput,
+  SalaryRevision,
+  SalaryStructure,
+  UpdateClientInput,
+  UpdateInvoiceInput,
 } from "@/types/phase4";
+import type {
+  CreateReportScheduleInput,
+  DashboardKpis,
+  KpiScope,
+  ReportFilters,
+  ReportFormat,
+  ReportPayload,
+  ReportSchedule,
+  ReportType,
+  UpdateReportScheduleInput,
+} from "@/types/reports";
+import type {
+  AuditLog,
+  AuditLogQuery,
+  CreateNotificationTemplateInput,
+  IntegrationPlaceholder,
+  MasterDataSummary,
+  NotificationTemplate,
+  SecurityEvent,
+  SecurityEventQuery,
+  SystemSetting,
+  UpdateNotificationTemplateInput,
+  UpsertSettingsInput,
+} from "@/types/admin";
+import type {
+  DevicesListResult,
+  LoginResult,
+  MfaEnableResult,
+  MfaEnableChallengeResult,
+  MfaSetupResult,
+  MfaStatus,
+  MfaVerifyResult,
+} from "@/types/security";
+import { downloadBlob } from "@/lib/download";
 
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:4000";
@@ -190,11 +236,14 @@ const AUTH_LOGIN_PATH = "/api/auth/login";
 
 let refreshInFlight: Promise<boolean> | null = null;
 
-function buildQuery(params?: Record<string, string | undefined>): string {
+function buildQuery(
+  params?: Record<string, string | number | boolean | undefined>,
+): string {
   if (!params) return "";
   const search = new URLSearchParams();
   for (const [key, value] of Object.entries(params)) {
-    if (value) search.set(key, value);
+    if (value === undefined || value === null || value === "") continue;
+    search.set(key, String(value));
   }
   const query = search.toString();
   return query ? `?${query}` : "";
@@ -340,6 +389,48 @@ async function requestSession<T>(
   return body;
 }
 
+/** Binary download (CSV/PDF) — returns blob + filename from Content-Disposition when present. */
+async function requestBlob(
+  path: string,
+  init?: RequestInit,
+  retried = false,
+): Promise<{ blob: Blob; filename: string }> {
+  const url = `${API_BASE_URL}${path}`;
+  const response = await fetch(url, {
+    ...init,
+    headers: {
+      Accept: "*/*",
+      ...init?.headers,
+    },
+    credentials: "include",
+    cache: "no-store",
+  });
+
+  if (response.status === 401 && shouldAttemptRefresh(path, retried)) {
+    const refreshed = await tryRefreshSession();
+    if (refreshed) {
+      return requestBlob(path, init, true);
+    }
+  }
+
+  if (!response.ok) {
+    let message = `Request failed with status ${response.status}`;
+    try {
+      const body = (await response.json()) as ApiResponse<unknown>;
+      if (body.error?.message) message = body.error.message;
+    } catch {
+      /* non-JSON error body */
+    }
+    throw new ApiClientError(message, response.status);
+  }
+
+  const disposition = response.headers.get("Content-Disposition") ?? "";
+  const match = /filename="?([^";]+)"?/i.exec(disposition);
+  const filename = match?.[1] ?? "download";
+  const blob = await response.blob();
+  return { blob, filename };
+}
+
 /**
  * Typed HTTP client for the Workforce 360 API.
  * The web app must never import Prisma, Postgres drivers, or Supabase Admin SDK.
@@ -351,9 +442,18 @@ export const apiClient = {
 
   auth: {
     login: (email: string, password: string) =>
-      request<{ user: AuthUser }>("/api/auth/login", {
+      request<LoginResult>("/api/auth/login", {
         method: "POST",
         body: JSON.stringify({ email, password }),
+      }),
+
+    getGoogleAuthUrl: () =>
+      request<{ enabled: boolean; url?: string }>("/api/auth/google/url"),
+
+    googleLogin: (code: string) =>
+      request<LoginResult>("/api/auth/google", {
+        method: "POST",
+        body: JSON.stringify({ code }),
       }),
 
     logout: () =>
@@ -379,6 +479,45 @@ export const apiClient = {
         method: "POST",
         body: JSON.stringify({ token, password }),
       }),
+
+    mfa: {
+      status: () => request<MfaStatus>("/api/auth/mfa/status"),
+      setup: () =>
+        request<MfaSetupResult>("/api/auth/mfa/setup", { method: "POST" }),
+      enable: (code: string) =>
+        request<MfaEnableResult>("/api/auth/mfa/enable", {
+          method: "POST",
+          body: JSON.stringify({ code }),
+        }),
+      disable: (code: string) =>
+        request<{ enabled: boolean }>("/api/auth/mfa/disable", {
+          method: "POST",
+          body: JSON.stringify({ code }),
+        }),
+      verify: (mfaToken: string, code: string) =>
+        request<MfaVerifyResult>("/api/auth/mfa/verify", {
+          method: "POST",
+          body: JSON.stringify({ mfaToken, code }),
+        }),
+      setupChallenge: (mfaToken: string) =>
+        request<MfaSetupResult>("/api/auth/mfa/setup-challenge", {
+          method: "POST",
+          body: JSON.stringify({ mfaToken }),
+        }),
+      enableChallenge: (mfaToken: string, code: string) =>
+        request<MfaEnableChallengeResult>("/api/auth/mfa/enable-challenge", {
+          method: "POST",
+          body: JSON.stringify({ mfaToken, code }),
+        }),
+    },
+
+    devices: {
+      list: () => request<DevicesListResult>("/api/auth/devices"),
+      revoke: (id: string) =>
+        request<{ id: string; revoked: boolean }>(`/api/auth/devices/${id}`, {
+          method: "DELETE",
+        }),
+    },
   },
 
   users: {
@@ -936,7 +1075,7 @@ export const apiClient = {
       subject: string;
       description: string;
       category?: string;
-      priority?: "low" | "medium" | "high";
+      priority?: "low" | "medium" | "high" | "urgent" | "LOW" | "MEDIUM" | "HIGH" | "URGENT";
       attachmentFileId?: string;
     }) =>
       request<SupportTicket>("/api/portal/tickets", {
@@ -1051,10 +1190,21 @@ export const apiClient = {
       recordManual: (data: RecordManualPaymentInput) =>
         request<Payment>("/api/finance/payments/manual", { method: "POST", body: JSON.stringify(data) }),
       createCheckoutSession: (invoiceId: string, provider: "STRIPE" | "RAZORPAY") =>
-        request<{ payment: Payment; session: { sessionId: string; url?: string } }>(
-          "/api/finance/payments/checkout-session",
-          { method: "POST", body: JSON.stringify({ invoiceId, provider }) },
-        ),
+        request<{
+          payment: Payment;
+          session: {
+            provider: "STRIPE" | "RAZORPAY";
+            sessionId: string;
+            checkoutUrl?: string;
+            razorpayOrderId?: string;
+            amount: number;
+            currency: string;
+            publishableKey?: string;
+          };
+        }>("/api/finance/payments/checkout-session", {
+          method: "POST",
+          body: JSON.stringify({ invoiceId, provider }),
+        }),
     },
 
     reimbursements: {
@@ -1676,5 +1826,371 @@ export const apiClient = {
           `/api/engineering/dashboard/team-metrics${buildQuery({ projectId })}`,
         ),
     },
+  },
+
+  helpdesk: {
+    listTickets: (params?: { status?: string; assignedToId?: string; search?: string }) =>
+      request<SupportTicket[]>(
+        `/api/helpdesk/tickets${buildQuery({
+          status: params?.status,
+          assignedToId: params?.assignedToId,
+          search: params?.search,
+        })}`,
+      ),
+    getTicket: (id: string) => request<SupportTicket>(`/api/helpdesk/tickets/${id}`),
+    assignTicket: (id: string, assignedToId: string | null) =>
+      request<SupportTicket>(`/api/helpdesk/tickets/${id}/assign`, {
+        method: "POST",
+        body: JSON.stringify({ assignedToId }),
+      }),
+    updateTicketStatus: (
+      id: string,
+      status: "OPEN" | "IN_PROGRESS" | "WAITING_FOR_EMPLOYEE" | "RESOLVED" | "CLOSED",
+    ) =>
+      request<SupportTicket>(`/api/helpdesk/tickets/${id}/status`, {
+        method: "POST",
+        body: JSON.stringify({ status }),
+      }),
+    replyToTicket: (
+      id: string,
+      data: { body: string; attachmentFileId?: string; setWaiting?: boolean },
+    ) =>
+      request<SupportTicket>(`/api/helpdesk/tickets/${id}/reply`, {
+        method: "POST",
+        body: JSON.stringify(data),
+      }),
+    escalateTicket: (id: string, data: EscalateTicketInput) =>
+      request<SupportTicket>(`/api/helpdesk/tickets/${id}/escalate`, {
+        method: "POST",
+        body: JSON.stringify(data),
+      }),
+    listSlaPolicies: () => request<SlaPolicy[]>("/api/helpdesk/sla"),
+    upsertSlaPolicy: (data: UpsertSlaPolicyInput) =>
+      request<SlaPolicy>("/api/helpdesk/sla", {
+        method: "PUT",
+        body: JSON.stringify(data),
+      }),
+    listKb: (params?: { publishedOnly?: boolean; category?: string; search?: string }) =>
+      request<KnowledgeBaseArticle[]>(
+        `/api/helpdesk/kb${buildQuery({
+          publishedOnly: params?.publishedOnly ? "true" : undefined,
+          category: params?.category,
+          search: params?.search,
+        })}`,
+      ),
+    getKb: (id: string) => request<KnowledgeBaseArticle>(`/api/helpdesk/kb/${id}`),
+    createKb: (data: CreateKbArticleInput) =>
+      request<KnowledgeBaseArticle>("/api/helpdesk/kb", {
+        method: "POST",
+        body: JSON.stringify(data),
+      }),
+    updateKb: (id: string, data: UpdateKbArticleInput) =>
+      request<KnowledgeBaseArticle>(`/api/helpdesk/kb/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify(data),
+      }),
+    deleteKb: (id: string) =>
+      request<{ id: string; deleted: boolean }>(`/api/helpdesk/kb/${id}`, { method: "DELETE" }),
+  },
+
+  notifications: {
+    list: (params?: { unreadOnly?: boolean; category?: string }) =>
+      request<AppNotification[]>(
+        `/api/notifications${buildQuery({
+          unreadOnly: params?.unreadOnly ? "true" : undefined,
+          category: params?.category,
+        })}`,
+      ),
+    unreadCount: () => request<{ count: number }>("/api/notifications/unread-count"),
+    markRead: (id: string) =>
+      request<AppNotification>(`/api/notifications/${id}/read`, { method: "POST" }),
+    markAllRead: () =>
+      request<{ count: number }>("/api/notifications/read-all", { method: "POST" }),
+    getPreferences: () => request<NotificationPreference[]>("/api/notifications/preferences"),
+    updatePreference: (data: UpdatePreferenceInput) =>
+      request<NotificationPreference>("/api/notifications/preferences", {
+        method: "PUT",
+        body: JSON.stringify(data),
+      }),
+    listAnnouncements: (activeOnly?: boolean) =>
+      request<Announcement[]>(
+        `/api/notifications/announcements${buildQuery(
+          activeOnly ? { activeOnly: "true" } : undefined,
+        )}`,
+      ),
+    createAnnouncement: (data: CreateAnnouncementInput) =>
+      request<Announcement>("/api/notifications/announcements", {
+        method: "POST",
+        body: JSON.stringify(data),
+      }),
+    updateAnnouncement: (id: string, data: UpdateAnnouncementInput) =>
+      request<Announcement>(`/api/notifications/announcements/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify(data),
+      }),
+    publishAnnouncement: (id: string) =>
+      request<Announcement>(`/api/notifications/announcements/${id}/publish`, {
+        method: "POST",
+      }),
+    deleteAnnouncement: (id: string) =>
+      request<{ id: string; deleted: boolean }>(`/api/notifications/announcements/${id}`, {
+        method: "DELETE",
+      }),
+  },
+
+  approvals: {
+    list: (params?: {
+      entityType?: string;
+      requesterId?: string;
+      approverId?: string;
+      status?: string;
+    }) =>
+      request<ApprovalRequest[]>(
+        `/api/approvals${buildQuery({
+          entityType: params?.entityType,
+          requesterId: params?.requesterId,
+          approverId: params?.approverId,
+          status: params?.status,
+        })}`,
+      ),
+    getPending: () => request<ApprovalRequest[]>("/api/approvals/pending/my"),
+    getStats: () => request<ApprovalStats>("/api/approvals/stats/my"),
+    getById: (id: string) => request<ApprovalRequest>(`/api/approvals/${id}`),
+    getHistory: (id: string) =>
+      request<ApprovalRequest["actions"]>(`/api/approvals/${id}/history`),
+    approve: (id: string, notes?: string) =>
+      request<ApprovalRequest>(`/api/approvals/${id}/approve`, {
+        method: "POST",
+        body: JSON.stringify({ notes }),
+      }),
+    reject: (id: string, notes: string) =>
+      request<ApprovalRequest>(`/api/approvals/${id}/reject`, {
+        method: "POST",
+        body: JSON.stringify({ notes }),
+      }),
+    cancel: (id: string, reason?: string) =>
+      request<ApprovalRequest>(`/api/approvals/${id}/cancel`, {
+        method: "POST",
+        body: JSON.stringify({ reason }),
+      }),
+    listWorkflows: (entityType?: string) =>
+      request<ApprovalWorkflow[]>(
+        `/api/approvals/workflows${buildQuery(entityType ? { entityType } : undefined)}`,
+      ),
+    getWorkflow: (id: string) => request<ApprovalWorkflow>(`/api/approvals/workflows/${id}`),
+    createWorkflow: (data: CreateWorkflowInput) =>
+      request<ApprovalWorkflow>("/api/approvals/workflows", {
+        method: "POST",
+        body: JSON.stringify(data),
+      }),
+    updateWorkflow: (id: string, data: UpdateWorkflowInput) =>
+      request<ApprovalWorkflow>(`/api/approvals/workflows/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify(data),
+      }),
+    deleteWorkflow: (id: string) =>
+      request<{ id: string; deleted: boolean }>(`/api/approvals/workflows/${id}`, {
+        method: "DELETE",
+      }),
+    listDelegations: () => request<ApprovalDelegation[]>("/api/approvals/delegations"),
+    createDelegation: (data: CreateDelegationInput) =>
+      request<ApprovalDelegation>("/api/approvals/delegations", {
+        method: "POST",
+        body: JSON.stringify(data),
+      }),
+    updateDelegation: (
+      id: string,
+      data: { startsAt?: string; endsAt?: string; reason?: string | null; isActive?: boolean },
+    ) =>
+      request<ApprovalDelegation>(`/api/approvals/delegations/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify(data),
+      }),
+    deleteDelegation: (id: string) =>
+      request<{ id: string; deleted: boolean }>(`/api/approvals/delegations/${id}`, {
+        method: "DELETE",
+      }),
+    processEscalations: () =>
+      request<{ processed: number }>("/api/approvals/process-escalations", { method: "POST" }),
+  },
+
+  documents: {
+    listCategories: () => request<DocumentCategory[]>("/api/documents/categories"),
+    createCategory: (data: CreateDocumentCategoryInput) =>
+      request<DocumentCategory>("/api/documents/categories", {
+        method: "POST",
+        body: JSON.stringify(data),
+      }),
+    updateCategory: (
+      id: string,
+      data: { name?: string; description?: string | null; context?: DocumentContext | null },
+    ) =>
+      request<DocumentCategory>(`/api/documents/categories/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify(data),
+      }),
+    deleteCategory: (id: string) =>
+      request<{ id: string; deleted: boolean }>(`/api/documents/categories/${id}`, {
+        method: "DELETE",
+      }),
+    list: (params?: {
+      search?: string;
+      context?: DocumentContext;
+      contextEntityId?: string;
+      categoryId?: string;
+      createdById?: string;
+    }) =>
+      request<ManagedDocument[]>(
+        `/api/documents${buildQuery({
+          search: params?.search,
+          context: params?.context,
+          contextEntityId: params?.contextEntityId,
+          categoryId: params?.categoryId,
+          createdById: params?.createdById,
+        })}`,
+      ),
+    getById: (id: string) => request<ManagedDocument>(`/api/documents/${id}`),
+    create: (data: CreateDocumentInput) =>
+      request<ManagedDocument>("/api/documents", {
+        method: "POST",
+        body: JSON.stringify(data),
+      }),
+    addVersion: (id: string, data: { fileId: string; changeNotes?: string }) =>
+      request<ManagedDocument>(`/api/documents/${id}/versions`, {
+        method: "POST",
+        body: JSON.stringify(data),
+      }),
+    setPermissions: (id: string, data: SetDocumentPermissionsInput) =>
+      request<ManagedDocument>(`/api/documents/${id}/permissions`, {
+        method: "PUT",
+        body: JSON.stringify(data),
+      }),
+    delete: (id: string) =>
+      request<{ id: string; deleted: boolean }>(`/api/documents/${id}`, { method: "DELETE" }),
+  },
+
+  reports: {
+    getKpis: (scope: KpiScope, filters?: ReportFilters) =>
+      request<DashboardKpis>(
+        `/api/reports/kpis/${scope}${buildQuery({
+          dateFrom: filters?.dateFrom,
+          dateTo: filters?.dateTo,
+          departmentId: filters?.departmentId,
+        })}`,
+      ),
+
+    getReport: (type: ReportType, filters?: ReportFilters) =>
+      request<ReportPayload>(
+        `/api/reports/${type}${buildQuery({
+          dateFrom: filters?.dateFrom,
+          dateTo: filters?.dateTo,
+          departmentId: filters?.departmentId,
+        })}`,
+      ),
+
+    exportReport: async (
+      type: ReportType,
+      format: ReportFormat,
+      filters?: ReportFilters,
+    ) => {
+      const { blob, filename } = await requestBlob(
+        `/api/reports/${type}/export${buildQuery({
+          format,
+          dateFrom: filters?.dateFrom,
+          dateTo: filters?.dateTo,
+          departmentId: filters?.departmentId,
+        })}`,
+      );
+      downloadBlob(blob, filename);
+      return { filename };
+    },
+
+    listSchedules: () => request<ReportSchedule[]>("/api/reports/schedules"),
+
+    createSchedule: (data: CreateReportScheduleInput) =>
+      request<ReportSchedule>("/api/reports/schedules", {
+        method: "POST",
+        body: JSON.stringify(data),
+      }),
+
+    updateSchedule: (id: string, data: UpdateReportScheduleInput) =>
+      request<ReportSchedule>(`/api/reports/schedules/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify(data),
+      }),
+
+    deleteSchedule: (id: string) =>
+      request<{ id: string; deleted?: boolean }>(`/api/reports/schedules/${id}`, {
+        method: "DELETE",
+      }),
+
+    runDue: () =>
+      request<{ processed: number; errors: unknown[] }>("/api/reports/schedules/run-due", {
+        method: "POST",
+      }),
+  },
+
+  audit: {
+    list: (params?: AuditLogQuery) =>
+      request<AuditLog[]>(
+        `/api/audit-logs${buildQuery({
+          userId: params?.userId,
+          entity: params?.entity,
+          action: params?.action,
+          dateFrom: params?.dateFrom,
+          dateTo: params?.dateTo,
+          search: params?.search,
+          page: params?.page != null ? String(params.page) : undefined,
+          pageSize: params?.pageSize != null ? String(params.pageSize) : undefined,
+        })}`,
+      ),
+  },
+
+  securityEvents: {
+    list: (params?: SecurityEventQuery) =>
+      request<SecurityEvent[]>(
+        `/api/security-events${buildQuery({
+          userId: params?.userId,
+          eventType: params?.eventType,
+          severity: params?.severity,
+          dateFrom: params?.dateFrom,
+          dateTo: params?.dateTo,
+          search: params?.search,
+          page: params?.page != null ? String(params.page) : undefined,
+          pageSize: params?.pageSize != null ? String(params.pageSize) : undefined,
+        })}`,
+      ),
+  },
+
+  settings: {
+    list: () => request<SystemSetting[]>("/api/settings"),
+    upsert: (data: UpsertSettingsInput) =>
+      request<SystemSetting[]>("/api/settings", {
+        method: "PUT",
+        body: JSON.stringify(data),
+      }),
+  },
+
+  notificationTemplates: {
+    list: () => request<NotificationTemplate[]>("/api/notification-templates"),
+    create: (data: CreateNotificationTemplateInput) =>
+      request<NotificationTemplate>("/api/notification-templates", {
+        method: "POST",
+        body: JSON.stringify(data),
+      }),
+    update: (id: string, data: UpdateNotificationTemplateInput) =>
+      request<NotificationTemplate>(`/api/notification-templates/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify(data),
+      }),
+    delete: (id: string) =>
+      request<NotificationTemplate>(`/api/notification-templates/${id}`, {
+        method: "DELETE",
+      }),
+  },
+
+  admin: {
+    getMasterData: () => request<MasterDataSummary>("/api/admin/master-data"),
+    getIntegrations: () => request<IntegrationPlaceholder[]>("/api/admin/integrations"),
   },
 };

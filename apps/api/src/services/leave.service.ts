@@ -1,9 +1,11 @@
 import { LeaveRepository } from "../repositories/leave.repository";
 import { AppError } from "../lib/app-error";
 import { writeAuditLog } from "../lib/audit";
+import { ApprovalService } from "./approval.service";
 
 export class LeaveService {
   private leaveRepo = new LeaveRepository();
+  private approvalService = new ApprovalService();
 
   async createLeaveType(data: {
     name: string;
@@ -241,6 +243,7 @@ export class LeaveService {
       startDate: string;
       endDate: string;
       reason: string;
+      approverIds?: string[];
     },
     actorId: string
   ) {
@@ -274,7 +277,7 @@ export class LeaveService {
       throw new AppError("INSUFFICIENT_LEAVE_BALANCE", "Insufficient leave balance", 400);
     }
 
-    const application = await this.leaveRepo.createLeaveApplication({
+    let application = await this.leaveRepo.createLeaveApplication({
       employeeId,
       leaveTypeId: data.leaveTypeId,
       startDate,
@@ -283,6 +286,31 @@ export class LeaveService {
       reason: data.reason,
       status: leaveType.requiresApproval ? "PENDING" : "APPROVED",
     });
+
+    if (
+      leaveType.requiresApproval &&
+      data.approverIds &&
+      data.approverIds.length > 0
+    ) {
+      const approval = await this.approvalService.createApprovalRequest(
+        {
+          entityType: "leave_application",
+          entityId: application.id,
+          requesterId: actorId,
+          approverIds: data.approverIds,
+          metadata: {
+            leaveTypeId: data.leaveTypeId,
+            dayCount,
+            startDate: data.startDate,
+            endDate: data.endDate,
+          },
+        },
+        actorId,
+      );
+      application = await this.leaveRepo.updateLeaveApplication(application.id, {
+        approvalRequestId: approval.id,
+      });
+    }
 
     if (!leaveType.requiresApproval && balance) {
       await this.deductLeaveBalance(employeeId, data.leaveTypeId, year, dayCount);

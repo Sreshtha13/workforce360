@@ -62,13 +62,17 @@ async function main() {
       "assessment",
       "offer",
     ]);
-    const hrResources = new Set(["employee", "policy", "asset", "hr", "ticket"]);
+    const hrResources = new Set(["employee", "policy", "asset", "hr", "ticket", "announcement"]);
     const attendanceResources = new Set(["attendance"]);
     const leaveResources = new Set(["leave"]);
     const approvalResources = new Set(["approval"]);
     const portalResources = new Set(["portal"]);
     const financeResources = new Set(["client", "invoice", "payment", "reimbursement", "finance"]);
     const payrollResources = new Set(["salary_structure", "salary_revision", "payroll_run", "payslip"]);
+    const documentResources = new Set(["document"]);
+    const notificationResources = new Set(["notification", "announcement"]);
+    const reportResources = new Set(["report"]);
+    const adminExtraResources = new Set(["audit", "settings", "template", "security"]);
     const label = resource
       .split("_")
       .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
@@ -79,6 +83,12 @@ async function main() {
     }
     if (adminResources.has(resource)) {
       return { module: "Administration", feature: label };
+    }
+    if (adminExtraResources.has(resource)) {
+      return { module: "Administration", feature: label };
+    }
+    if (reportResources.has(resource)) {
+      return { module: "Reporting", feature: label };
     }
     if (resource === "dashboard") {
       return { module: "Administration", feature: "Dashboard" };
@@ -106,6 +116,12 @@ async function main() {
     }
     if (payrollResources.has(resource)) {
       return { module: "Payroll", feature: label };
+    }
+    if (documentResources.has(resource)) {
+      return { module: "Documents", feature: label };
+    }
+    if (notificationResources.has(resource)) {
+      return { module: "Notifications", feature: label };
     }
     return { module: "General", feature: label };
   }
@@ -209,6 +225,19 @@ async function main() {
     { name: "Manage Assets", code: "asset.manage", resource: "asset", action: "manage" },
 
     { name: "Create Approvals", code: "approval.create", resource: "approval", action: "create" },
+    { name: "Read Approvals", code: "approval.read", resource: "approval", action: "read" },
+    { name: "Action Approvals", code: "approval.action", resource: "approval", action: "action" },
+    { name: "Manage Approvals", code: "approval.manage", resource: "approval", action: "manage" },
+    { name: "Delegate Approvals", code: "approval.delegate", resource: "approval", action: "delegate" },
+
+    { name: "Read Documents", code: "document.read", resource: "document", action: "read" },
+    { name: "Create Documents", code: "document.create", resource: "document", action: "create" },
+    { name: "Update Documents", code: "document.update", resource: "document", action: "update" },
+    { name: "Delete Documents", code: "document.delete", resource: "document", action: "delete" },
+    { name: "Manage Documents", code: "document.manage", resource: "document", action: "manage" },
+
+    { name: "Manage Announcements", code: "announcement.manage", resource: "announcement", action: "manage" },
+    { name: "Manage Notification Prefs", code: "notification.manage", resource: "notification", action: "manage" },
 
     { name: "Portal Read", code: "portal.read", resource: "portal", action: "read" },
     { name: "Portal Update", code: "portal.update", resource: "portal", action: "update" },
@@ -240,6 +269,15 @@ async function main() {
     { name: "Approve Payroll Runs", code: "payroll_run.approve", resource: "payroll_run", action: "approve" },
 
     { name: "Read Payslips", code: "payslip.read", resource: "payslip", action: "read" },
+
+    { name: "Read Reports", code: "report.read", resource: "report", action: "read" },
+    { name: "Export Reports", code: "report.export", resource: "report", action: "export" },
+    { name: "Manage Report Schedules", code: "report.schedule.manage", resource: "report", action: "schedule_manage" },
+    { name: "Executive Dashboard", code: "dashboard.executive.read", resource: "dashboard", action: "executive_read" },
+    { name: "Read Audit Logs", code: "audit.read", resource: "audit", action: "read" },
+    { name: "Manage Settings", code: "settings.manage", resource: "settings", action: "manage" },
+    { name: "Manage Notification Templates", code: "template.manage", resource: "template", action: "manage" },
+    { name: "Read Security Events", code: "security.read", resource: "security", action: "read" },
   ];
   
   const createdPermissions = [];
@@ -391,6 +429,11 @@ async function main() {
       "policy",
       "asset",
       "ticket",
+      "announcement",
+      "document",
+      "approval",
+      "leave",
+      "attendance",
     ].includes(p.resource),
   );
   
@@ -431,7 +474,13 @@ async function main() {
   }
 
   const employeePermissions = createdPermissions.filter(
-    (p) => ["portal"].includes(p.resource) || p.code === "ticket.create",
+    (p) =>
+      ["portal"].includes(p.resource) ||
+      p.code === "ticket.create" ||
+      p.code === "document.read" ||
+      p.code === "approval.action" ||
+      p.code === "approval.read" ||
+      p.code === "approval.delegate",
   );
   for (const permission of employeePermissions) {
     await prisma.rolePermission.upsert({
@@ -495,8 +544,10 @@ async function main() {
     });
   }
   
-  const financePermissions = createdPermissions.filter((p) =>
-    ["client", "invoice", "payment", "reimbursement", "finance"].includes(p.resource),
+  const financePermissions = createdPermissions.filter(
+    (p) =>
+      ["client", "invoice", "payment", "reimbursement", "finance"].includes(p.resource) ||
+      ["approval.read", "approval.action", "approval.create"].includes(p.code),
   );
   await prisma.rolePermission.deleteMany({ where: { roleId: financeRole.id } });
   for (const permission of financePermissions) {
@@ -505,8 +556,10 @@ async function main() {
     });
   }
 
-  const payrollPermissions = createdPermissions.filter((p) =>
-    ["salary_structure", "salary_revision", "payroll_run", "payslip"].includes(p.resource),
+  const payrollPermissions = createdPermissions.filter(
+    (p) =>
+      ["salary_structure", "salary_revision", "payroll_run", "payslip"].includes(p.resource) ||
+      ["approval.read", "approval.action", "approval.create"].includes(p.code),
   );
   await prisma.rolePermission.deleteMany({ where: { roleId: payrollRole.id } });
   for (const permission of payrollPermissions) {

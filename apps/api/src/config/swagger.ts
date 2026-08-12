@@ -12,42 +12,34 @@ const options: swaggerJsdoc.Options = {
     openapi: "3.0.0",
     info: {
       title: "Workforce 360 ERP API",
-      version: "0.1.0",
+      version: "1.0.0-mvp",
       description: `
-Production-grade ERP API built with Express, Prisma, and PostgreSQL.
+Production-grade ERP API — Express, Prisma, PostgreSQL.
 
-## Why \`/\` only shows a small JSON ping
-Visiting \`http://localhost:4000/\` is the **service root**, not a route listing.
-All domain endpoints live under \`/api/...\`. Use this Swagger UI to browse and try them.
+## Modules (by phase)
+| Phase | Modules |
+|-------|---------|
+| 0–1 | Health, Auth, Users, Roles, Organization |
+| 2 | Recruitment, Careers, HR, Portal, Storage |
+| 3 | Attendance, Leave, Assets, Approvals |
+| 4 | Finance, Payroll |
+| 5–6 | Business Development, Project Management |
+| 7 | Engineering workflows (via PM/HR routes) |
+| 8–9 | Helpdesk, Notifications, Documents |
+| 10 | Reports & KPIs |
+| 11 | Settings, Templates, Admin |
+| 12 | Security events, MFA |
+| 13 | Integrations, Payment webhooks |
 
-## Architecture
-- Frontend (Next.js) calls this API only — zero direct database access
-- Backend owns ALL data access, business logic, and RBAC enforcement
-- Auth via JWT (access + refresh tokens in httpOnly cookies)
+## Authentication
+Cookie (recommended): POST /api/auth/login — browser stores httpOnly cookies.
 
-## How to authenticate in Swagger
-**Option A — Cookie (recommended):**
-1. Call \`POST /api/auth/login\` with the demo credentials
-2. Browser stores \`accessToken\` / \`refreshToken\` cookies
-3. Subsequent "Try it out" calls include those cookies
+Bearer: Copy accessToken from login response, then Authorize in Swagger UI.
 
-**Option B — Bearer token:**
-1. Call \`POST /api/auth/login\` and copy \`data.accessToken\`
-2. Click **Authorize**, paste the token (no \`Bearer \` prefix needed if using the bearer field)
-3. Requests send \`Authorization: Bearer <token>\`
+Demo: admin@workforce360.com / Admin@123
 
-## Demo credentials
-- Email: \`admin@workforce360.com\`
-- Password: \`Admin@123\`
-
-## Response format
-\`\`\`json
-{
-  "data": <payload> | null,
-  "error": { "code": "...", "message": "..." } | null,
-  "meta": { "page": 1, "pageSize": 20, "total": 100 } | null
-}
-\`\`\`
+## Response envelope
+JSON: { data, error, meta } — meta may include page, pageSize, total for lists.
       `,
       contact: {
         name: "Workforce 360 Support",
@@ -57,7 +49,11 @@ All domain endpoints live under \`/api/...\`. Use this Swagger UI to browse and 
     servers: [
       {
         url: `http://localhost:${env.PORT}`,
-        description: "Development server",
+        description: "Local development",
+      },
+      {
+        url: "https://api.staging.workforce360.example",
+        description: "Staging (replace with your host)",
       },
     ],
     components: {
@@ -66,13 +62,12 @@ All domain endpoints live under \`/api/...\`. Use this Swagger UI to browse and 
           type: "apiKey",
           in: "cookie",
           name: "accessToken",
-          description: "JWT access token stored in httpOnly cookie (set automatically after login)",
+          description: "JWT access token (httpOnly cookie after login)",
         },
         bearerAuth: {
           type: "http",
           scheme: "bearer",
           bearerFormat: "JWT",
-          description: "Paste the accessToken from POST /api/auth/login",
         },
       },
       schemas: {
@@ -98,70 +93,41 @@ All domain endpoints live under \`/api/...\`. Use this Swagger UI to browse and 
       },
     },
     tags: [
-      {
-        name: "Health",
-        description: "System health checks",
-      },
-      {
-        name: "Authentication",
-        description: "User authentication and session management",
-      },
-      {
-        name: "Users",
-        description: "User management endpoints",
-      },
-      {
-        name: "Roles",
-        description: "Role and permission management",
-      },
-      {
-        name: "Organization - Departments",
-        description: "Company departments and hierarchy",
-      },
-      {
-        name: "Organization - Teams",
-        description: "Teams within departments",
-      },
-      {
-        name: "Organization - Designations",
-        description: "Job titles and levels by department",
-      },
-      {
-        name: "Organization - Offices",
-        description: "Office locations and branches",
-      },
-      {
-        name: "Organization - Employee Types",
-        description: "Employment classifications (Full-Time, Contract, etc.)",
-      },
-      {
-        name: "Organization - Employment Statuses",
-        description: "Employment lifecycle statuses (Active, On Leave, etc.)",
-      },
-      {
-        name: "Attendance",
-        description: "Attendance tracking, shifts, holidays, and corrections",
-      },
-      {
-        name: "Leave Management",
-        description: "Leave types, balances, applications, and approvals",
-      },
-      {
-        name: "Asset Management",
-        description: "Asset tracking, assignment, returns, and history",
-      },
-      {
-        name: "Approvals",
-        description: "Generic multi-level approval workflow engine",
-      },
-      {
-        name: "Finance",
-        description: "Clients, invoices, payments (Stripe/Razorpay), and employee reimbursements",
-      },
-      {
-        name: "Payroll",
-        description: "Versioned salary structures, salary revisions, payroll runs, and payslips",
-      },
+      { name: "Health", description: "System health checks" },
+      { name: "Authentication", description: "Login, OAuth, MFA, sessions" },
+      { name: "Users", description: "User management" },
+      { name: "Roles", description: "Roles and permissions" },
+      { name: "Organization - Departments", description: "Departments" },
+      { name: "Organization - Teams", description: "Teams" },
+      { name: "Organization - Designations", description: "Designations" },
+      { name: "Organization - Offices", description: "Offices" },
+      { name: "Organization - Employee Types", description: "Employee types" },
+      { name: "Organization - Employment Statuses", description: "Employment statuses" },
+      { name: "Careers", description: "Public careers portal (no auth)" },
+      { name: "Recruitment", description: "Jobs, candidates, applications, offers" },
+      { name: "HR", description: "Employee master, policies, HR operations" },
+      { name: "Employee Portal", description: "Self-service portal" },
+      { name: "Storage", description: "Presigned file uploads" },
+      { name: "Dashboard", description: "Admin dashboard widgets" },
+      { name: "Attendance", description: "Attendance and shifts" },
+      { name: "Leave Management", description: "Leave policies and applications" },
+      { name: "Asset Management", description: "Company assets" },
+      { name: "Approvals", description: "Approval workflows" },
+      { name: "Finance", description: "Clients, invoices, payments" },
+      { name: "Payroll", description: "Salary, payroll runs, payslips" },
+      { name: "Business Development", description: "Contacts, leads, bids, proposals" },
+      { name: "Project Management", description: "Projects, tasks, sprints, timesheets" },
+      { name: "Helpdesk", description: "Support tickets, SLA, knowledge base" },
+      { name: "Notifications", description: "In-app notifications and announcements" },
+      { name: "Documents", description: "Document management (DMS)" },
+      { name: "Reports", description: "KPIs, exports, scheduled reports" },
+      { name: "Audit Logs", description: "Audit trail" },
+      { name: "Settings", description: "System settings" },
+      { name: "Notification Templates", description: "Email/in-app templates" },
+      { name: "Admin", description: "Master data and integrations status" },
+      { name: "Security", description: "Security events" },
+      { name: "Integrations", description: "Outbound webhook subscriptions" },
+      { name: "Payment Webhooks", description: "Stripe/Razorpay inbound webhooks" },
     ],
   },
   apis: [routesGlob, docsGlob],

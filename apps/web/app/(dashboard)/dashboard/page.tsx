@@ -3,11 +3,14 @@
 import {
   Building2,
   Briefcase,
+  DollarSign,
+  FolderKanban,
   MapPin,
   Shield,
   UserCheck,
   Users,
   UsersRound,
+  Wallet,
 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
@@ -15,6 +18,7 @@ import { useAuth } from "@/lib/auth-context";
 import { apiClient } from "@/lib/api-client";
 import { adminNav, filterNavByPermissions } from "@/lib/navigation";
 import { dashboardGrid } from "@/lib/design-system";
+import { formatMoney } from "@/lib/phase4-status";
 import { ActiveEmployees } from "@/components/dashboard/active-employees";
 import { AdminShortcuts } from "@/components/dashboard/admin-shortcuts";
 import { MetricStatCard } from "@/components/dashboard/metric-stat-card";
@@ -29,11 +33,16 @@ import { QuickActions } from "@/components/dashboard/quick-actions";
 import { RecentActivity } from "@/components/dashboard/recent-activity";
 import { WelcomeHero } from "@/components/dashboard/welcome-hero";
 import { Skeleton } from "@/components/ui/skeleton";
+import type { ExecutiveKpis } from "@/types/reports";
 
 export default function DashboardPage() {
   const { user, hasPermission } = useAuth();
 
   const canViewDashboard = hasPermission("dashboard.read");
+  const canViewReports =
+    hasPermission("report.read") ||
+    hasPermission("dashboard.executive.read") ||
+    canViewDashboard;
 
   const dashboardQuery = useQuery({
     queryKey: ["dashboard", "admin"],
@@ -44,6 +53,15 @@ export default function DashboardPage() {
     enabled: !!user && canViewDashboard,
   });
 
+  const kpisQuery = useQuery({
+    queryKey: ["reports", "kpis", "executive"],
+    queryFn: async () => {
+      const res = await apiClient.reports.getKpis("executive");
+      return res.data as ExecutiveKpis;
+    },
+    enabled: !!user && canViewReports,
+  });
+
   if (!user) return null;
 
   const visibleAdmin = filterNavByPermissions(adminNav, {
@@ -52,6 +70,7 @@ export default function DashboardPage() {
   });
   const stats = dashboardQuery.data?.stats;
   const loading = dashboardQuery.isLoading;
+  const exec = kpisQuery.data;
 
   return (
     <div className="dashboard-canvas -mx-2 rounded-2xl px-2 py-2 md:-mx-4 md:px-4">
@@ -162,6 +181,43 @@ export default function DashboardPage() {
             />
           </>
         )}
+
+        {exec && !kpisQuery.isLoading ? (
+          <>
+            <MetricStatCard
+              className="lg:col-span-3"
+              title="Open jobs"
+              value={String(exec.hr.openJobs)}
+              description={`${exec.hr.applications} applications · ${exec.hr.onboarding} onboarding`}
+              icon={Briefcase}
+              chartColor="blue"
+            />
+            <MetricStatCard
+              className="lg:col-span-3"
+              title="AR outstanding"
+              value={formatMoney(exec.finance.arOutstanding)}
+              description={`${exec.finance.invoiceCount} invoices · ${formatMoney(exec.finance.revenueCollected)} collected`}
+              icon={DollarSign}
+              chartColor="amber"
+            />
+            <MetricStatCard
+              className="lg:col-span-3"
+              title="Payroll runs"
+              value={String(exec.payroll.runs)}
+              description="Across current filter window"
+              icon={Wallet}
+              chartColor="emerald"
+            />
+            <MetricStatCard
+              className="lg:col-span-3"
+              title="Active projects"
+              value={String(exec.project.active)}
+              description={`${exec.project.total} total projects`}
+              icon={FolderKanban}
+              chartColor="indigo"
+            />
+          </>
+        ) : null}
 
         {canViewDashboard && dashboardQuery.isError ? (
           <div className="lg:col-span-12 rounded-2xl border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">

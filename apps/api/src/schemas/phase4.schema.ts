@@ -106,6 +106,7 @@ export const createReimbursementSchema = z.object({
   currency: z.string().length(3).default("USD"),
   expenseDate: dateOnly(),
   receiptFileId: z.string().optional(),
+  approverIds: z.array(z.string().min(1)).min(1).optional(),
 });
 
 export const reviewReimbursementSchema = z.object({

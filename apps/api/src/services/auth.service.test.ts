@@ -7,6 +7,7 @@ const { mockAuthRepo } = vi.hoisted(() => ({
     findUserByGoogleId: vi.fn(),
     createUser: vi.fn(),
     updateLastLogin: vi.fn(),
+    linkGoogleId: vi.fn(),
     updatePassword: vi.fn(),
     createRefreshToken: vi.fn(),
     findRefreshToken: vi.fn(),
@@ -32,10 +33,35 @@ vi.mock("../lib/google-oauth", () => ({
   verifyGoogleToken: vi.fn(),
 }));
 
+vi.mock("./mfa.service", () => ({
+  mfaService: {
+    userRequiresMfa: vi.fn(async () => ({ required: false, enabled: false })),
+    upsertTrustedDevice: vi.fn(async () => ({})),
+    createChallengeToken: vi.fn(() => "mfa-challenge-token"),
+  },
+}));
+
+vi.mock("../lib/security-monitor", () => ({
+  recordFailedLogin: vi.fn(async () => undefined),
+}));
+
+vi.mock("../lib/email", () => ({
+  sendEmail: vi.fn(async () => ({ sent: false, mode: "console" })),
+}));
+
+vi.mock("../lib/prisma", () => ({
+  prisma: {
+    notificationTemplate: {
+      findFirst: vi.fn(async () => null),
+    },
+  },
+}));
+
 import { AuthService } from "./auth.service";
 import { verifyGoogleToken } from "../lib/google-oauth";
 import { hashPassword } from "../lib/password";
 import { signRefreshToken } from "../lib/jwt";
+import { mfaService } from "./mfa.service";
 
 describe("AuthService", () => {
   let service: AuthService;
@@ -53,9 +79,7 @@ describe("AuthService", () => {
         service.login("unknown@example.com", "password"),
       ).rejects.toThrow("Invalid email or password");
 
-      expect(mockAuthRepo.createLoginHistory).toHaveBeenCalledWith(
-        expect.objectContaining({ status: "failed", method: "email_password" }),
-      );
+      expect(mockAuthRepo.createLoginHistory).not.toHaveBeenCalled();
     });
 
     it("throws for user without password hash", async () => {
@@ -116,6 +140,8 @@ describe("AuthService", () => {
       );
 
       expect(result.user.email).toBe("user@example.com");
+      expect(result.mfaRequired).toBe(false);
+      if (result.mfaRequired) throw new Error("expected full session");
       expect(result.accessToken).toBeTruthy();
       expect(result.refreshToken).toBeTruthy();
       expect(mockAuthRepo.updateLastLogin).toHaveBeenCalledWith("user-1");
@@ -123,6 +149,29 @@ describe("AuthService", () => {
       expect(mockAuthRepo.createLoginHistory).toHaveBeenCalledWith(
         expect.objectContaining({ status: "success" }),
       );
+      expect(mfaService.upsertTrustedDevice).toHaveBeenCalled();
+    });
+
+    it("returns mfa challenge when MFA is required", async () => {
+      vi.mocked(mfaService.userRequiresMfa).mockResolvedValueOnce({
+        required: true,
+        enabled: true,
+      });
+      mockAuthRepo.findUserByEmail.mockResolvedValue({
+        id: "user-1",
+        email: "user@example.com",
+        firstName: "Jane",
+        lastName: "Doe",
+        passwordHash: await hashPassword("SecurePass1"),
+        status: "active",
+        sessionVersion: 0,
+      });
+
+      const result = await service.login("user@example.com", "SecurePass1");
+      expect(result.mfaRequired).toBe(true);
+      if (!result.mfaRequired) throw new Error("expected mfa");
+      expect(result.mfaToken).toBe("mfa-challenge-token");
+      expect(mockAuthRepo.createRefreshToken).not.toHaveBeenCalled();
     });
   });
 
@@ -133,6 +182,42 @@ describe("AuthService", () => {
       await expect(service.googleLogin("bad-code")).rejects.toThrow(
         "Google authentication failed",
       );
+    });
+
+    it("links googleId when user exists by email", async () => {
+      vi.mocked(verifyGoogleToken).mockResolvedValue({
+        id: "google-2",
+        email: "existing@workforce360.com",
+        verified_email: true,
+        name: "Existing User",
+        given_name: "Existing",
+        family_name: "User",
+      });
+      mockAuthRepo.findUserByGoogleId.mockResolvedValue(null);
+      mockAuthRepo.findUserByEmail.mockResolvedValue({
+        id: "user-existing",
+        email: "existing@workforce360.com",
+        firstName: "Existing",
+        lastName: "User",
+        status: "active",
+        sessionVersion: 0,
+        googleId: null,
+      });
+      mockAuthRepo.linkGoogleId.mockResolvedValue({
+        id: "user-existing",
+        email: "existing@workforce360.com",
+        firstName: "Existing",
+        lastName: "User",
+        status: "active",
+        sessionVersion: 0,
+        googleId: "google-2",
+      });
+
+      const result = await service.googleLogin("auth-code");
+
+      expect(mockAuthRepo.linkGoogleId).toHaveBeenCalledWith("user-existing", "google-2");
+      if (result.mfaRequired) throw new Error("expected full session");
+      expect(result.accessToken).toBeTruthy();
     });
 
     it("creates new user when not found by googleId or email", async () => {
@@ -158,6 +243,7 @@ describe("AuthService", () => {
       const result = await service.googleLogin("auth-code");
 
       expect(mockAuthRepo.createUser).toHaveBeenCalled();
+      if (result.mfaRequired) throw new Error("expected full session");
       expect(result.accessToken).toBeTruthy();
     });
   });

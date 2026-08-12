@@ -12,6 +12,7 @@ export type ApiMeta = {
   page?: number;
   pageSize?: number;
   total?: number;
+  totalPages?: number;
   sort?: string;
   filters?: Record<string, unknown>;
   [key: string]: unknown;

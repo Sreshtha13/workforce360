@@ -1,18 +1,39 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-const { mockTicketRepo } = vi.hoisted(() => ({
+const { mockTicketRepo, mockNotification, mockApproval } = vi.hoisted(() => ({
   mockTicketRepo: {
     listTickets: vi.fn(),
     findTicketById: vi.fn(),
     createTicket: vi.fn(),
     addMessage: vi.fn(),
     updateTicket: vi.fn(),
+    findSlaPolicyByPriority: vi.fn(),
+    listSlaPolicies: vi.fn(),
+    upsertSlaPolicy: vi.fn(),
+  },
+  mockNotification: {
+    createInApp: vi.fn().mockResolvedValue(null),
+  },
+  mockApproval: {
+    createApprovalRequest: vi.fn(),
   },
 }));
 
 vi.mock("../repositories/ticket.repository", () => ({
   TicketRepository: vi.fn(function TicketRepositoryMock() {
     return mockTicketRepo;
+  }),
+}));
+
+vi.mock("./notification.service", () => ({
+  NotificationService: vi.fn(function () {
+    return mockNotification;
+  }),
+}));
+
+vi.mock("./approval.service", () => ({
+  ApprovalService: vi.fn(function () {
+    return mockApproval;
   }),
 }));
 
@@ -53,6 +74,38 @@ describe("TicketService", () => {
     });
   });
 
+  describe("createTicket", () => {
+    it("applies SLA due dates from policy", async () => {
+      mockTicketRepo.findSlaPolicyByPriority.mockResolvedValue({
+        id: "sla-high",
+        firstResponseMinutes: 60,
+        resolutionMinutes: 480,
+      });
+      mockTicketRepo.createTicket.mockImplementation(async (input: Record<string, unknown>) => ({
+        id: "t1",
+        ticketNumber: input.ticketNumber,
+        firstResponseDueAt: input.firstResponseDueAt,
+        resolutionDueAt: input.resolutionDueAt,
+        priority: "HIGH",
+      }));
+
+      const ticket = await service.createTicket("user-1", {
+        subject: "Outage",
+        description: "Down",
+        priority: "HIGH",
+      });
+
+      expect(mockTicketRepo.createTicket).toHaveBeenCalledWith(
+        expect.objectContaining({
+          slaPolicyId: "sla-high",
+          firstResponseDueAt: expect.any(Date),
+          resolutionDueAt: expect.any(Date),
+        }),
+      );
+      expect(ticket?.priority).toBe("HIGH");
+    });
+  });
+
   describe("addEmployeeReply", () => {
     it("blocks replies on closed tickets", async () => {
       mockTicketRepo.findTicketById.mockResolvedValue({
@@ -72,6 +125,7 @@ describe("TicketService", () => {
           id: "t1",
           userId: "user-1",
           status: "WAITING_FOR_EMPLOYEE",
+          assignedToId: null,
         })
         .mockResolvedValueOnce({
           id: "t1",
@@ -101,6 +155,7 @@ describe("TicketService", () => {
       mockTicketRepo.findTicketById
         .mockResolvedValueOnce({
           id: "t1",
+          userId: "user-1",
           status: "OPEN",
           resolvedAt: null,
           closedAt: null,
@@ -109,7 +164,7 @@ describe("TicketService", () => {
           id: "t1",
           status: "RESOLVED",
         });
-      mockTicketRepo.updateTicket.mockResolvedValue({ id: "t1", status: "RESOLVED" });
+      mockTicketRepo.updateTicket.mockResolvedValue({ id: "t1", status: "RESOLVED", subject: "x" });
       mockTicketRepo.addMessage.mockResolvedValue({ id: "m1" });
 
       const result = await service.updateStatus("t1", "RESOLVED", "staff-1");

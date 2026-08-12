@@ -5,6 +5,13 @@ import { AppError } from "../lib/app-error";
 
 vi.mock("../repositories/leave.repository");
 vi.mock("../lib/audit");
+vi.mock("./approval.service", () => ({
+  ApprovalService: vi.fn(function () {
+    return {
+      createApprovalRequest: vi.fn().mockResolvedValue({ id: "approval-1" }),
+    };
+  }),
+}));
 
 describe("LeaveService", () => {
   let leaveService: LeaveService;

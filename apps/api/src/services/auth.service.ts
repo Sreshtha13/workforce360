@@ -4,6 +4,12 @@ import { hashPassword, verifyPassword, validatePasswordPolicy } from "../lib/pas
 import { signAccessToken, signRefreshToken, verifyRefreshToken } from "../lib/jwt";
 import { getRefreshTokenExpiresAt } from "../lib/token-expiry";
 import { verifyGoogleToken } from "../lib/google-oauth";
+import { recordFailedLogin } from "../lib/security-monitor";
+import { sendEmail } from "../lib/email";
+import { prisma } from "../lib/prisma";
+import { renderTemplate } from "../lib/template-render";
+import { env } from "../lib/env";
+import { mfaService } from "./mfa.service";
 
 export class AuthService {
   private authRepo: AuthRepository;
@@ -41,12 +47,20 @@ export class AuthService {
     const user = await this.authRepo.findUserByEmail(email);
     
     if (!user || !user.passwordHash) {
-      await this.authRepo.createLoginHistory({
-        userId: user?.id || "unknown",
+      if (user?.id) {
+        await this.authRepo.createLoginHistory({
+          userId: user.id,
+          ipAddress,
+          userAgent,
+          status: "failed",
+          method: "email_password",
+        });
+      }
+      await recordFailedLogin({
+        email,
+        userId: user?.id,
         ipAddress,
         userAgent,
-        status: "failed",
-        method: "email_password",
       });
       throw new Error("Invalid email or password");
     }
@@ -58,6 +72,12 @@ export class AuthService {
         userAgent,
         status: "failed",
         method: "email_password",
+      });
+      await recordFailedLogin({
+        email,
+        userId: user.id,
+        ipAddress,
+        userAgent,
       });
       throw new Error("Account is inactive");
     }
@@ -72,9 +92,37 @@ export class AuthService {
         status: "failed",
         method: "email_password",
       });
+      await recordFailedLogin({
+        email,
+        userId: user.id,
+        ipAddress,
+        userAgent,
+      });
       throw new Error("Invalid email or password");
     }
-    
+
+    const mfa = await mfaService.userRequiresMfa(user.id);
+    if (mfa.required) {
+      await this.authRepo.createLoginHistory({
+        userId: user.id,
+        ipAddress,
+        userAgent,
+        status: "mfa_pending",
+        method: "email_password",
+      });
+      return {
+        mfaRequired: true as const,
+        mfaSetupRequired: !mfa.enabled,
+        mfaToken: mfaService.createChallengeToken(user.id, user.email),
+        user: {
+          id: user.id,
+          email: user.email,
+          firstName: user.firstName,
+          lastName: user.lastName,
+        },
+      };
+    }
+
     await this.authRepo.updateLastLogin(user.id);
     await this.authRepo.createLoginHistory({
       userId: user.id,
@@ -85,8 +133,10 @@ export class AuthService {
     });
 
     const tokens = await this.issueSession(user);
+    await mfaService.upsertTrustedDevice(user.id, userAgent, ipAddress);
     
     return {
+      mfaRequired: false as const,
       user: {
         id: user.id,
         email: user.email,
@@ -112,7 +162,7 @@ export class AuthService {
     
     if (!user) {
       user = await this.authRepo.findUserByEmail(googleUser.email);
-      
+
       if (!user) {
         user = await this.authRepo.createUser({
           email: googleUser.email,
@@ -122,6 +172,8 @@ export class AuthService {
           googleId: googleUser.id,
           emailVerified: true,
         });
+      } else if (!user.googleId) {
+        user = await this.authRepo.linkGoogleId(user.id, googleUser.id);
       }
     }
     
@@ -136,6 +188,28 @@ export class AuthService {
       throw new Error("Account is inactive");
     }
     
+    const mfa = await mfaService.userRequiresMfa(user.id);
+    if (mfa.required) {
+      await this.authRepo.createLoginHistory({
+        userId: user.id,
+        ipAddress,
+        userAgent,
+        status: "mfa_pending",
+        method: "google_oauth",
+      });
+      return {
+        mfaRequired: true as const,
+        mfaSetupRequired: !mfa.enabled,
+        mfaToken: mfaService.createChallengeToken(user.id, user.email),
+        user: {
+          id: user.id,
+          email: user.email,
+          firstName: user.firstName,
+          lastName: user.lastName,
+        },
+      };
+    }
+
     await this.authRepo.updateLastLogin(user.id);
     await this.authRepo.createLoginHistory({
       userId: user.id,
@@ -146,8 +220,10 @@ export class AuthService {
     });
 
     const tokens = await this.issueSession(user);
+    await mfaService.upsertTrustedDevice(user.id, userAgent, ipAddress);
     
     return {
+      mfaRequired: false as const,
       user: {
         id: user.id,
         email: user.email,
@@ -225,6 +301,31 @@ export class AuthService {
       userId: user.id,
       token,
       expiresAt,
+    });
+
+    const resetLink = `${env.APP_PUBLIC_BASE_URL}/reset-password?token=${token}`;
+    const vars = {
+      firstName: user.firstName,
+      resetLink,
+      email: user.email,
+    };
+
+    let subject = "Reset your Workforce 360 password";
+    let body = `Hello ${user.firstName},\n\nUse this link to reset your password (expires in 1 hour):\n${resetLink}`;
+
+    const template = await prisma.notificationTemplate.findFirst({
+      where: { code: "password_reset", deletedAt: null, isActive: true },
+    });
+    if (template) {
+      subject = renderTemplate(template.subject ?? subject, vars);
+      body = renderTemplate(template.body, vars);
+    }
+
+    await sendEmail({
+      to: user.email,
+      subject,
+      text: body,
+      html: `<p>${body.replace(/\n/g, "<br/>")}</p>`,
     });
     
     return { token };

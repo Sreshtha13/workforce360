@@ -224,6 +224,7 @@ export type SupportTicketMessage = {
 
 export type SupportTicket = {
   id: string;
+  ticketNumber?: string | null;
   subject: string;
   description: string;
   status: string;
@@ -234,6 +235,12 @@ export type SupportTicket = {
   updatedAt?: string;
   resolvedAt?: string | null;
   closedAt?: string | null;
+  firstResponseDueAt?: string | null;
+  resolutionDueAt?: string | null;
+  firstRespondedAt?: string | null;
+  escalatedAt?: string | null;
+  escalationLevel?: number;
+  approvalRequestId?: string | null;
   user?: { id: string; firstName: string; lastName: string; email: string } | null;
   assignedTo?: { id: string; firstName: string; lastName: string; email: string } | null;
   attachment?: StoredFile | null;
@@ -245,6 +252,7 @@ export type NotificationItem = {
   id: string;
   title: string;
   message: string;
+  category?: string;
   isRead: boolean;
   link?: string | null;
   createdAt: string;

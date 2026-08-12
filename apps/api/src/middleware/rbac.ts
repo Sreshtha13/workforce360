@@ -1,5 +1,6 @@
 import type { Request, Response, NextFunction } from "express";
 import { sendError } from "../lib/response";
+import { recordPermissionDenied } from "../lib/security-monitor";
 
 export function requirePermission(
   ...permissions: string[]
@@ -12,12 +13,20 @@ export function requirePermission(
       });
       return;
     }
-    
+
     const hasPermission = permissions.some((permission) =>
       req.user!.permissions.includes(permission),
     );
-    
+
     if (!hasPermission) {
+      void recordPermissionDenied({
+        userId: req.user.userId,
+        path: req.originalUrl || req.path,
+        method: req.method,
+        ipAddress: req.ip,
+        userAgent: typeof req.get === "function" ? req.get("user-agent") : undefined,
+        required: permissions,
+      });
       sendError(res, 403, {
         code: "FORBIDDEN",
         message: "Insufficient permissions",
@@ -50,6 +59,14 @@ export function requireAllPermissions(
     );
     
     if (!hasAllPermissions) {
+      void recordPermissionDenied({
+        userId: req.user.userId,
+        path: req.originalUrl || req.path,
+        method: req.method,
+        ipAddress: req.ip,
+        userAgent: typeof req.get === "function" ? req.get("user-agent") : undefined,
+        required: permissions,
+      });
       sendError(res, 403, {
         code: "FORBIDDEN",
         message: "Insufficient permissions",

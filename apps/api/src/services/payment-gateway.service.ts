@@ -50,9 +50,17 @@ export type CheckoutSessionResult = {
 export class PaymentGatewayService {
   /** Client-safe config (publishable keys only — never secrets). */
   getPublicConfig() {
+    const stripeEnabled = Boolean(env.STRIPE_SECRET_KEY && env.STRIPE_PUBLISHABLE_KEY);
+    const razorpayEnabled = Boolean(env.RAZORPAY_KEY_ID && env.RAZORPAY_KEY_SECRET);
     return {
-      stripePublishableKey: env.STRIPE_PUBLISHABLE_KEY ?? null,
-      razorpayKeyId: env.RAZORPAY_KEY_ID ?? null,
+      stripe: {
+        enabled: stripeEnabled,
+        publishableKey: stripeEnabled ? env.STRIPE_PUBLISHABLE_KEY : null,
+      },
+      razorpay: {
+        enabled: razorpayEnabled,
+        keyId: razorpayEnabled ? env.RAZORPAY_KEY_ID : null,
+      },
     };
   }
 

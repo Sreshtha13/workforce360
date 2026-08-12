@@ -84,6 +84,7 @@ export type CreateRoleInput = {
   code?: string;
   description?: string;
   isSystem?: boolean;
+  requiresMfa?: boolean;
 };
 
 export type UpdateRoleInput = Partial<CreateRoleInput>;

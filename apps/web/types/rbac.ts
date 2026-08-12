@@ -25,6 +25,7 @@ export type Role = {
   description?: string | null;
   isSystem: boolean;
   isActive: boolean;
+  requiresMfa?: boolean;
   createdAt?: string;
   updatedAt?: string;
   deletedAt?: string | null;
@@ -48,6 +49,7 @@ export type CreateRoleInput = {
   name: string;
   code?: string;
   description?: string;
+  requiresMfa?: boolean;
 };
 
 export type UpdateRoleInput = Partial<CreateRoleInput>;

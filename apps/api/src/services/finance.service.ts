@@ -3,6 +3,8 @@ import { ApprovalService } from "./approval.service";
 import { paymentGatewayService } from "./payment-gateway.service";
 import { AppError } from "../lib/app-error";
 import { writeAuditLog } from "../lib/audit";
+import { sendEmail } from "../lib/email";
+import { env } from "../lib/env";
 import { prisma } from "../lib/prisma";
 import { Prisma, type InvoiceStatus } from "@prisma/client";
 
@@ -254,6 +256,24 @@ export class FinanceService {
     }
 
     const updated = await this.financeRepo.updateInvoice(id, { status: "SENT", sentAt: new Date() });
+
+    const clientEmail = invoice.client?.email;
+    if (clientEmail) {
+      const viewUrl = `${env.APP_PUBLIC_BASE_URL}/finance/invoices/${id}`;
+      await sendEmail({
+        to: clientEmail,
+        subject: `Invoice ${invoice.invoiceNumber} from Workforce 360`,
+        html: `
+          <p>Hello ${invoice.client?.name ?? "there"},</p>
+          <p>Your invoice <strong>${invoice.invoiceNumber}</strong> is ready.</p>
+          <p>Amount due: <strong>${invoice.currency} ${Number(invoice.totalAmount).toFixed(2)}</strong></p>
+          <p>Due date: ${new Date(invoice.dueDate).toLocaleDateString()}</p>
+          <p><a href="${viewUrl}">View invoice</a></p>
+        `,
+        text: `Invoice ${invoice.invoiceNumber} — amount due ${invoice.currency} ${Number(invoice.totalAmount).toFixed(2)}. View: ${viewUrl}`,
+      });
+    }
+
     await writeAuditLog({ userId: actorId, action: "send", entity: "invoice", entityId: id, after: updated });
     return updated;
   }
@@ -394,6 +414,13 @@ export class FinanceService {
     }
 
     await writeAuditLog({ action: "webhook_payment_succeeded", entity: "payment", entityId: payment.id, after: updated });
+    const { dispatchWebhookEvent } = await import("../lib/webhook-dispatcher");
+    await dispatchWebhookEvent("payment.succeeded", {
+      paymentId: updated.id,
+      invoiceId: payment.invoiceId,
+      amount: Number(payment.amount),
+      provider: payment.provider,
+    });
     return updated;
   }
 
@@ -420,6 +447,13 @@ export class FinanceService {
     }
 
     await writeAuditLog({ action: "webhook_payment_succeeded", entity: "payment", entityId: payment.id, after: updated });
+    const { dispatchWebhookEvent } = await import("../lib/webhook-dispatcher");
+    await dispatchWebhookEvent("payment.succeeded", {
+      paymentId: updated.id,
+      invoiceId: payment.invoiceId,
+      amount: Number(payment.amount),
+      provider: payment.provider,
+    });
     return updated;
   }
 
@@ -449,19 +483,43 @@ export class FinanceService {
 
   async createReimbursement(
     employeeId: string,
-    data: { category: string; description: string; amount: number; currency: string; expenseDate: string; receiptFileId?: string },
+    data: {
+      category: string;
+      description: string;
+      amount: number;
+      currency: string;
+      expenseDate: string;
+      receiptFileId?: string;
+      approverIds?: string[];
+    },
     actorId: string,
   ) {
-    const reimbursement = await this.financeRepo.createReimbursement({
-      employeeId,
+    let reimbursement = await this.financeRepo.createReimbursement({
+      userId: employeeId,
       category: data.category,
       description: data.description,
       amount: data.amount,
       currency: data.currency,
-      expenseDate: new Date(data.expenseDate),
       receiptFileId: data.receiptFileId,
       status: "PENDING",
-    });
+      notes: `Expense date: ${data.expenseDate}`,
+    } as Prisma.ReimbursementUncheckedCreateInput);
+
+    if (data.approverIds && data.approverIds.length > 0) {
+      const approval = await this.approvalService.createApprovalRequest(
+        {
+          entityType: "reimbursement",
+          entityId: reimbursement.id,
+          requesterId: actorId,
+          approverIds: data.approverIds,
+          metadata: { amount: data.amount, category: data.category },
+        },
+        actorId,
+      );
+      reimbursement = await this.financeRepo.updateReimbursement(reimbursement.id, {
+        approvalRequestId: approval.id,
+      });
+    }
 
     await writeAuditLog({ userId: actorId, action: "create", entity: "reimbursement", entityId: reimbursement.id, after: reimbursement });
     return reimbursement;

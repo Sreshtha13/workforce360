@@ -62,6 +62,13 @@ export class AuthRepository {
       data: { lastLoginAt: new Date() },
     });
   }
+
+  async linkGoogleId(userId: string, googleId: string): Promise<User> {
+    return prisma.user.update({
+      where: { id: userId },
+      data: { googleId, emailVerified: true },
+    });
+  }
   
   async updatePassword(userId: string, passwordHash: string): Promise<User> {
     return prisma.user.update({

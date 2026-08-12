@@ -42,11 +42,17 @@ export class RoleService {
     }
 
     if (existing.isSystem) {
-      throw new AppError(
-        "SYSTEM_ROLE_LOCKED",
-        "System roles cannot be renamed or edited. Duplicate the role to create a custom copy, or ask a Super Admin to adjust permissions only.",
-        403,
-      );
+      // System roles: only requiresMfa may be toggled (name/code stay locked).
+      const keys = Object.keys(data).filter((k) => data[k as keyof typeof data] !== undefined);
+      const allowed = keys.every((k) => k === "requiresMfa");
+      if (!allowed) {
+        throw new AppError(
+          "SYSTEM_ROLE_LOCKED",
+          "System roles cannot be renamed or edited. Duplicate the role to create a custom copy, or ask a Super Admin to adjust permissions only.",
+          403,
+        );
+      }
+      return this.roleRepo.updateRole(id, { requiresMfa: data.requiresMfa });
     }
 
     return this.roleRepo.updateRole(id, data);
