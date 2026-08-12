@@ -289,6 +289,15 @@ model User {
   createdPayrollRuns PayrollRun[] @relation("PayrollRunCreator")
   approvalRequests   ApprovalRequest[] @relation("ApprovalRequester")
   approvalSteps      ApprovalStep[] @relation("StepApprover")
+  deployedReleases   Release[] @relation("ReleaseDeployer")
+  assignedTestCases  TestCase[] @relation("TestCaseAssignee")
+  createdTestCases   TestCase[] @relation("TestCaseCreator")
+  executedTestCases  TestCase[] @relation("TestCaseExecutor")
+  createdDocs        Documentation[] @relation("DocumentationCreator")
+  createdTrainings   TechTraining[] @relation("TrainingCreator")
+  trainingEnrollments TrainingEnrollment[]
+  authoredCodeReviews CodeReview[] @relation("CodeReviewAuthor")
+  reviewedCodeReviews CodeReview[] @relation("CodeReviewer")
 
   @@index([email])
   @@index([departmentId])
@@ -1172,6 +1181,10 @@ model Project {
   teamAllocations   ProjectTeamAllocation[]
   budgetTracking    ProjectBudgetTracking[]
   timesheetEntries  TimesheetEntry[]
+  releases          Release[]
+  testCases         TestCase[]
+  documentations    Documentation[]
+  codeReviews       CodeReview[]
 
   @@index([status])
   @@index([managerId])
@@ -1204,6 +1217,7 @@ model Task {
   projectId      String       @map("project_id")
   milestoneId    String?      @map("milestone_id")
   sprintId       String?      @map("sprint_id")
+  releaseId      String?      @map("release_id")
   title          String
   description    String?
   status         TaskStatus   @default(TODO)
@@ -1222,15 +1236,18 @@ model Task {
   project        Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
   milestone      Milestone?   @relation(fields: [milestoneId], references: [id])
   sprint         Sprint?      @relation(fields: [sprintId], references: [id])
+  release        Release?     @relation("ReleaseTask", fields: [releaseId], references: [id])
   assignee       User?        @relation("TaskAssignee", fields: [assigneeId], references: [id])
   reporter       User?        @relation("TaskReporter", fields: [reporterId], references: [id])
   timeEntries    TaskTimeEntry[]
   comments       TaskComment[]
   timesheetEntries TimesheetEntry[]
+  codeReviews    CodeReview[]
 
   @@index([projectId])
   @@index([milestoneId])
   @@index([sprintId])
+  @@index([releaseId])
   @@index([assigneeId])
   @@index([status])
   @@map("tasks")
@@ -1793,4 +1810,212 @@ model ApprovalStep {
   @@index([approverId])
   @@index([status])
   @@map("approval_steps")
+}
+
+// ============================================================================
+// PHASE 7: DEVELOPMENT & QA MODULE
+// ============================================================================
+
+enum ReleaseStatus {
+  PLANNING
+  IN_PROGRESS
+  TESTING
+  STAGING
+  RELEASED
+  ROLLED_BACK
+}
+
+enum ReleaseType {
+  MAJOR
+  MINOR
+  PATCH
+  HOTFIX
+}
+
+enum TestCaseStatus {
+  DRAFT
+  READY
+  PASSED
+  FAILED
+  BLOCKED
+  SKIPPED
+}
+
+enum TestCasePriority {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum TrainingStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  COMPLETED
+  EXPIRED
+}
+
+model Release {
+  id                String        @id @default(cuid())
+  projectId         String        @map("project_id")
+  version           String
+  name              String
+  type              ReleaseType   @default(MINOR)
+  status            ReleaseStatus @default(PLANNING)
+  description       String?
+  releaseDate       DateTime?     @map("release_date")
+  deployedAt        DateTime?     @map("deployed_at")
+  deployedById      String?       @map("deployed_by_id")
+  releaseNotes      String?       @map("release_notes")
+  tagName           String?       @map("tag_name")
+  commitHash        String?       @map("commit_hash")
+  buildNumber       String?       @map("build_number")
+  createdAt         DateTime      @default(now()) @map("created_at")
+  updatedAt         DateTime      @updatedAt @map("updated_at")
+  deletedAt         DateTime?     @map("deleted_at")
+
+  project           Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  deployedBy        User?         @relation("ReleaseDeployer", fields: [deployedById], references: [id])
+  tasks             Task[]        @relation("ReleaseTask")
+  testCases         TestCase[]
+
+  @@unique([projectId, version])
+  @@index([projectId])
+  @@index([status])
+  @@index([releaseDate])
+  @@map("releases")
+}
+
+model TestCase {
+  id             String           @id @default(cuid())
+  projectId      String           @map("project_id")
+  releaseId      String?          @map("release_id")
+  title          String
+  description    String?
+  steps          String?
+  expectedResult String?          @map("expected_result")
+  status         TestCaseStatus   @default(DRAFT)
+  priority       TestCasePriority @default(MEDIUM)
+  assignedToId   String?          @map("assigned_to_id")
+  createdById    String           @map("created_by_id")
+  executedAt     DateTime?        @map("executed_at")
+  executedById   String?          @map("executed_by_id")
+  actualResult   String?          @map("actual_result")
+  notes          String?
+  createdAt      DateTime         @default(now()) @map("created_at")
+  updatedAt      DateTime         @updatedAt @map("updated_at")
+  deletedAt      DateTime?        @map("deleted_at")
+
+  project        Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  release        Release?         @relation(fields: [releaseId], references: [id])
+  assignedTo     User?            @relation("TestCaseAssignee", fields: [assignedToId], references: [id])
+  createdBy      User             @relation("TestCaseCreator", fields: [createdById], references: [id])
+  executedBy     User?            @relation("TestCaseExecutor", fields: [executedById], references: [id])
+
+  @@index([projectId])
+  @@index([releaseId])
+  @@index([status])
+  @@index([assignedToId])
+  @@map("test_cases")
+}
+
+model Documentation {
+  id             String    @id @default(cuid())
+  projectId      String?   @map("project_id")
+  title          String
+  description    String?
+  category       String?
+  url            String?
+  content        String?
+  version        String?
+  isPublished    Boolean   @default(false) @map("is_published")
+  publishedAt    DateTime? @map("published_at")
+  createdById    String    @map("created_by_id")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+  deletedAt      DateTime? @map("deleted_at")
+
+  project        Project?  @relation(fields: [projectId], references: [id])
+  createdBy      User      @relation("DocumentationCreator", fields: [createdById], references: [id])
+
+  @@index([projectId])
+  @@index([category])
+  @@index([isPublished])
+  @@map("documentations")
+}
+
+model TechTraining {
+  id             String    @id @default(cuid())
+  title          String
+  description    String?
+  category       String?
+  content        String?
+  url            String?
+  duration       Int?
+  isRequired     Boolean   @default(false) @map("is_required")
+  isActive       Boolean   @default(true) @map("is_active")
+  createdById    String    @map("created_by_id")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+  deletedAt      DateTime? @map("deleted_at")
+
+  createdBy      User      @relation("TrainingCreator", fields: [createdById], references: [id])
+  enrollments    TrainingEnrollment[]
+
+  @@index([category])
+  @@index([isActive])
+  @@map("tech_trainings")
+}
+
+model TrainingEnrollment {
+  id             String         @id @default(cuid())
+  trainingId     String         @map("training_id")
+  userId         String         @map("user_id")
+  status         TrainingStatus @default(NOT_STARTED)
+  enrolledAt     DateTime       @default(now()) @map("enrolled_at")
+  startedAt      DateTime?      @map("started_at")
+  completedAt    DateTime?      @map("completed_at")
+  score          Int?
+  notes          String?
+  createdAt      DateTime       @default(now()) @map("created_at")
+  updatedAt      DateTime       @updatedAt @map("updated_at")
+
+  training       TechTraining   @relation(fields: [trainingId], references: [id], onDelete: Cascade)
+  user           User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([trainingId, userId])
+  @@index([trainingId])
+  @@index([userId])
+  @@index([status])
+  @@map("training_enrollments")
+}
+
+model CodeReview {
+  id             String    @id @default(cuid())
+  taskId         String?   @map("task_id")
+  projectId      String    @map("project_id")
+  title          String
+  description    String?
+  pullRequestUrl String?   @map("pull_request_url")
+  authorId       String    @map("author_id")
+  reviewerId     String?   @map("reviewer_id")
+  status         String    @default("PENDING")
+  reviewNotes    String?   @map("review_notes")
+  requestedAt    DateTime  @default(now()) @map("requested_at")
+  reviewedAt     DateTime? @map("reviewed_at")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+  deletedAt      DateTime? @map("deleted_at")
+
+  task           Task?     @relation(fields: [taskId], references: [id])
+  project        Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  author         User      @relation("CodeReviewAuthor", fields: [authorId], references: [id])
+  reviewer       User?     @relation("CodeReviewer", fields: [reviewerId], references: [id])
+
+  @@index([taskId])
+  @@index([projectId])
+  @@index([authorId])
+  @@index([reviewerId])
+  @@index([status])
+  @@map("code_reviews")
 }

@@ -49,6 +49,29 @@ import type {
   UpdateSalaryStructureInput,
 } from "@/types/payroll";
 import type {
+  CodeReview,
+  CreateCodeReviewInput,
+  CreateDocumentationInput,
+  CreateReleaseInput,
+  CreateTestCaseInput,
+  CreateTrainingInput,
+  Documentation,
+  EngineeringMetrics,
+  EnrollTrainingInput,
+  ExecuteTestCaseInput,
+  Release,
+  SprintDashboard,
+  TechTraining,
+  TestCase,
+  TrainingEnrollment,
+  UpdateCodeReviewInput,
+  UpdateDocumentationInput,
+  UpdateEnrollmentInput,
+  UpdateReleaseInput,
+  UpdateTestCaseInput,
+  UpdateTrainingInput,
+} from "@/types/engineering";
+import type {
   AuthUser,
   CreateDepartmentInput,
   CreateDesignationInput,
@@ -1432,6 +1455,171 @@ export const apiClient = {
           method: "PATCH",
           body: JSON.stringify(data),
         }),
+    },
+  },
+
+  // Phase 7: Development & QA Module
+  engineering: {
+    releases: {
+      list: (params?: { projectId?: string; status?: string }) =>
+        request<Release[]>(
+          `/api/engineering/releases${buildQuery({
+            projectId: params?.projectId,
+            status: params?.status,
+          })}`,
+        ),
+      get: (id: string) => request<Release>(`/api/engineering/releases/${id}`),
+      create: (data: CreateReleaseInput) =>
+        request<Release>("/api/engineering/releases", {
+          method: "POST",
+          body: JSON.stringify(data),
+        }),
+      update: (id: string, data: UpdateReleaseInput) =>
+        request<Release>(`/api/engineering/releases/${id}`, {
+          method: "PATCH",
+          body: JSON.stringify(data),
+        }),
+      deploy: (id: string) =>
+        request<Release>(`/api/engineering/releases/${id}/deploy`, {
+          method: "POST",
+        }),
+      rollback: (id: string) =>
+        request<Release>(`/api/engineering/releases/${id}/rollback`, {
+          method: "POST",
+        }),
+    },
+
+    testCases: {
+      list: (params?: { projectId?: string; releaseId?: string; status?: string; assignedToId?: string }) =>
+        request<TestCase[]>(
+          `/api/engineering/test-cases${buildQuery({
+            projectId: params?.projectId,
+            releaseId: params?.releaseId,
+            status: params?.status,
+            assignedToId: params?.assignedToId,
+          })}`,
+        ),
+      get: (id: string) => request<TestCase>(`/api/engineering/test-cases/${id}`),
+      create: (data: CreateTestCaseInput) =>
+        request<TestCase>("/api/engineering/test-cases", {
+          method: "POST",
+          body: JSON.stringify(data),
+        }),
+      update: (id: string, data: UpdateTestCaseInput) =>
+        request<TestCase>(`/api/engineering/test-cases/${id}`, {
+          method: "PATCH",
+          body: JSON.stringify(data),
+        }),
+      execute: (id: string, data: ExecuteTestCaseInput) =>
+        request<TestCase>(`/api/engineering/test-cases/${id}/execute`, {
+          method: "POST",
+          body: JSON.stringify(data),
+        }),
+    },
+
+    documentation: {
+      list: (params?: { projectId?: string; category?: string; search?: string }) =>
+        request<Documentation[]>(
+          `/api/engineering/docs${buildQuery({
+            projectId: params?.projectId,
+            category: params?.category,
+            search: params?.search,
+          })}`,
+        ),
+      get: (id: string) => request<Documentation>(`/api/engineering/docs/${id}`),
+      create: (data: CreateDocumentationInput) =>
+        request<Documentation>("/api/engineering/docs", {
+          method: "POST",
+          body: JSON.stringify(data),
+        }),
+      update: (id: string, data: UpdateDocumentationInput) =>
+        request<Documentation>(`/api/engineering/docs/${id}`, {
+          method: "PATCH",
+          body: JSON.stringify(data),
+        }),
+      publish: (id: string) =>
+        request<Documentation>(`/api/engineering/docs/${id}/publish`, {
+          method: "POST",
+        }),
+    },
+
+    training: {
+      list: (params?: { category?: string; isRequired?: boolean }) =>
+        request<TechTraining[]>(
+          `/api/engineering/training${buildQuery({
+            category: params?.category,
+            isRequired: params?.isRequired,
+          })}`,
+        ),
+      get: (id: string) => request<TechTraining>(`/api/engineering/training/${id}`),
+      create: (data: CreateTrainingInput) =>
+        request<TechTraining>("/api/engineering/training", {
+          method: "POST",
+          body: JSON.stringify(data),
+        }),
+      update: (id: string, data: UpdateTrainingInput) =>
+        request<TechTraining>(`/api/engineering/training/${id}`, {
+          method: "PATCH",
+          body: JSON.stringify(data),
+        }),
+      myEnrollments: () => request<TrainingEnrollment[]>("/api/engineering/training/my-enrollments"),
+      enroll: (data: EnrollTrainingInput) =>
+        request<TrainingEnrollment>("/api/engineering/training/enroll", {
+          method: "POST",
+          body: JSON.stringify(data),
+        }),
+      updateEnrollment: (id: string, data: UpdateEnrollmentInput) =>
+        request<TrainingEnrollment>(`/api/engineering/training/enrollments/${id}`, {
+          method: "PATCH",
+          body: JSON.stringify(data),
+        }),
+    },
+
+    codeReviews: {
+      list: (params?: { projectId?: string; authorId?: string; reviewerId?: string; status?: string }) =>
+        request<CodeReview[]>(
+          `/api/engineering/code-reviews${buildQuery({
+            projectId: params?.projectId,
+            authorId: params?.authorId,
+            reviewerId: params?.reviewerId,
+            status: params?.status,
+          })}`,
+        ),
+      get: (id: string) => request<CodeReview>(`/api/engineering/code-reviews/${id}`),
+      create: (data: CreateCodeReviewInput) =>
+        request<CodeReview>("/api/engineering/code-reviews", {
+          method: "POST",
+          body: JSON.stringify(data),
+        }),
+      update: (id: string, data: UpdateCodeReviewInput) =>
+        request<CodeReview>(`/api/engineering/code-reviews/${id}`, {
+          method: "PATCH",
+          body: JSON.stringify(data),
+        }),
+      approve: (id: string) =>
+        request<CodeReview>(`/api/engineering/code-reviews/${id}/approve`, {
+          method: "POST",
+        }),
+      requestChanges: (id: string, notes: string) =>
+        request<CodeReview>(`/api/engineering/code-reviews/${id}/request-changes`, {
+          method: "POST",
+          body: JSON.stringify({ notes }),
+        }),
+    },
+
+    dashboard: {
+      mySprintDashboard: (sprintId?: string) =>
+        request<SprintDashboard>(
+          `/api/engineering/dashboard/my-sprint${buildQuery({ sprintId })}`,
+        ),
+      myMetrics: (period?: string) =>
+        request<EngineeringMetrics>(
+          `/api/engineering/dashboard/my-metrics${buildQuery({ period })}`,
+        ),
+      teamMetrics: (projectId?: string) =>
+        request<EngineeringMetrics[]>(
+          `/api/engineering/dashboard/team-metrics${buildQuery({ projectId })}`,
+        ),
     },
   },
 };
