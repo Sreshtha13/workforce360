@@ -11,6 +11,8 @@ import { hrRouter } from "./hr.routes";
 import { portalRouter } from "./portal.routes";
 import { storageRouter } from "./storage.routes";
 import { dashboardRouter } from "./dashboard.routes";
+import bdRouter from "./bd.routes";
+import pmRouter from "./pm.routes";
 
 const apiRouter = Router();
 
@@ -26,5 +28,7 @@ apiRouter.use("/hr", hrRouter);
 apiRouter.use("/portal", portalRouter);
 apiRouter.use("/storage", storageRouter);
 apiRouter.use("/dashboard", dashboardRouter);
+apiRouter.use("/bd", bdRouter);
+apiRouter.use("/pm", pmRouter);
 
 export { apiRouter };
