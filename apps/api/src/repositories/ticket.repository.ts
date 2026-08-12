@@ -16,7 +16,7 @@ const ticketListInclude = {
     select: { id: true, originalName: true, mimeType: true, sizeBytes: true },
   },
   _count: { select: { messages: true } },
-} as const;
+} satisfies Prisma.SupportTicketInclude;
 
 const ticketDetailInclude = {
   ...ticketListInclude,
@@ -30,6 +30,24 @@ const ticketDetailInclude = {
       },
     },
   },
+} satisfies Prisma.SupportTicketInclude;
+
+export type TicketListItem = Prisma.SupportTicketGetPayload<{
+  include: typeof ticketListInclude;
+}>;
+
+export type TicketDetail = Prisma.SupportTicketGetPayload<{
+  include: typeof ticketDetailInclude;
+}>;
+
+/** Scalar fields used by ticket workflow actions — stable when Prisma include typing lags. */
+export type TicketWorkflowFields = {
+  id: string;
+  userId: string;
+  assignedToId: string | null;
+  status: SupportTicketStatus;
+  resolvedAt: Date | null;
+  closedAt: Date | null;
 };
 
 export type CreateTicketInput = {
@@ -55,7 +73,7 @@ export class TicketRepository {
     assignedToId?: string;
     status?: string;
     search?: string;
-  }) {
+  }): Promise<TicketListItem[]> {
     const where: Prisma.SupportTicketWhereInput = { deletedAt: null };
     if (filters?.userId) where.userId = filters.userId;
     if (filters?.assignedToId) where.assignedToId = filters.assignedToId;
@@ -75,17 +93,17 @@ export class TicketRepository {
       where,
       include: ticketListInclude,
       orderBy: { updatedAt: "desc" },
-    });
+    }) as Promise<TicketListItem[]>;
   }
 
-  findTicketById(id: string) {
+  findTicketById(id: string): Promise<TicketDetail | null> {
     return prisma.supportTicket.findFirst({
       where: { id, deletedAt: null },
       include: ticketDetailInclude,
-    });
+    }) as Promise<TicketDetail | null>;
   }
 
-  async createTicket(input: CreateTicketInput) {
+  async createTicket(input: CreateTicketInput): Promise<TicketDetail | null> {
     return prisma.$transaction(async (tx) => {
       const ticket = await tx.supportTicket.create({
         data: {
@@ -111,7 +129,7 @@ export class TicketRepository {
       return tx.supportTicket.findFirst({
         where: { id: ticket.id },
         include: ticketDetailInclude,
-      });
+      }) as Promise<TicketDetail | null>;
     });
   }
 
@@ -151,7 +169,7 @@ export class TicketRepository {
       resolvedAt?: Date | null;
       closedAt?: Date | null;
     },
-  ) {
+  ): Promise<TicketDetail> {
     return prisma.supportTicket.update({
       where: { id },
       data: {
@@ -162,6 +180,6 @@ export class TicketRepository {
         closedAt: data.closedAt,
       },
       include: ticketDetailInclude,
-    });
+    }) as Promise<TicketDetail>;
   }
 }

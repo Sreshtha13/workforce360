@@ -11,6 +11,12 @@ import { hrRouter } from "./hr.routes";
 import { portalRouter } from "./portal.routes";
 import { storageRouter } from "./storage.routes";
 import { dashboardRouter } from "./dashboard.routes";
+import { attendanceRouter } from "./attendance.routes";
+import { leaveRouter } from "./leave.routes";
+import { approvalRouter } from "./approval.routes";
+import { assetRouter } from "./asset.routes";
+import { financeRouter } from "./finance.routes";
+import { payrollRouter } from "./payroll.routes";
 
 const apiRouter = Router();
 
@@ -26,5 +32,11 @@ apiRouter.use("/hr", hrRouter);
 apiRouter.use("/portal", portalRouter);
 apiRouter.use("/storage", storageRouter);
 apiRouter.use("/dashboard", dashboardRouter);
+apiRouter.use("/attendance", attendanceRouter);
+apiRouter.use("/leave", leaveRouter);
+apiRouter.use("/approvals", approvalRouter);
+apiRouter.use("/assets", assetRouter);
+apiRouter.use("/finance", financeRouter);
+apiRouter.use("/payroll", payrollRouter);
 
 export { apiRouter };

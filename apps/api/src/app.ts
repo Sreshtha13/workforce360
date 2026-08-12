@@ -7,8 +7,10 @@ import { errorHandler, notFoundHandler } from "./middleware/error-handler";
 import { apiRouter } from "./routes";
 
 import { StorageController } from "./controllers/storage.controller";
+import { PaymentWebhookController } from "./controllers/payment-webhook.controller";
 
 const storageController = new StorageController();
+const paymentWebhookController = new PaymentWebhookController();
 
 export function createApp() {
   const app = express();
@@ -37,6 +39,18 @@ export function createApp() {
     "/api/storage/upload/:uploadToken",
     express.raw({ type: "*/*", limit: "10mb" }),
     storageController.localUpload,
+  );
+  // Stripe/Razorpay webhooks need the raw body for signature verification —
+  // must be registered before express.json() consumes the stream.
+  app.post(
+    "/api/payment-webhooks/stripe",
+    express.raw({ type: "application/json", limit: "1mb" }),
+    paymentWebhookController.stripeWebhook,
+  );
+  app.post(
+    "/api/payment-webhooks/razorpay",
+    express.raw({ type: "application/json", limit: "1mb" }),
+    paymentWebhookController.razorpayWebhook,
   );
   app.use(express.json({ limit: "1mb" }));
   app.use(cookieParser());
