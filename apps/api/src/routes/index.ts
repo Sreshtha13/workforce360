@@ -13,6 +13,12 @@ import { storageRouter } from "./storage.routes";
 import { dashboardRouter } from "./dashboard.routes";
 import bdRouter from "./bd.routes";
 import pmRouter from "./pm.routes";
+import { attendanceRouter } from "./attendance.routes";
+import { leaveRouter } from "./leave.routes";
+import { approvalRouter } from "./approval.routes";
+import { assetRouter } from "./asset.routes";
+import { financeRouter } from "./finance.routes";
+import { payrollRouter } from "./payroll.routes";
 
 const apiRouter = Router();
 
@@ -30,5 +36,11 @@ apiRouter.use("/storage", storageRouter);
 apiRouter.use("/dashboard", dashboardRouter);
 apiRouter.use("/bd", bdRouter);
 apiRouter.use("/pm", pmRouter);
+apiRouter.use("/attendance", attendanceRouter);
+apiRouter.use("/leave", leaveRouter);
+apiRouter.use("/approvals", approvalRouter);
+apiRouter.use("/assets", assetRouter);
+apiRouter.use("/finance", financeRouter);
+apiRouter.use("/payroll", payrollRouter);
 
 export { apiRouter };

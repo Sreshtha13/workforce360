@@ -1,4 +1,4 @@
-import type { EmployeeLifecycleState } from "@prisma/client";
+import type { EmployeeLifecycleState, SupportTicketStatus } from "@prisma/client";
 import { HrRepository, PortalRepository, RecruitmentRepository } from "../repositories/phase2.repository";
 import { UserRepository } from "../repositories/user.repository";
 import { toClientError } from "../lib/app-error";
@@ -7,7 +7,9 @@ import { prisma } from "../lib/prisma";
 import { allocateNextEmployeeId } from "./employee-id.service";
 import { employeeMasterService } from "./employee-master.service";
 import { policyService } from "./policy.service";
-import { ticketService } from "./ticket.service";
+import { OPEN_TICKET_STATUSES, ticketService } from "./ticket.service";
+import { payrollService } from "./payroll.service";
+import { AppError } from "../lib/app-error";
 import {
   assertCanViewUser,
   resolveEmployeeVisibilityScope,
@@ -251,12 +253,8 @@ export class HrService {
     return ticketService.assignTicket(ticketId, assigneeId, actorId);
   }
 
-  updateTicketStatus(ticketId: string, status: string, actorId: string) {
-    return ticketService.updateStatus(
-      ticketId,
-      status as "OPEN" | "IN_PROGRESS" | "WAITING_FOR_EMPLOYEE" | "RESOLVED" | "CLOSED",
-      actorId,
-    );
+  updateTicketStatus(ticketId: string, status: SupportTicketStatus, actorId: string) {
+    return ticketService.updateStatus(ticketId, status, actorId);
   }
 
   addTicketReply(
@@ -458,12 +456,7 @@ export class PortalService {
     return {
       employee,
       unreadNotifications: notifications.filter((n) => !n.isRead).length,
-      openTickets: tickets.filter(
-        (t) =>
-          t.status === "OPEN" ||
-          t.status === "IN_PROGRESS" ||
-          t.status === "WAITING_FOR_EMPLOYEE",
-      ).length,
+      openTickets: tickets.filter((t) => OPEN_TICKET_STATUSES.includes(t.status)).length,
       comingSoon: {
         attendance: true,
         leave: true,
@@ -552,6 +545,21 @@ export class PortalService {
 
   acknowledgePolicy(policyId: string, userId: string) {
     return policyService.acknowledgePolicy(policyId, userId);
+  }
+
+  /** Employee's own payslips only — never another employee's, enforced via their Employee Master record. */
+  async listMyPayslips(userId: string) {
+    const employee = await this.hrRepo.findEmployeeByUserId(userId);
+    if (!employee) return [];
+    return payrollService.listMyPayslips(employee.id);
+  }
+
+  async getMyPayslipDownload(userId: string, payslipId: string) {
+    const employee = await this.hrRepo.findEmployeeByUserId(userId);
+    if (!employee) {
+      throw new AppError("EMPLOYEE_NOT_FOUND", "Employee record not found for this user", 404);
+    }
+    return payrollService.getMyPayslipDownload(employee.id, payslipId);
   }
 }
 

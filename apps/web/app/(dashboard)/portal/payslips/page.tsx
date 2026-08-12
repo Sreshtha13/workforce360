@@ -1,137 +1,97 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
-import { format } from "date-fns";
-import { apiClient } from "@/lib/api-client";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Download, FileText, DollarSign } from "lucide-react";
+import { useState } from "react";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import { Download, FileText, Loader2 } from "lucide-react";
+import { apiClient, ApiClientError } from "@/lib/api-client";
+import { AdminPageHeader } from "@/components/admin/admin-page-header";
+import { AlertBanner, EmptyState, LoadingState, ErrorState } from "@/components/admin/admin-states";
 
-export default function PayslipsPage() {
-  const { data: payslips, isLoading } = useQuery({
+const MONTH_NAMES = [
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December",
+];
+
+export default function PortalPayslipsPage() {
+  const [error, setError] = useState<string | null>(null);
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
+
+  const query = useQuery({
     queryKey: ["portal", "payslips"],
-    queryFn: () => apiClient.payroll.payslips.list({}),
+    queryFn: async () => {
+      const res = await apiClient.portal.listPayslips();
+      return res.data ?? [];
+    },
   });
 
-  const publishedPayslips = payslips?.filter(p => p.isPublished) || [];
+  const downloadMutation = useMutation({
+    mutationFn: (id: string) => apiClient.portal.downloadPayslip(id),
+    onMutate: (id) => setDownloadingId(id),
+    onSettled: () => setDownloadingId(null),
+    onError: (err) => {
+      setError(err instanceof ApiClientError ? err.message : "Failed to download payslip");
+    },
+  });
+
+  if (query.isLoading) return <LoadingState message="Loading your payslips..." />;
+  if (query.isError) {
+    return <ErrorState message="Failed to load payslips." onRetry={() => query.refetch()} />;
+  }
+
+  const payslips = query.data ?? [];
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold">My Payslips</h1>
-        <p className="text-muted-foreground">View and download your salary payslips</p>
-      </div>
+      <AdminPageHeader
+        title="Payslips"
+        description="View and download your monthly payslips. Only your own published payslips are ever shown here."
+      />
 
-      {/* Latest Payslip Summary */}
-      {publishedPayslips.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <DollarSign className="h-5 w-5" />
-              Latest Payslip
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-muted-foreground">Period</p>
-                  <p className="text-lg font-medium">{publishedPayslips[0].period}</p>
+      {error && <AlertBanner variant="error" message={error} onDismiss={() => setError(null)} />}
+
+      {payslips.length === 0 ? (
+        <EmptyState
+          title="No payslips yet"
+          description="Your payslips will appear here once payroll has been processed and paid for a pay period."
+          icon={FileText}
+        />
+      ) : (
+        <div className="space-y-3">
+          {payslips.map((payslip) => (
+            <div
+              key={payslip.id}
+              className="flex items-center justify-between gap-3 rounded-xl border border-white/20 bg-white/40 p-4 dark:bg-white/5"
+            >
+              <div className="flex items-center gap-3">
+                <div className="flex size-10 items-center justify-center rounded-xl bg-white/50 shadow-inner ring-1 ring-white/20 dark:bg-white/5 dark:ring-white/10">
+                  <FileText className="size-5 text-brand-700 dark:text-brand-300" aria-hidden />
                 </div>
-                <div className="text-right">
-                  <p className="text-sm text-muted-foreground">Net Salary</p>
-                  <p className="text-2xl font-bold text-green-600">
-                    ${Number(publishedPayslips[0].netSalary).toLocaleString()}
+                <div>
+                  <p className="font-medium">
+                    {MONTH_NAMES[payslip.month - 1] ?? payslip.month} {payslip.year}
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    {payslip.file?.originalName ?? "Payslip"}
                   </p>
                 </div>
               </div>
-              <div className="grid grid-cols-3 gap-4 pt-4 border-t">
-                <div>
-                  <p className="text-xs text-muted-foreground">Gross</p>
-                  <p className="font-medium">${Number(publishedPayslips[0].grossSalary).toLocaleString()}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground">Deductions</p>
-                  <p className="font-medium text-red-600">-${Number(publishedPayslips[0].deductions).toLocaleString()}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground">Days</p>
-                  <p className="font-medium">{publishedPayslips[0].paidDays}/{publishedPayslips[0].workingDays}</p>
-                </div>
-              </div>
-              {publishedPayslips[0].fileId && (
-                <a
-                  href={apiClient.payroll.payslips.download(publishedPayslips[0].id)}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  <Button variant="outline" className="w-full">
-                    <Download className="mr-2 h-4 w-4" />
-                    Download PDF
-                  </Button>
-                </a>
-              )}
+              <button
+                type="button"
+                onClick={() => downloadMutation.mutate(payslip.id)}
+                disabled={downloadingId === payslip.id}
+                className="inline-flex items-center gap-2 rounded-lg border border-white/20 bg-white/50 px-3 py-2 text-sm font-medium transition-colors hover:bg-white/70 disabled:opacity-60 dark:bg-white/10 dark:hover:bg-white/20"
+              >
+                {downloadingId === payslip.id ? (
+                  <Loader2 className="size-4 animate-spin" aria-hidden />
+                ) : (
+                  <Download className="size-4" aria-hidden />
+                )}
+                Download
+              </button>
             </div>
-          </CardContent>
-        </Card>
+          ))}
+        </div>
       )}
-
-      {/* All Payslips */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <FileText className="h-5 w-5" />
-            All Payslips
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {isLoading ? (
-            <div>Loading...</div>
-          ) : publishedPayslips.length > 0 ? (
-            <div className="space-y-3">
-              {publishedPayslips.map((payslip) => (
-                <div key={payslip.id} className="flex items-center justify-between p-4 border rounded-lg">
-                  <div className="space-y-1">
-                    <p className="font-medium">{payslip.period}</p>
-                    <p className="text-sm text-muted-foreground">
-                      Published {format(new Date(payslip.publishedAt!), "MMM d, yyyy")}
-                    </p>
-                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                      <span>Gross: ${Number(payslip.grossSalary).toLocaleString()}</span>
-                      <span>•</span>
-                      <span>Deductions: ${Number(payslip.deductions).toLocaleString()}</span>
-                      <span>•</span>
-                      <span>{payslip.paidDays} paid days</span>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <div className="text-right">
-                      <p className="text-xs text-muted-foreground">Net Salary</p>
-                      <p className="text-lg font-bold text-green-600">
-                        ${Number(payslip.netSalary).toLocaleString()}
-                      </p>
-                    </div>
-                    {payslip.fileId && (
-                      <a
-                        href={apiClient.payroll.payslips.download(payslip.id)}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                      >
-                        <Button variant="outline" size="sm">
-                          <Download className="h-4 w-4" />
-                        </Button>
-                      </a>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <p className="text-center text-muted-foreground py-8">No payslips available yet</p>
-          )}
-        </CardContent>
-      </Card>
     </div>
   );
 }

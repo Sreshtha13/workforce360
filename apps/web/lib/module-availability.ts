@@ -4,7 +4,7 @@ export const PORTAL_MODULE_FLAGS = {
   leave: false,
   timesheets: false,
   requests: false,
-  payslips: false,
+  payslips: true,
   documents: false,
 } as const;
 

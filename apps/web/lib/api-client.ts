@@ -162,6 +162,25 @@ import type {
   CreateBudgetEntryInput,
   UpdateBudgetEntryInput,
 } from "@/types/pm";
+import type {
+  Client,
+  CreateClientInput,
+  UpdateClientInput,
+  Invoice,
+  CreateInvoiceInput,
+  UpdateInvoiceInput,
+  Payment,
+  RecordManualPaymentInput,
+  PublicPaymentConfig,
+  FinanceDashboard,
+  SalaryStructure,
+  CreateSalaryStructureInput,
+  SalaryRevision,
+  RequestSalaryRevisionInput,
+  PayrollRun,
+  CreatePayrollRunInput,
+  Payslip,
+} from "@/types/phase4";
 
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:4000";
@@ -935,6 +954,196 @@ export const apiClient = {
       request<{ id: string; acknowledgedAt: string }>(`/api/portal/policies/${policyId}/acknowledge`, {
         method: "POST",
       }),
+    listPayslips: () => request<Payslip[]>("/api/portal/payslips"),
+    /** Downloads (or opens, for S3-backed pre-signed URLs) the employee's own payslip PDF. */
+    downloadPayslip: async (id: string) => {
+      const response = await fetch(`${API_BASE_URL}/api/portal/payslips/${id}/download`, {
+        headers: { Accept: "application/json, application/pdf" },
+        credentials: "include",
+        cache: "no-store",
+      });
+
+      if (!response.ok) {
+        let message = `Request failed with status ${response.status}`;
+        let code: string | undefined;
+        try {
+          const body = (await response.json()) as ApiResponse<unknown>;
+          message = body?.error?.message ?? message;
+          code = body?.error?.code;
+        } catch {
+          // Non-JSON error body — keep the generic message.
+        }
+        throw new ApiClientError(message, response.status, code);
+      }
+
+      const contentType = response.headers.get("content-type") ?? "";
+      if (contentType.includes("application/json")) {
+        const body = (await response.json()) as ApiResponse<{ url: string; fileName: string }>;
+        if (body.data?.url) {
+          window.open(body.data.url, "_blank", "noopener,noreferrer");
+          return;
+        }
+        throw new ApiClientError("Unexpected response from payslip download", response.status);
+      }
+
+      const blob = await response.blob();
+      const disposition = response.headers.get("content-disposition") ?? "";
+      const fileName = /filename="?([^"]+)"?/.exec(disposition)?.[1] ?? "payslip.pdf";
+      const blobUrl = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = blobUrl;
+      link.download = fileName;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(blobUrl);
+    },
+  },
+
+  finance: {
+    getDashboard: () => request<FinanceDashboard>("/api/finance/dashboard"),
+    getPaymentConfig: () => request<PublicPaymentConfig>("/api/finance/payment-config"),
+
+    clients: {
+      list: (params?: { status?: string; search?: string }) =>
+        request<Client[]>(`/api/finance/clients${buildQuery(params)}`),
+      get: (id: string) => request<Client>(`/api/finance/clients/${id}`),
+      create: (data: CreateClientInput) =>
+        request<Client>("/api/finance/clients", { method: "POST", body: JSON.stringify(data) }),
+      update: (id: string, data: UpdateClientInput) =>
+        request<Client>(`/api/finance/clients/${id}`, { method: "PUT", body: JSON.stringify(data) }),
+      delete: (id: string) =>
+        request<{ message: string }>(`/api/finance/clients/${id}`, { method: "DELETE" }),
+    },
+
+    invoices: {
+      list: (params?: { clientId?: string; status?: string; from?: string; to?: string }) =>
+        request<Invoice[]>(`/api/finance/invoices${buildQuery(params)}`),
+      get: (id: string) => request<Invoice>(`/api/finance/invoices/${id}`),
+      create: (data: CreateInvoiceInput) =>
+        request<Invoice>("/api/finance/invoices", { method: "POST", body: JSON.stringify(data) }),
+      update: (id: string, data: UpdateInvoiceInput) =>
+        request<Invoice>(`/api/finance/invoices/${id}`, { method: "PUT", body: JSON.stringify(data) }),
+      submitForApproval: (id: string, approverIds: string[]) =>
+        request<Invoice>(`/api/finance/invoices/${id}/submit`, {
+          method: "POST",
+          body: JSON.stringify({ approverIds }),
+        }),
+      approve: (id: string, notes?: string) =>
+        request<Invoice>(`/api/finance/invoices/${id}/approve`, {
+          method: "POST",
+          body: JSON.stringify({ notes }),
+        }),
+      reject: (id: string, notes: string) =>
+        request<Invoice>(`/api/finance/invoices/${id}/reject`, {
+          method: "POST",
+          body: JSON.stringify({ notes }),
+        }),
+      send: (id: string) => request<Invoice>(`/api/finance/invoices/${id}/send`, { method: "POST" }),
+      cancel: (id: string) => request<Invoice>(`/api/finance/invoices/${id}/cancel`, { method: "POST" }),
+      markOverdue: () =>
+        request<{ updatedCount: number }>("/api/finance/invoices/mark-overdue", { method: "POST" }),
+    },
+
+    payments: {
+      list: (params?: { invoiceId?: string; status?: string; provider?: string }) =>
+        request<Payment[]>(`/api/finance/payments${buildQuery(params)}`),
+      recordManual: (data: RecordManualPaymentInput) =>
+        request<Payment>("/api/finance/payments/manual", { method: "POST", body: JSON.stringify(data) }),
+      createCheckoutSession: (invoiceId: string, provider: "STRIPE" | "RAZORPAY") =>
+        request<{ payment: Payment; session: { sessionId: string; url?: string } }>(
+          "/api/finance/payments/checkout-session",
+          { method: "POST", body: JSON.stringify({ invoiceId, provider }) },
+        ),
+    },
+
+    reimbursements: {
+      list: (params?: { employeeId?: string; status?: string }) =>
+        request<Reimbursement[]>(`/api/finance/reimbursements${buildQuery(params)}`),
+      get: (id: string) => request<Reimbursement>(`/api/finance/reimbursements/${id}`),
+      create: (data: CreateReimbursementInput) =>
+        request<Reimbursement>("/api/finance/reimbursements", { method: "POST", body: JSON.stringify(data) }),
+      review: (id: string, data: { status: "APPROVED" | "REJECTED"; reviewNotes?: string }) =>
+        request<Reimbursement>(`/api/finance/reimbursements/${id}/review`, {
+          method: "POST",
+          body: JSON.stringify(data),
+        }),
+      markPaid: (id: string, data?: { paymentReference?: string }) =>
+        request<Reimbursement>(`/api/finance/reimbursements/${id}/mark-paid`, {
+          method: "POST",
+          body: JSON.stringify(data ?? {}),
+        }),
+    },
+  },
+
+  payroll: {
+    salaryStructures: {
+      list: (params?: { employeeId?: string }) =>
+        request<SalaryStructure[]>(`/api/payroll/salary-structures${buildQuery(params)}`),
+      getActive: (employeeId: string) =>
+        request<SalaryStructure>(`/api/payroll/salary-structures/active/${employeeId}`),
+      create: (data: CreateSalaryStructureInput) =>
+        request<SalaryStructure>("/api/payroll/salary-structures", {
+          method: "POST",
+          body: JSON.stringify(data),
+        }),
+    },
+
+    salaryRevisions: {
+      list: (params?: { employeeId?: string; status?: string }) =>
+        request<SalaryRevision[]>(`/api/payroll/salary-revisions${buildQuery(params)}`),
+      get: (id: string) => request<SalaryRevision>(`/api/payroll/salary-revisions/${id}`),
+      request: (data: RequestSalaryRevisionInput) =>
+        request<SalaryRevision>("/api/payroll/salary-revisions", {
+          method: "POST",
+          body: JSON.stringify(data),
+        }),
+      approve: (id: string, reviewNotes?: string) =>
+        request<SalaryRevision>(`/api/payroll/salary-revisions/${id}/approve`, {
+          method: "POST",
+          body: JSON.stringify({ reviewNotes }),
+        }),
+      reject: (id: string, reviewNotes?: string) =>
+        request<SalaryRevision>(`/api/payroll/salary-revisions/${id}/reject`, {
+          method: "POST",
+          body: JSON.stringify({ reviewNotes }),
+        }),
+    },
+
+    runs: {
+      list: (params?: { year?: string; status?: string }) =>
+        request<PayrollRun[]>(`/api/payroll/runs${buildQuery(params)}`),
+      get: (id: string) => request<PayrollRun>(`/api/payroll/runs/${id}`),
+      create: (data: CreatePayrollRunInput) =>
+        request<PayrollRun>("/api/payroll/runs", { method: "POST", body: JSON.stringify(data) }),
+      calculate: (id: string) =>
+        request<{ run: PayrollRun; skippedEmployeeIds: string[] }>(`/api/payroll/runs/${id}/calculate`, {
+          method: "POST",
+        }),
+      submitForApproval: (id: string, approverIds: string[]) =>
+        request<PayrollRun>(`/api/payroll/runs/${id}/submit`, {
+          method: "POST",
+          body: JSON.stringify({ approverIds }),
+        }),
+      approve: (id: string, notes?: string) =>
+        request<PayrollRun>(`/api/payroll/runs/${id}/approve`, {
+          method: "POST",
+          body: JSON.stringify({ notes }),
+        }),
+      reject: (id: string, notes?: string) =>
+        request<PayrollRun>(`/api/payroll/runs/${id}/reject`, {
+          method: "POST",
+          body: JSON.stringify({ notes }),
+        }),
+      process: (id: string) => request<PayrollRun>(`/api/payroll/runs/${id}/process`, { method: "POST" }),
+      markPaid: (id: string) => request<PayrollRun>(`/api/payroll/runs/${id}/mark-paid`, { method: "POST" }),
+      cancel: (id: string) => request<PayrollRun>(`/api/payroll/runs/${id}/cancel`, { method: "POST" }),
+    },
+
+    payslips: {
+      list: (params?: { employeeId?: string; year?: string }) =>
+        request<Payslip[]>(`/api/payroll/payslips${buildQuery(params)}`),
+    },
   },
 
   // Phase 3: Attendance & Leave Management
@@ -1020,160 +1229,6 @@ export const apiClient = {
       request<{ ok: boolean }>(`/api/timesheets/${id}`, {
         method: "DELETE",
       }),
-  },
-
-  // Phase 4: Finance Module
-  finance: {
-    clients: {
-      list: (params?: { search?: string }) =>
-        request<FinanceClient[]>(`/api/finance/clients${buildQuery({ search: params?.search })}`),
-      get: (id: string) => request<FinanceClient>(`/api/finance/clients/${id}`),
-      create: (data: CreateFinanceClientInput) =>
-        request<FinanceClient>("/api/finance/clients", {
-          method: "POST",
-          body: JSON.stringify(data),
-        }),
-      update: (id: string, data: UpdateFinanceClientInput) =>
-        request<FinanceClient>(`/api/finance/clients/${id}`, {
-          method: "PATCH",
-          body: JSON.stringify(data),
-        }),
-    },
-    invoices: {
-      list: (params?: { clientId?: string; status?: string; search?: string }) =>
-        request<Invoice[]>(
-          `/api/finance/invoices${buildQuery({
-            clientId: params?.clientId,
-            status: params?.status,
-            search: params?.search,
-          })}`,
-        ),
-      get: (id: string) => request<Invoice>(`/api/finance/invoices/${id}`),
-      create: (data: CreateInvoiceInput) =>
-        request<Invoice>("/api/finance/invoices", {
-          method: "POST",
-          body: JSON.stringify(data),
-        }),
-      update: (id: string, data: UpdateInvoiceInput) =>
-        request<Invoice>(`/api/finance/invoices/${id}`, {
-          method: "PATCH",
-          body: JSON.stringify(data),
-        }),
-      submit: (id: string) =>
-        request<Invoice>(`/api/finance/invoices/${id}/submit`, {
-          method: "POST",
-        }),
-      send: (id: string) =>
-        request<Invoice>(`/api/finance/invoices/${id}/send`, {
-          method: "POST",
-        }),
-      cancel: (id: string) =>
-        request<Invoice>(`/api/finance/invoices/${id}/cancel`, {
-          method: "POST",
-        }),
-      recordPayment: (id: string, data: RecordPaymentInput) =>
-        request<Payment>(`/api/finance/invoices/${id}/payments`, {
-          method: "POST",
-          body: JSON.stringify(data),
-        }),
-    },
-    payments: {
-      list: (invoiceId?: string) =>
-        request<Payment[]>(`/api/finance/payments${buildQuery({ invoiceId })}`),
-    },
-    reimbursements: {
-      list: (params?: { userId?: string; status?: string }) =>
-        request<Reimbursement[]>(
-          `/api/finance/reimbursements${buildQuery({
-            userId: params?.userId,
-            status: params?.status,
-          })}`,
-        ),
-      get: (id: string) => request<Reimbursement>(`/api/finance/reimbursements/${id}`),
-      create: (data: CreateReimbursementInput) =>
-        request<Reimbursement>("/api/finance/reimbursements", {
-          method: "POST",
-          body: JSON.stringify(data),
-        }),
-      review: (id: string, data: ReviewReimbursementInput) =>
-        request<Reimbursement>(`/api/finance/reimbursements/${id}/review`, {
-          method: "POST",
-          body: JSON.stringify(data),
-        }),
-      markPaid: (id: string) =>
-        request<Reimbursement>(`/api/finance/reimbursements/${id}/mark-paid`, {
-          method: "POST",
-        }),
-    },
-  },
-
-  // Phase 4: Payroll Module
-  payroll: {
-    structures: {
-      list: (params?: { userId?: string; isActive?: boolean }) =>
-        request<SalaryStructure[]>(
-          `/api/payroll/structures${buildQuery({
-            userId: params?.userId,
-            isActive: params?.isActive,
-          })}`,
-        ),
-      get: (id: string) => request<SalaryStructure>(`/api/payroll/structures/${id}`),
-      create: (data: CreateSalaryStructureInput) =>
-        request<SalaryStructure>("/api/payroll/structures", {
-          method: "POST",
-          body: JSON.stringify(data),
-        }),
-      update: (id: string, data: UpdateSalaryStructureInput) =>
-        request<SalaryStructure>(`/api/payroll/structures/${id}`, {
-          method: "PATCH",
-          body: JSON.stringify(data),
-        }),
-    },
-    runs: {
-      list: (params?: { status?: string }) =>
-        request<PayrollRun[]>(`/api/payroll/runs${buildQuery({ status: params?.status })}`),
-      get: (id: string) => request<PayrollRun>(`/api/payroll/runs/${id}`),
-      create: (data: CreatePayrollRunInput) =>
-        request<PayrollRun>("/api/payroll/runs", {
-          method: "POST",
-          body: JSON.stringify(data),
-        }),
-      update: (id: string, data: UpdatePayrollRunInput) =>
-        request<PayrollRun>(`/api/payroll/runs/${id}`, {
-          method: "PATCH",
-          body: JSON.stringify(data),
-        }),
-      calculate: (id: string) =>
-        request<PayrollRun>(`/api/payroll/runs/${id}/calculate`, {
-          method: "POST",
-        }),
-      submit: (id: string) =>
-        request<PayrollRun>(`/api/payroll/runs/${id}/submit`, {
-          method: "POST",
-        }),
-      process: (id: string) =>
-        request<PayrollRun>(`/api/payroll/runs/${id}/process`, {
-          method: "POST",
-        }),
-      markPaid: (id: string) =>
-        request<PayrollRun>(`/api/payroll/runs/${id}/mark-paid`, {
-          method: "POST",
-        }),
-    },
-    payslips: {
-      list: (params?: { runId?: string; userId?: string }) =>
-        request<Payslip[]>(
-          `/api/payroll/payslips${buildQuery({
-            runId: params?.runId,
-            userId: params?.userId,
-          })}`,
-        ),
-      get: (id: string) => request<Payslip>(`/api/payroll/payslips/${id}`),
-      download: (id: string) => `/api/payroll/payslips/${id}/download`,
-    },
-    revisions: {
-      list: () => request<SalaryRevision[]>("/api/payroll/revisions"),
-    },
   },
 
   // Business Development Module

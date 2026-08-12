@@ -3,6 +3,25 @@ import bcrypt from "bcrypt";
 
 const prisma = new PrismaClient();
 
+/** Finds the next unused EMP### code by scanning existing employees/users (seed-only helper). */
+async function nextEmployeeCode(): Promise<string> {
+  const [employees, users] = await Promise.all([
+    prisma.employee.findMany({ select: { employeeCode: true } }),
+    prisma.user.findMany({ where: { employeeId: { not: null } }, select: { employeeId: true } }),
+  ]);
+  let max = 0;
+  const pattern = /^EMP(\d+)$/;
+  for (const e of employees) {
+    const match = pattern.exec(e.employeeCode);
+    if (match) max = Math.max(max, parseInt(match[1], 10));
+  }
+  for (const u of users) {
+    const match = u.employeeId ? pattern.exec(u.employeeId) : null;
+    if (match) max = Math.max(max, parseInt(match[1], 10));
+  }
+  return `EMP${String(max + 1).padStart(3, "0")}`;
+}
+
 async function main() {
   console.log("🌱 Seeding database...");
   
@@ -44,7 +63,12 @@ async function main() {
       "offer",
     ]);
     const hrResources = new Set(["employee", "policy", "asset", "hr", "ticket"]);
+    const attendanceResources = new Set(["attendance"]);
+    const leaveResources = new Set(["leave"]);
+    const approvalResources = new Set(["approval"]);
     const portalResources = new Set(["portal"]);
+    const financeResources = new Set(["client", "invoice", "payment", "reimbursement", "finance"]);
+    const payrollResources = new Set(["salary_structure", "salary_revision", "payroll_run", "payslip"]);
     const label = resource
       .split("_")
       .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
@@ -65,8 +89,23 @@ async function main() {
     if (hrResources.has(resource)) {
       return { module: "HR", feature: label };
     }
+    if (attendanceResources.has(resource)) {
+      return { module: "Attendance", feature: label };
+    }
+    if (leaveResources.has(resource)) {
+      return { module: "Leave", feature: label };
+    }
+    if (approvalResources.has(resource)) {
+      return { module: "Approvals", feature: label };
+    }
     if (portalResources.has(resource)) {
       return { module: "Employee Portal", feature: label };
+    }
+    if (financeResources.has(resource)) {
+      return { module: "Finance", feature: label };
+    }
+    if (payrollResources.has(resource)) {
+      return { module: "Payroll", feature: label };
     }
     return { module: "General", feature: label };
   }
@@ -158,8 +197,49 @@ async function main() {
     { name: "Create Support Tickets", code: "ticket.create", resource: "ticket", action: "create" },
     { name: "Manage Support Tickets", code: "ticket.manage", resource: "ticket", action: "manage" },
 
+    { name: "Read Attendance", code: "attendance.read", resource: "attendance", action: "read" },
+    { name: "Manage Attendance", code: "attendance.manage", resource: "attendance", action: "manage" },
+    { name: "Approve Attendance", code: "attendance.approve", resource: "attendance", action: "approve" },
+
+    { name: "Read Leave", code: "leave.read", resource: "leave", action: "read" },
+    { name: "Manage Leave", code: "leave.manage", resource: "leave", action: "manage" },
+    { name: "Approve Leave", code: "leave.approve", resource: "leave", action: "approve" },
+
+    { name: "Delete Assets", code: "asset.delete", resource: "asset", action: "delete" },
+    { name: "Manage Assets", code: "asset.manage", resource: "asset", action: "manage" },
+
+    { name: "Create Approvals", code: "approval.create", resource: "approval", action: "create" },
+
     { name: "Portal Read", code: "portal.read", resource: "portal", action: "read" },
     { name: "Portal Update", code: "portal.update", resource: "portal", action: "update" },
+
+    { name: "Read Clients", code: "client.read", resource: "client", action: "read" },
+    { name: "Manage Clients", code: "client.manage", resource: "client", action: "manage" },
+
+    { name: "Read Invoices", code: "invoice.read", resource: "invoice", action: "read" },
+    { name: "Manage Invoices", code: "invoice.manage", resource: "invoice", action: "manage" },
+    { name: "Approve Invoices", code: "invoice.approve", resource: "invoice", action: "approve" },
+
+    { name: "Read Payments", code: "payment.read", resource: "payment", action: "read" },
+    { name: "Manage Payments", code: "payment.manage", resource: "payment", action: "manage" },
+
+    { name: "Read Reimbursements", code: "reimbursement.read", resource: "reimbursement", action: "read" },
+    { name: "Review Reimbursements", code: "reimbursement.review", resource: "reimbursement", action: "review" },
+
+    { name: "Finance Dashboard", code: "finance.dashboard.read", resource: "finance", action: "read" },
+
+    { name: "Read Salary Structures", code: "salary_structure.read", resource: "salary_structure", action: "read" },
+    { name: "Manage Salary Structures", code: "salary_structure.manage", resource: "salary_structure", action: "manage" },
+
+    { name: "Read Salary Revisions", code: "salary_revision.read", resource: "salary_revision", action: "read" },
+    { name: "Request Salary Revisions", code: "salary_revision.request", resource: "salary_revision", action: "request" },
+    { name: "Approve Salary Revisions", code: "salary_revision.approve", resource: "salary_revision", action: "approve" },
+
+    { name: "Read Payroll Runs", code: "payroll_run.read", resource: "payroll_run", action: "read" },
+    { name: "Manage Payroll Runs", code: "payroll_run.manage", resource: "payroll_run", action: "manage" },
+    { name: "Approve Payroll Runs", code: "payroll_run.approve", resource: "payroll_run", action: "approve" },
+
+    { name: "Read Payslips", code: "payslip.read", resource: "payslip", action: "read" },
   ];
   
   const createdPermissions = [];
@@ -250,6 +330,28 @@ async function main() {
       code: "developer",
       description:
         "Engineering contributor with portal access and team-scoped employee visibility",
+      isSystem: true,
+    },
+  });
+
+  const financeRole = await prisma.role.upsert({
+    where: { code: "finance" },
+    update: {},
+    create: {
+      name: "Finance Team",
+      code: "finance",
+      description: "Manages clients, invoices, payments, and employee reimbursements",
+      isSystem: true,
+    },
+  });
+
+  const payrollRole = await prisma.role.upsert({
+    where: { code: "payroll" },
+    update: {},
+    create: {
+      name: "Payroll Team",
+      code: "payroll",
+      description: "Manages salary structures, salary revisions, and payroll runs",
       isSystem: true,
     },
   });
@@ -393,6 +495,26 @@ async function main() {
     });
   }
   
+  const financePermissions = createdPermissions.filter((p) =>
+    ["client", "invoice", "payment", "reimbursement", "finance"].includes(p.resource),
+  );
+  await prisma.rolePermission.deleteMany({ where: { roleId: financeRole.id } });
+  for (const permission of financePermissions) {
+    await prisma.rolePermission.create({
+      data: { roleId: financeRole.id, permissionId: permission.id },
+    });
+  }
+
+  const payrollPermissions = createdPermissions.filter((p) =>
+    ["salary_structure", "salary_revision", "payroll_run", "payslip"].includes(p.resource),
+  );
+  await prisma.rolePermission.deleteMany({ where: { roleId: payrollRole.id } });
+  for (const permission of payrollPermissions) {
+    await prisma.rolePermission.create({
+      data: { roleId: payrollRole.id, permissionId: permission.id },
+    });
+  }
+
   console.log("✅ Role permissions assigned");
   
   const employeeTypes = [
@@ -575,13 +697,23 @@ async function main() {
     create: { userId: hrUser.id, roleId: hrRole.id },
   });
 
-  // Ensure Employee master record exists for HR user
+  // Ensure Employee master record exists for HR user. The User.employeeId and
+  // Employee.employeeCode sequences can drift (legacy field vs. employee master),
+  // so fall back to a freshly allocated code if the preferred one is already
+  // claimed by a different employee.
+  let hrEmployeeCode = hrUser.employeeId ?? (await nextEmployeeCode());
+  const conflictingHrEmployee = await prisma.employee.findFirst({
+    where: { employeeCode: hrEmployeeCode },
+  });
+  if (conflictingHrEmployee && conflictingHrEmployee.userId !== hrUser.id) {
+    hrEmployeeCode = await nextEmployeeCode();
+  }
   await prisma.employee.upsert({
     where: { userId: hrUser.id },
     update: { lifecycleState: "ACTIVE" },
     create: {
       userId: hrUser.id,
-      employeeCode: hrUser.employeeId ?? "EMP002",
+      employeeCode: hrEmployeeCode,
       lifecycleState: "ACTIVE",
       hiredAt: new Date(),
     },
@@ -620,6 +752,81 @@ async function main() {
   });
 
   console.log(`📧 HR user: ${hrUserEmail} / Hr@123456`);
+
+  // Demo Finance Team user
+  const financeUserEmail = "finance@workforce360.com";
+  let financeUser = await prisma.user.findUnique({ where: { email: financeUserEmail } });
+  if (!financeUser) {
+    const financeEmployeeCode = await nextEmployeeCode();
+    financeUser = await prisma.user.create({
+      data: {
+        email: financeUserEmail,
+        passwordHash: await bcrypt.hash("Finance@123", 12),
+        firstName: "Finance",
+        lastName: "Manager",
+        status: "active",
+        employeeId: financeEmployeeCode,
+        emailVerified: true,
+        employeeTypeId: fullTimeType?.id,
+        employmentStatusId: activeEmploymentStatus?.id,
+        dateOfJoining: new Date(),
+      },
+    });
+  }
+  await prisma.userRole.upsert({
+    where: { userId_roleId: { userId: financeUser.id, roleId: financeRole.id } },
+    update: {},
+    create: { userId: financeUser.id, roleId: financeRole.id },
+  });
+  await prisma.employee.upsert({
+    where: { userId: financeUser.id },
+    update: { lifecycleState: "ACTIVE" },
+    create: {
+      userId: financeUser.id,
+      employeeCode: financeUser.employeeId ?? (await nextEmployeeCode()),
+      lifecycleState: "ACTIVE",
+      hiredAt: new Date(),
+    },
+  });
+  console.log(`📧 Finance user: ${financeUserEmail} / Finance@123`);
+
+  // Demo Payroll Team user
+  const payrollUserEmail = "payroll@workforce360.com";
+  let payrollUser = await prisma.user.findUnique({ where: { email: payrollUserEmail } });
+  if (!payrollUser) {
+    const payrollEmployeeCode = await nextEmployeeCode();
+    payrollUser = await prisma.user.create({
+      data: {
+        email: payrollUserEmail,
+        passwordHash: await bcrypt.hash("Payroll@123", 12),
+        firstName: "Payroll",
+        lastName: "Manager",
+        status: "active",
+        employeeId: payrollEmployeeCode,
+        emailVerified: true,
+        employeeTypeId: fullTimeType?.id,
+        employmentStatusId: activeEmploymentStatus?.id,
+        dateOfJoining: new Date(),
+      },
+    });
+  }
+  await prisma.userRole.upsert({
+    where: { userId_roleId: { userId: payrollUser.id, roleId: payrollRole.id } },
+    update: {},
+    create: { userId: payrollUser.id, roleId: payrollRole.id },
+  });
+  await prisma.employee.upsert({
+    where: { userId: payrollUser.id },
+    update: { lifecycleState: "ACTIVE" },
+    create: {
+      userId: payrollUser.id,
+      employeeCode: payrollUser.employeeId ?? (await nextEmployeeCode()),
+      lifecycleState: "ACTIVE",
+      hiredAt: new Date(),
+    },
+  });
+  console.log(`📧 Payroll user: ${payrollUserEmail} / Payroll@123`);
+
   console.log("");
   console.log("🎉 Database seeded successfully!");
 }
