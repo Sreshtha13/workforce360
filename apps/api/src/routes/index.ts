@@ -19,6 +19,9 @@ import { approvalRouter } from "./approval.routes";
 import { assetRouter } from "./asset.routes";
 import { financeRouter } from "./finance.routes";
 import { payrollRouter } from "./payroll.routes";
+import { notificationRouter } from "./notification.routes";
+import { helpdeskRouter } from "./helpdesk.routes";
+import { documentRouter } from "./document.routes";
 
 const apiRouter = Router();
 
@@ -42,5 +45,8 @@ apiRouter.use("/approvals", approvalRouter);
 apiRouter.use("/assets", assetRouter);
 apiRouter.use("/finance", financeRouter);
 apiRouter.use("/payroll", payrollRouter);
+apiRouter.use("/notifications", notificationRouter);
+apiRouter.use("/helpdesk", helpdeskRouter);
+apiRouter.use("/documents", documentRouter);
 
 export { apiRouter };

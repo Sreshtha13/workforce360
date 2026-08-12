@@ -1,5 +1,12 @@
-import ComingSoonPage from "@/components/portal/coming-soon-page";
+"use client";
 
-export default function Page() {
-  return <ComingSoonPage title="My documents" />;
+import { DocumentsPage } from "@/components/documents/documents-page";
+
+export default function PortalDocumentsPage() {
+  return (
+    <DocumentsPage
+      title="My documents"
+      description="Documents you can access, including uploads and shared files."
+    />
+  );
 }

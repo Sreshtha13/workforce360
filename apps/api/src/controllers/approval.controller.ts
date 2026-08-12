@@ -14,6 +14,21 @@ export class ApprovalController {
     }
   };
 
+  createFromWorkflow = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const request = await this.approvalService.createFromWorkflow(
+        req.body.entityType,
+        req.body.entityId,
+        req.body.requesterId ?? req.user!.userId,
+        req.body.metadata ?? {},
+        req.user!.userId,
+      );
+      return sendSuccess(res, request, 201);
+    } catch (error) {
+      next(error);
+    }
+  };
+
   approveRequest = async (req: Request, res: Response, next: NextFunction) => {
     try {
       const request = await this.approvalService.approveRequest(
@@ -64,6 +79,15 @@ export class ApprovalController {
     }
   };
 
+  getHistory = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const actions = await this.approvalService.getHistory(req.params.id);
+      return sendSuccess(res, actions);
+    } catch (error) {
+      next(error);
+    }
+  };
+
   listApprovalRequests = async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { entityType, requesterId, approverId, status } = req.query;
@@ -92,6 +116,99 @@ export class ApprovalController {
     try {
       const stats = await this.approvalService.getApprovalStats(req.user!.userId);
       return sendSuccess(res, stats);
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  processEscalations = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const result = await this.approvalService.escalateOverdueSteps(req.user!.userId);
+      return sendSuccess(res, result);
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  listWorkflows = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const data = await this.approvalService.listWorkflows(req.query.entityType as string | undefined);
+      return sendSuccess(res, data);
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  getWorkflow = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const data = await this.approvalService.getWorkflow(req.params.id);
+      return sendSuccess(res, data);
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  createWorkflow = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const data = await this.approvalService.createWorkflow(req.body, req.user!.userId);
+      return sendSuccess(res, data, 201);
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  updateWorkflow = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const data = await this.approvalService.updateWorkflow(req.params.id, req.body, req.user!.userId);
+      return sendSuccess(res, data);
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  deleteWorkflow = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const data = await this.approvalService.deleteWorkflow(req.params.id, req.user!.userId);
+      return sendSuccess(res, data);
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  listDelegations = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const data = await this.approvalService.listDelegations({
+        delegatorId: req.query.delegatorId as string | undefined,
+        delegateId: req.query.delegateId as string | undefined,
+      });
+      return sendSuccess(res, data);
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  createDelegation = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const data = await this.approvalService.createDelegation(req.body, req.user!.userId);
+      return sendSuccess(res, data, 201);
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  updateDelegation = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const data = await this.approvalService.updateDelegation(req.params.id, req.body, req.user!.userId);
+      return sendSuccess(res, data);
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  deleteDelegation = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const data = await this.approvalService.deleteDelegation(req.params.id, req.user!.userId);
+      return sendSuccess(res, data);
     } catch (error) {
       next(error);
     }

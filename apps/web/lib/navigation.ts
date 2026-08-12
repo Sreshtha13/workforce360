@@ -1,7 +1,9 @@
 import type { LucideIcon } from "lucide-react";
 import {
+  Bell,
   Building2,
   Briefcase,
+  ClipboardCheck,
   ClipboardList,
   CreditCard,
   DollarSign,
@@ -10,9 +12,12 @@ import {
   KeyRound,
   LayoutDashboard,
   MapPin,
+  Megaphone,
+  BookOpen,
   Receipt,
   Shield,
   Tags,
+  Timer,
   UserCheck,
   UserCircle,
   Users,
@@ -50,6 +55,18 @@ export const mainNav: NavItem[] = [
     href: "/dashboard",
     icon: LayoutDashboard,
     public: true,
+  },
+  {
+    label: "Approvals",
+    href: "/approvals",
+    icon: ClipboardCheck,
+    permissions: ["approval.read", "approval.action", "approval.manage"],
+  },
+  {
+    label: "Delegations",
+    href: "/approvals/delegations",
+    icon: UserCheck,
+    permissions: ["approval.delegate", "approval.manage"],
   },
 ];
 
@@ -125,10 +142,28 @@ export const hrNav: NavItem[] = [
     permissions: ["asset.read"],
   },
   {
+    label: "Documents",
+    href: "/hr/documents",
+    icon: FileText,
+    permissions: ["document.read", "document.manage"],
+  },
+  {
     label: "Support Tickets",
     href: "/hr/tickets",
     icon: Headphones,
     permissions: ["ticket.read"],
+  },
+  {
+    label: "Knowledge Base",
+    href: "/hr/knowledge-base",
+    icon: BookOpen,
+    permissions: ["ticket.read", "ticket.manage"],
+  },
+  {
+    label: "SLA Policies",
+    href: "/hr/sla-policies",
+    icon: Timer,
+    permissions: ["ticket.manage"],
   },
 ];
 
@@ -239,7 +274,7 @@ export const portalNav: NavItem[] = [
     label: "Documents",
     href: "/portal/documents",
     icon: FileText,
-    permissions: ["portal.read"],
+    permissions: ["document.read", "portal.read"],
   },
   {
     label: "Policies",
@@ -250,7 +285,13 @@ export const portalNav: NavItem[] = [
   {
     label: "Notifications",
     href: "/portal/notifications",
-    icon: ClipboardList,
+    icon: Bell,
+    permissions: ["portal.read"],
+  },
+  {
+    label: "Notification preferences",
+    href: "/portal/notification-preferences",
+    icon: Bell,
     permissions: ["portal.read"],
   },
   {
@@ -320,6 +361,18 @@ export const adminNav: NavItem[] = [
       "employment_status.update",
       "employment_status.delete",
     ],
+  },
+  {
+    label: "Approval Workflows",
+    href: "/admin/approval-workflows",
+    icon: Workflow,
+    permissions: ["approval.read", "approval.manage"],
+  },
+  {
+    label: "Announcements",
+    href: "/admin/announcements",
+    icon: Megaphone,
+    permissions: ["announcement.manage"],
   },
 ];
 

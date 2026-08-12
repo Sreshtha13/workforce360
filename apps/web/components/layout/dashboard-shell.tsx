@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { type ReactNode, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import {
   Bell,
   ChevronDown,
@@ -11,6 +12,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
+import { apiClient } from "@/lib/api-client";
 import {
   adminNav,
   candidateNav,
@@ -48,6 +50,13 @@ export function DashboardShell({ children }: { children: ReactNode }) {
   const [payrollExpanded, setPayrollExpanded] = useState(true);
   const [portalExpanded, setPortalExpanded] = useState(true);
 
+  const unreadQuery = useQuery({
+    queryKey: ["notifications", "unread-count"],
+    queryFn: async () => (await apiClient.notifications.unreadCount()).data?.count ?? 0,
+    enabled: Boolean(user),
+    refetchInterval: 60_000,
+  });
+
   if (!user) return null;
 
   const navUser = { permissions: user.permissions, roles: user.roles };
@@ -60,6 +69,7 @@ export function DashboardShell({ children }: { children: ReactNode }) {
   const visibleAdmin = filterNavByPermissions(adminNav, navUser);
   const breadcrumbs = buildBreadcrumbs(pathname);
   const initials = `${user.firstName[0] ?? ""}${user.lastName[0] ?? ""}`;
+  const unreadCount = unreadQuery.data ?? 0;
 
   const sidebar = (
     <>
@@ -348,15 +358,22 @@ export function DashboardShell({ children }: { children: ReactNode }) {
           <div className="ml-auto flex items-center gap-1 sm:gap-2">
             <ThemeToggle />
 
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              disabled
-              aria-label="Notifications (coming soon)"
-              className="relative"
+            <Link
+              href="/portal/notifications"
+              aria-label={
+                unreadCount > 0
+                  ? `${unreadCount} unread notifications`
+                  : "Notifications"
+              }
+              className="relative inline-flex size-8 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground"
             >
               <Bell className={iconSize.md} />
-            </Button>
+              {unreadCount > 0 && (
+                <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-brand-600 px-1 text-[10px] font-semibold text-white">
+                  {unreadCount > 99 ? "99+" : unreadCount}
+                </span>
+              )}
+            </Link>
 
             <Separator orientation="vertical" className="mx-1 hidden h-6 sm:block" />
 

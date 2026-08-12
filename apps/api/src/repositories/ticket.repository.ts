@@ -2,8 +2,10 @@ import type {
   Prisma,
   SupportTicketMessageAuthor,
   SupportTicketStatus,
+  TicketPriority,
 } from "@prisma/client";
 import { prisma } from "../lib/prisma";
+import { generateTicketNumber, normalizeTicketPriority } from "../lib/ticket-sla";
 
 const ticketListInclude = {
   user: {
@@ -15,6 +17,7 @@ const ticketListInclude = {
   attachment: {
     select: { id: true, originalName: true, mimeType: true, sizeBytes: true },
   },
+  slaPolicy: true,
   _count: { select: { messages: true } },
 } satisfies Prisma.SupportTicketInclude;
 
@@ -46,6 +49,11 @@ export type TicketWorkflowFields = {
   userId: string;
   assignedToId: string | null;
   status: SupportTicketStatus;
+  priority: TicketPriority;
+  firstRespondedAt: Date | null;
+  escalatedAt: Date | null;
+  escalationLevel: number;
+  approvalRequestId: string | null;
   resolvedAt: Date | null;
   closedAt: Date | null;
 };
@@ -57,11 +65,15 @@ export type CreateTicketInput = {
   priority?: string;
   category?: string;
   attachmentFileId?: string;
+  ticketNumber?: string;
+  slaPolicyId?: string | null;
+  firstResponseDueAt?: Date | null;
+  resolutionDueAt?: Date | null;
 };
 
 export type AddMessageInput = {
   ticketId: string;
-  authorId: string;
+  authorId: string | null;
   authorType: SupportTicketMessageAuthor;
   body: string;
   attachmentFileId?: string;
@@ -86,6 +98,7 @@ export class TicketRepository {
         { subject: { contains: q, mode: "insensitive" } },
         { description: { contains: q, mode: "insensitive" } },
         { category: { contains: q, mode: "insensitive" } },
+        { ticketNumber: { contains: q, mode: "insensitive" } },
       ];
     }
 
@@ -103,16 +116,76 @@ export class TicketRepository {
     }) as Promise<TicketDetail | null>;
   }
 
+  findSlaPolicyByPriority(priority: TicketPriority) {
+    return prisma.slaPolicy.findFirst({
+      where: { priority, isActive: true, deletedAt: null },
+    });
+  }
+
+  listSlaPolicies() {
+    return prisma.slaPolicy.findMany({
+      where: { deletedAt: null },
+      orderBy: { priority: "asc" },
+    });
+  }
+
+  upsertSlaPolicy(data: {
+    id?: string;
+    name: string;
+    priority: TicketPriority;
+    firstResponseMinutes: number;
+    resolutionMinutes: number;
+    escalateAfterMinutes?: number | null;
+    isActive?: boolean;
+  }) {
+    if (data.id) {
+      return prisma.slaPolicy.update({
+        where: { id: data.id },
+        data: {
+          name: data.name,
+          firstResponseMinutes: data.firstResponseMinutes,
+          resolutionMinutes: data.resolutionMinutes,
+          escalateAfterMinutes: data.escalateAfterMinutes,
+          isActive: data.isActive,
+        },
+      });
+    }
+    return prisma.slaPolicy.upsert({
+      where: { priority: data.priority },
+      create: {
+        name: data.name,
+        priority: data.priority,
+        firstResponseMinutes: data.firstResponseMinutes,
+        resolutionMinutes: data.resolutionMinutes,
+        escalateAfterMinutes: data.escalateAfterMinutes,
+        isActive: data.isActive ?? true,
+      },
+      update: {
+        name: data.name,
+        firstResponseMinutes: data.firstResponseMinutes,
+        resolutionMinutes: data.resolutionMinutes,
+        escalateAfterMinutes: data.escalateAfterMinutes,
+        isActive: data.isActive,
+        deletedAt: null,
+      },
+    });
+  }
+
   async createTicket(input: CreateTicketInput): Promise<TicketDetail | null> {
+    const priority = normalizeTicketPriority(input.priority);
     return prisma.$transaction(async (tx) => {
       const ticket = await tx.supportTicket.create({
         data: {
           userId: input.userId,
           subject: input.subject,
           description: input.description,
-          priority: input.priority ?? "medium",
+          priority,
           category: input.category,
           attachmentFileId: input.attachmentFileId,
+          ticketNumber: input.ticketNumber ?? generateTicketNumber(),
+          slaPolicyId: input.slaPolicyId,
+          firstResponseDueAt: input.firstResponseDueAt,
+          resolutionDueAt: input.resolutionDueAt,
         },
       });
 
@@ -165,9 +238,17 @@ export class TicketRepository {
     data: {
       status?: SupportTicketStatus;
       assignedToId?: string | null;
-      priority?: string;
+      priority?: TicketPriority | string;
       resolvedAt?: Date | null;
       closedAt?: Date | null;
+      firstRespondedAt?: Date | null;
+      escalatedAt?: Date | null;
+      escalationLevel?: number;
+      approvalRequestId?: string | null;
+      slaPolicyId?: string | null;
+      firstResponseDueAt?: Date | null;
+      resolutionDueAt?: Date | null;
+      ticketNumber?: string;
     },
   ): Promise<TicketDetail> {
     return prisma.supportTicket.update({
@@ -175,9 +256,19 @@ export class TicketRepository {
       data: {
         status: data.status,
         assignedToId: data.assignedToId,
-        priority: data.priority,
+        priority: data.priority
+          ? normalizeTicketPriority(String(data.priority))
+          : undefined,
         resolvedAt: data.resolvedAt,
         closedAt: data.closedAt,
+        firstRespondedAt: data.firstRespondedAt,
+        escalatedAt: data.escalatedAt,
+        escalationLevel: data.escalationLevel,
+        approvalRequestId: data.approvalRequestId,
+        slaPolicyId: data.slaPolicyId,
+        firstResponseDueAt: data.firstResponseDueAt,
+        resolutionDueAt: data.resolutionDueAt,
+        ticketNumber: data.ticketNumber,
       },
       include: ticketDetailInclude,
     }) as Promise<TicketDetail>;

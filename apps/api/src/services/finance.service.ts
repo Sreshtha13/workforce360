@@ -449,19 +449,43 @@ export class FinanceService {
 
   async createReimbursement(
     employeeId: string,
-    data: { category: string; description: string; amount: number; currency: string; expenseDate: string; receiptFileId?: string },
+    data: {
+      category: string;
+      description: string;
+      amount: number;
+      currency: string;
+      expenseDate: string;
+      receiptFileId?: string;
+      approverIds?: string[];
+    },
     actorId: string,
   ) {
-    const reimbursement = await this.financeRepo.createReimbursement({
-      employeeId,
+    let reimbursement = await this.financeRepo.createReimbursement({
+      userId: employeeId,
       category: data.category,
       description: data.description,
       amount: data.amount,
       currency: data.currency,
-      expenseDate: new Date(data.expenseDate),
       receiptFileId: data.receiptFileId,
       status: "PENDING",
-    });
+      notes: `Expense date: ${data.expenseDate}`,
+    } as Prisma.ReimbursementUncheckedCreateInput);
+
+    if (data.approverIds && data.approverIds.length > 0) {
+      const approval = await this.approvalService.createApprovalRequest(
+        {
+          entityType: "reimbursement",
+          entityId: reimbursement.id,
+          requesterId: actorId,
+          approverIds: data.approverIds,
+          metadata: { amount: data.amount, category: data.category },
+        },
+        actorId,
+      );
+      reimbursement = await this.financeRepo.updateReimbursement(reimbursement.id, {
+        approvalRequestId: approval.id,
+      });
+    }
 
     await writeAuditLog({ userId: actorId, action: "create", entity: "reimbursement", entityId: reimbursement.id, after: reimbursement });
     return reimbursement;

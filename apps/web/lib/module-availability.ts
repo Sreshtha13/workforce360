@@ -5,7 +5,7 @@ export const PORTAL_MODULE_FLAGS = {
   timesheets: false,
   requests: false,
   payslips: true,
-  documents: false,
+  documents: true,
 } as const;
 
 export type PortalModuleKey = keyof typeof PORTAL_MODULE_FLAGS;

@@ -264,9 +264,12 @@ model User {
   policyAssignmentsCreated PolicyAssignment[] @relation("PolicyAssignmentCreator")
   policyAcknowledgements PolicyAcknowledgement[]
   notifications      Notification[]
+  notificationPreferences NotificationPreference[]
+  publishedAnnouncements Announcement[] @relation("AnnouncementPublisher")
   supportTickets     SupportTicket[] @relation("TicketRequester")
   assignedTickets    SupportTicket[] @relation("TicketAssignee")
   ticketMessages     SupportTicketMessage[]
+  kbArticles         KnowledgeBaseArticle[] @relation("KbArticleAuthor")
   uploadedFiles      StoredFile[] @relation("FileUploader")
   assignedLeads      Lead[] @relation("LeadAssignee")
   managedProjects    Project[] @relation("ProjectManager")
@@ -289,6 +292,13 @@ model User {
   createdPayrollRuns PayrollRun[] @relation("PayrollRunCreator")
   approvalRequests   ApprovalRequest[] @relation("ApprovalRequester")
   approvalSteps      ApprovalStep[] @relation("StepApprover")
+  approvalStepsDelegatedFrom ApprovalStep[] @relation("StepDelegatedFrom")
+  approvalActions    ApprovalAction[] @relation("ApprovalActionActor")
+  approvalDelegationsGiven ApprovalDelegation[] @relation("DelegationDelegator")
+  approvalDelegationsReceived ApprovalDelegation[] @relation("DelegationDelegate")
+  createdDocuments   ManagedDocument[] @relation("DocumentCreator")
+  documentVersionsUploaded DocumentVersion[] @relation("DocumentVersionUploader")
+  documentPermissions DocumentPermission[] @relation("DocumentPermissionUser")
   deployedReleases   Release[] @relation("ReleaseDeployer")
   assignedTestCases  TestCase[] @relation("TestCaseAssignee")
   createdTestCases   TestCase[] @relation("TestCaseCreator")
@@ -571,6 +581,7 @@ model StoredFile {
   ticketMessages SupportTicketMessage[]
   payslips     Payslip[] @relation("PayslipPDF")
   reimbursements Reimbursement[] @relation("ReimbursementReceipt")
+  documentVersions DocumentVersion[]
 
   @@index([uploadedById])
   @@index([entityType, entityId])
@@ -874,50 +885,159 @@ model Asset {
   @@map("assets")
 }
 
-model Notification {
-  id        String    @id @default(cuid())
-  userId    String    @map("user_id")
-  title     String
-  message   String
-  isRead    Boolean   @default(false) @map("is_read")
-  link      String?
-  createdAt DateTime  @default(now()) @map("created_at")
-  updatedAt DateTime  @updatedAt @map("updated_at")
-  deletedAt DateTime? @map("deleted_at")
+enum NotificationCategory {
+  TICKET
+  APPROVAL
+  LEAVE
+  PAYROLL
+  FINANCE
+  HR
+  ANNOUNCEMENT
+  SYSTEM
+  DOCUMENT
+}
 
-  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+model Notification {
+  id          String                @id @default(cuid())
+  userId      String                @map("user_id")
+  title       String
+  message     String
+  category    NotificationCategory  @default(SYSTEM)
+  isRead      Boolean               @default(false) @map("is_read")
+  link        String?
+  emailSentAt DateTime?             @map("email_sent_at")
+  createdAt   DateTime              @default(now()) @map("created_at")
+  updatedAt   DateTime              @updatedAt @map("updated_at")
+  deletedAt   DateTime?             @map("deleted_at")
+
+  user        User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([isRead])
+  @@index([category])
   @@map("notifications")
 }
 
-model SupportTicket {
-  id               String              @id @default(cuid())
-  userId           String              @map("user_id")
-  assignedToId     String?             @map("assigned_to_id")
-  subject          String
-  description      String
-  status           SupportTicketStatus @default(OPEN)
-  priority         String              @default("medium")
-  category         String?
-  latestReply      String?             @map("latest_reply")
-  attachmentFileId String?             @map("attachment_file_id")
-  resolvedAt       DateTime?           @map("resolved_at")
-  closedAt         DateTime?           @map("closed_at")
-  createdAt        DateTime            @default(now()) @map("created_at")
-  updatedAt        DateTime            @updatedAt @map("updated_at")
-  deletedAt        DateTime?           @map("deleted_at")
+model NotificationPreference {
+  id            String               @id @default(cuid())
+  userId        String               @map("user_id")
+  category      NotificationCategory
+  inAppEnabled  Boolean              @default(true) @map("in_app_enabled")
+  emailEnabled  Boolean              @default(true) @map("email_enabled")
+  createdAt     DateTime             @default(now()) @map("created_at")
+  updatedAt     DateTime             @updatedAt @map("updated_at")
+  deletedAt     DateTime?            @map("deleted_at")
 
-  user             User                @relation("TicketRequester", fields: [userId], references: [id], onDelete: Cascade)
-  assignedTo       User?               @relation("TicketAssignee", fields: [assignedToId], references: [id])
-  attachment       StoredFile?         @relation(fields: [attachmentFileId], references: [id])
-  messages         SupportTicketMessage[]
+  user          User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, category])
+  @@index([userId])
+  @@map("notification_preferences")
+}
+
+model Announcement {
+  id            String    @id @default(cuid())
+  title         String
+  body          String
+  publishedById String    @map("published_by_id")
+  publishedAt   DateTime? @map("published_at")
+  expiresAt     DateTime? @map("expires_at")
+  isActive      Boolean   @default(true) @map("is_active")
+  audience      String    @default("ALL") // ALL | ROLE:<code> | DEPT:<id>
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+  deletedAt     DateTime? @map("deleted_at")
+
+  publishedBy   User      @relation("AnnouncementPublisher", fields: [publishedById], references: [id])
+
+  @@index([isActive])
+  @@index([publishedAt])
+  @@map("announcements")
+}
+
+enum TicketPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+model SlaPolicy {
+  id                   String         @id @default(cuid())
+  name                 String
+  priority             TicketPriority @unique
+  firstResponseMinutes Int            @map("first_response_minutes")
+  resolutionMinutes    Int            @map("resolution_minutes")
+  escalateAfterMinutes Int?           @map("escalate_after_minutes")
+  isActive             Boolean        @default(true) @map("is_active")
+  createdAt            DateTime       @default(now()) @map("created_at")
+  updatedAt            DateTime       @updatedAt @map("updated_at")
+  deletedAt            DateTime?      @map("deleted_at")
+
+  tickets              SupportTicket[]
+
+  @@map("sla_policies")
+}
+
+model SupportTicket {
+  id                  String              @id @default(cuid())
+  ticketNumber        String?             @unique @map("ticket_number")
+  userId              String              @map("user_id")
+  assignedToId        String?             @map("assigned_to_id")
+  subject             String
+  description         String
+  status              SupportTicketStatus @default(OPEN)
+  priority            TicketPriority      @default(MEDIUM)
+  category            String?
+  latestReply         String?             @map("latest_reply")
+  attachmentFileId    String?             @map("attachment_file_id")
+  slaPolicyId         String?             @map("sla_policy_id")
+  firstResponseDueAt  DateTime?           @map("first_response_due_at")
+  resolutionDueAt     DateTime?           @map("resolution_due_at")
+  firstRespondedAt    DateTime?           @map("first_responded_at")
+  escalatedAt         DateTime?           @map("escalated_at")
+  escalationLevel     Int                 @default(0) @map("escalation_level")
+  approvalRequestId   String?             @unique @map("approval_request_id")
+  resolvedAt          DateTime?           @map("resolved_at")
+  closedAt            DateTime?           @map("closed_at")
+  createdAt           DateTime            @default(now()) @map("created_at")
+  updatedAt           DateTime            @updatedAt @map("updated_at")
+  deletedAt           DateTime?           @map("deleted_at")
+
+  user                User                @relation("TicketRequester", fields: [userId], references: [id], onDelete: Cascade)
+  assignedTo          User?               @relation("TicketAssignee", fields: [assignedToId], references: [id])
+  attachment          StoredFile?         @relation(fields: [attachmentFileId], references: [id])
+  slaPolicy           SlaPolicy?          @relation(fields: [slaPolicyId], references: [id])
+  approvalRequest     ApprovalRequest?    @relation(fields: [approvalRequestId], references: [id])
+  messages            SupportTicketMessage[]
 
   @@index([userId])
   @@index([assignedToId])
   @@index([status])
+  @@index([priority])
+  @@index([resolutionDueAt])
   @@map("support_tickets")
+}
+
+model KnowledgeBaseArticle {
+  id          String    @id @default(cuid())
+  title       String
+  slug        String    @unique
+  content     String
+  category    String?
+  tags        String[]  @default([])
+  isPublished Boolean   @default(false) @map("is_published")
+  viewCount   Int       @default(0) @map("view_count")
+  authorId    String    @map("author_id")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+  deletedAt   DateTime? @map("deleted_at")
+
+  author      User      @relation("KbArticleAuthor", fields: [authorId], references: [id])
+
+  @@index([isPublished])
+  @@index([category])
+  @@map("knowledge_base_articles")
 }
 
 model SupportTicketMessage {
@@ -1436,7 +1556,7 @@ model LeaveApplication {
   reviewedAt     DateTime?     @map("reviewed_at")
   reviewedById   String?       @map("reviewed_by_id")
   reviewNotes    String?       @map("review_notes")
-  approvalId     String?       @unique @map("approval_id")
+  approvalRequestId String?    @unique @map("approval_request_id")
   createdAt      DateTime      @default(now()) @map("created_at")
   updatedAt      DateTime      @updatedAt @map("updated_at")
   deletedAt      DateTime?     @map("deleted_at")
@@ -1444,7 +1564,7 @@ model LeaveApplication {
   user           User          @relation("UserLeaveApplications", fields: [userId], references: [id], onDelete: Cascade)
   policy         LeavePolicy   @relation(fields: [policyId], references: [id])
   reviewedBy     User?         @relation("LeaveReviewer", fields: [reviewedById], references: [id])
-  approval       ApprovalRequest? @relation(fields: [approvalId], references: [id])
+  approvalRequest ApprovalRequest? @relation(fields: [approvalRequestId], references: [id])
 
   @@index([userId])
   @@index([policyId])
@@ -1560,7 +1680,7 @@ model Invoice {
   submittedAt       DateTime?     @map("submitted_at")
   approvedAt        DateTime?     @map("approved_at")
   sentAt            DateTime?     @map("sent_at")
-  approvalId        String?       @unique @map("approval_id")
+  approvalRequestId String?       @unique @map("approval_request_id")
   createdById       String        @map("created_by_id")
   createdAt         DateTime      @default(now()) @map("created_at")
   updatedAt         DateTime      @updatedAt @map("updated_at")
@@ -1568,7 +1688,7 @@ model Invoice {
 
   client            FinanceClient @relation(fields: [clientId], references: [id])
   createdBy         User          @relation("InvoiceCreator", fields: [createdById], references: [id])
-  approval          ApprovalRequest? @relation(fields: [approvalId], references: [id])
+  approvalRequest   ApprovalRequest? @relation(fields: [approvalRequestId], references: [id])
   lineItems         InvoiceLineItem[]
   payments          Payment[]
 
@@ -1631,6 +1751,7 @@ model Reimbursement {
   reviewedById   String?              @map("reviewed_by_id")
   paidAt         DateTime?            @map("paid_at")
   notes          String?
+  approvalRequestId String?           @unique @map("approval_request_id")
   createdAt      DateTime             @default(now()) @map("created_at")
   updatedAt      DateTime             @updatedAt @map("updated_at")
   deletedAt      DateTime?            @map("deleted_at")
@@ -1638,6 +1759,7 @@ model Reimbursement {
   user           User                 @relation("UserReimbursements", fields: [userId], references: [id], onDelete: Cascade)
   reviewedBy     User?                @relation("ReimbursementReviewer", fields: [reviewedById], references: [id])
   receiptFile    StoredFile?          @relation("ReimbursementReceipt", fields: [receiptFileId], references: [id])
+  approvalRequest ApprovalRequest?    @relation(fields: [approvalRequestId], references: [id])
 
   @@index([userId])
   @@index([status])
@@ -1700,14 +1822,14 @@ model PayrollRun {
   approvedAt     DateTime?        @map("approved_at")
   processedAt    DateTime?        @map("processed_at")
   paidAt         DateTime?        @map("paid_at")
-  approvalId     String?          @unique @map("approval_id")
+  approvalRequestId String?       @unique @map("approval_request_id")
   createdById    String           @map("created_by_id")
   createdAt      DateTime         @default(now()) @map("created_at")
   updatedAt      DateTime         @updatedAt @map("updated_at")
   deletedAt      DateTime?        @map("deleted_at")
 
   createdBy      User             @relation("PayrollRunCreator", fields: [createdById], references: [id])
-  approval       ApprovalRequest? @relation(fields: [approvalId], references: [id])
+  approvalRequest ApprovalRequest? @relation(fields: [approvalRequestId], references: [id])
   payslips       Payslip[]
 
   @@index([status])
@@ -1748,68 +1870,275 @@ model Payslip {
 }
 
 // ============================================================================
-// GENERIC APPROVAL WORKFLOW ENGINE
+// GENERIC APPROVAL WORKFLOW ENGINE (Phase 3 + Phase 9 hardening)
 // ============================================================================
 
-enum ApprovalStatus {
+enum ApprovalRequestStatus {
   PENDING
   APPROVED
   REJECTED
   CANCELLED
 }
 
-enum ApprovalType {
-  LEAVE
-  REIMBURSEMENT
-  INVOICE
-  PAYROLL_RUN
+enum ApprovalActionType {
+  APPROVE
+  REJECT
+  REQUEST_CHANGES
+  CANCEL
+  DELEGATE
+  ESCALATE
+}
+
+model ApprovalWorkflow {
+  id          String    @id @default(cuid())
+  name        String
+  code        String    @unique
+  entityType  String    @map("entity_type") // leave_application | invoice | payroll_run | reimbursement | support_ticket
+  description String?
+  isActive    Boolean   @default(true) @map("is_active")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+  deletedAt   DateTime? @map("deleted_at")
+
+  levels      ApprovalWorkflowLevel[]
+  conditions  ApprovalWorkflowCondition[]
+  requests    ApprovalRequest[]
+
+  @@index([entityType])
+  @@index([isActive])
+  @@map("approval_workflows")
+}
+
+model ApprovalWorkflowLevel {
+  id                 String   @id @default(cuid())
+  workflowId         String   @map("workflow_id")
+  level              Int
+  /// Prefer role-based routing when set (resolved at request creation time).
+  approverRoleCode   String?  @map("approver_role_code")
+  /// Fixed approver override (optional).
+  approverUserId     String?  @map("approver_user_id")
+  escalateAfterHours Int?     @map("escalate_after_hours")
+  createdAt          DateTime @default(now()) @map("created_at")
+  updatedAt          DateTime @updatedAt @map("updated_at")
+
+  workflow           ApprovalWorkflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+
+  @@unique([workflowId, level])
+  @@index([workflowId])
+  @@map("approval_workflow_levels")
+}
+
+model ApprovalWorkflowCondition {
+  id         String   @id @default(cuid())
+  workflowId String   @map("workflow_id")
+  /// Metadata field path, e.g. "amount" or "priority"
+  field      String
+  /// eq | ne | gt | gte | lt | lte | in
+  operator   String
+  value      String
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  workflow   ApprovalWorkflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+
+  @@index([workflowId])
+  @@map("approval_workflow_conditions")
+}
+
+model ApprovalDelegation {
+  id          String    @id @default(cuid())
+  delegatorId String    @map("delegator_id")
+  delegateId  String    @map("delegate_id")
+  startsAt    DateTime  @map("starts_at")
+  endsAt      DateTime  @map("ends_at")
+  reason      String?
+  isActive    Boolean   @default(true) @map("is_active")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+  deletedAt   DateTime? @map("deleted_at")
+
+  delegator   User      @relation("DelegationDelegator", fields: [delegatorId], references: [id])
+  delegate    User      @relation("DelegationDelegate", fields: [delegateId], references: [id])
+
+  @@index([delegatorId])
+  @@index([delegateId])
+  @@index([startsAt, endsAt])
+  @@map("approval_delegations")
 }
 
 model ApprovalRequest {
-  id             String         @id @default(cuid())
-  type           ApprovalType
-  entityId       String         @map("entity_id")
-  requesterId    String         @map("requester_id")
-  status         ApprovalStatus @default(PENDING)
-  currentStep    Int            @default(1) @map("current_step")
-  totalSteps     Int            @map("total_steps")
-  completedAt    DateTime?      @map("completed_at")
-  createdAt      DateTime       @default(now()) @map("created_at")
-  updatedAt      DateTime       @updatedAt @map("updated_at")
-  deletedAt      DateTime?      @map("deleted_at")
+  id            String                @id @default(cuid())
+  entityType    String                @map("entity_type")
+  entityId      String                @map("entity_id")
+  requesterId   String                @map("requester_id")
+  workflowId    String?               @map("workflow_id")
+  currentLevel  Int                   @default(1) @map("current_level")
+  totalLevels   Int                   @default(1) @map("total_levels")
+  status        ApprovalRequestStatus @default(PENDING)
+  metadata      Json?
+  dueAt         DateTime?             @map("due_at")
+  completedAt   DateTime?             @map("completed_at")
+  createdAt     DateTime              @default(now()) @map("created_at")
+  updatedAt     DateTime              @updatedAt @map("updated_at")
+  deletedAt     DateTime?             @map("deleted_at")
 
-  requester      User           @relation("ApprovalRequester", fields: [requesterId], references: [id])
-  steps          ApprovalStep[]
+  requester     User                  @relation("ApprovalRequester", fields: [requesterId], references: [id])
+  workflow      ApprovalWorkflow?     @relation(fields: [workflowId], references: [id])
+  steps         ApprovalStep[]
+  actions       ApprovalAction[]
   leaveApplications LeaveApplication[]
-  invoices       Invoice[]
-  payrollRuns    PayrollRun[]
+  invoices      Invoice[]
+  payrollRuns   PayrollRun[]
+  reimbursements Reimbursement[]
+  supportTickets SupportTicket[]
 
-  @@index([type])
+  @@index([entityType, entityId])
   @@index([status])
   @@index([requesterId])
+  @@index([dueAt])
   @@map("approval_requests")
 }
 
 model ApprovalStep {
-  id             String        @id @default(cuid())
-  requestId      String        @map("request_id")
-  stepNumber     Int           @map("step_number")
-  approverId     String        @map("approver_id")
-  status         ApprovalStatus @default(PENDING)
-  action         String?
-  comments       String?
-  actionedAt     DateTime?     @map("actioned_at")
-  createdAt      DateTime      @default(now()) @map("created_at")
-  updatedAt      DateTime      @updatedAt @map("updated_at")
+  id                String                @id @default(cuid())
+  approvalRequestId String                @map("approval_request_id")
+  level             Int
+  approverId        String                @map("approver_id")
+  status            ApprovalRequestStatus @default(PENDING)
+  assignedAt        DateTime              @default(now()) @map("assigned_at")
+  respondedAt       DateTime?             @map("responded_at")
+  notes             String?
+  dueAt             DateTime?             @map("due_at")
+  delegatedFromId   String?               @map("delegated_from_id")
+  createdAt         DateTime              @default(now()) @map("created_at")
+  updatedAt         DateTime              @updatedAt @map("updated_at")
 
-  request        ApprovalRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
-  approver       User            @relation("StepApprover", fields: [approverId], references: [id])
+  approvalRequest   ApprovalRequest       @relation(fields: [approvalRequestId], references: [id], onDelete: Cascade)
+  approver          User                  @relation("StepApprover", fields: [approverId], references: [id])
+  delegatedFrom     User?                 @relation("StepDelegatedFrom", fields: [delegatedFromId], references: [id])
 
-  @@unique([requestId, stepNumber])
-  @@index([requestId])
+  @@unique([approvalRequestId, level])
+  @@index([approvalRequestId])
   @@index([approverId])
   @@index([status])
   @@map("approval_steps")
+}
+
+model ApprovalAction {
+  id                String             @id @default(cuid())
+  approvalRequestId String             @map("approval_request_id")
+  actorId           String             @map("actor_id")
+  actionType        ApprovalActionType @map("action_type")
+  level             Int
+  notes             String?
+  timestamp         DateTime           @default(now())
+  createdAt         DateTime           @default(now()) @map("created_at")
+
+  approvalRequest   ApprovalRequest    @relation(fields: [approvalRequestId], references: [id], onDelete: Cascade)
+  actor             User               @relation("ApprovalActionActor", fields: [actorId], references: [id])
+
+  @@index([approvalRequestId])
+  @@index([actorId])
+  @@map("approval_actions")
+}
+
+// ============================================================================
+// DOCUMENT MANAGEMENT SYSTEM (Phase 9)
+// ============================================================================
+
+enum DocumentContext {
+  EMPLOYEE
+  CANDIDATE
+  PROJECT
+  GENERAL
+}
+
+enum DocumentAccessLevel {
+  VIEW
+  EDIT
+  DELETE
+  MANAGE
+}
+
+model DocumentCategory {
+  id          String           @id @default(cuid())
+  name        String
+  code        String           @unique
+  description String?
+  context     DocumentContext?
+  createdAt   DateTime         @default(now()) @map("created_at")
+  updatedAt   DateTime         @updatedAt @map("updated_at")
+  deletedAt   DateTime?        @map("deleted_at")
+
+  documents   ManagedDocument[]
+
+  @@map("document_categories")
+}
+
+model ManagedDocument {
+  id               String           @id @default(cuid())
+  title            String
+  description      String?
+  categoryId       String?          @map("category_id")
+  context          DocumentContext  @default(GENERAL)
+  contextEntityId  String?          @map("context_entity_id")
+  currentVersionId String?          @unique @map("current_version_id")
+  createdById      String           @map("created_by_id")
+  createdAt        DateTime         @default(now()) @map("created_at")
+  updatedAt        DateTime         @updatedAt @map("updated_at")
+  deletedAt        DateTime?        @map("deleted_at")
+
+  category         DocumentCategory? @relation(fields: [categoryId], references: [id])
+  createdBy        User              @relation("DocumentCreator", fields: [createdById], references: [id])
+  currentVersion   DocumentVersion?  @relation("CurrentDocumentVersion", fields: [currentVersionId], references: [id])
+  versions         DocumentVersion[] @relation("DocumentVersions")
+  permissions      DocumentPermission[]
+
+  @@index([context, contextEntityId])
+  @@index([categoryId])
+  @@index([createdById])
+  @@map("managed_documents")
+}
+
+model DocumentVersion {
+  id            String           @id @default(cuid())
+  documentId    String           @map("document_id")
+  versionNumber Int              @map("version_number")
+  fileId        String           @map("file_id")
+  changeNotes   String?          @map("change_notes")
+  uploadedById  String           @map("uploaded_by_id")
+  createdAt     DateTime         @default(now()) @map("created_at")
+  updatedAt     DateTime         @updatedAt @map("updated_at")
+  deletedAt     DateTime?        @map("deleted_at")
+
+  document      ManagedDocument  @relation("DocumentVersions", fields: [documentId], references: [id], onDelete: Cascade)
+  currentFor    ManagedDocument? @relation("CurrentDocumentVersion")
+  file          StoredFile       @relation(fields: [fileId], references: [id])
+  uploadedBy    User             @relation("DocumentVersionUploader", fields: [uploadedById], references: [id])
+
+  @@unique([documentId, versionNumber])
+  @@index([documentId])
+  @@index([fileId])
+  @@map("document_versions")
+}
+
+model DocumentPermission {
+  id          String              @id @default(cuid())
+  documentId  String              @map("document_id")
+  userId      String?             @map("user_id")
+  roleCode    String?             @map("role_code")
+  accessLevel DocumentAccessLevel @map("access_level")
+  createdAt   DateTime            @default(now()) @map("created_at")
+  updatedAt   DateTime            @updatedAt @map("updated_at")
+  deletedAt   DateTime?           @map("deleted_at")
+
+  document    ManagedDocument     @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  user        User?               @relation("DocumentPermissionUser", fields: [userId], references: [id])
+
+  @@index([documentId])
+  @@index([userId])
+  @@index([roleCode])
+  @@map("document_permissions")
 }
 
 // ============================================================================

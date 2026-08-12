@@ -117,6 +117,39 @@ import type {
   DashboardEmployeePreview,
 } from "@/types/phase2";
 import type {
+  CreateKbArticleInput,
+  EscalateTicketInput,
+  KnowledgeBaseArticle,
+  SlaPolicy,
+  UpdateKbArticleInput,
+  UpsertSlaPolicyInput,
+} from "@/types/helpdesk";
+import type {
+  Announcement,
+  AppNotification,
+  CreateAnnouncementInput,
+  NotificationPreference,
+  UpdateAnnouncementInput,
+  UpdatePreferenceInput,
+} from "@/types/notifications";
+import type {
+  ApprovalDelegation,
+  ApprovalRequest,
+  ApprovalStats,
+  ApprovalWorkflow,
+  CreateDelegationInput,
+  CreateWorkflowInput,
+  UpdateWorkflowInput,
+} from "@/types/approvals";
+import type {
+  CreateDocumentCategoryInput,
+  CreateDocumentInput,
+  DocumentCategory,
+  DocumentContext,
+  ManagedDocument,
+  SetDocumentPermissionsInput,
+} from "@/types/documents";
+import type {
   Contact,
   Lead,
   Bid,
@@ -936,7 +969,7 @@ export const apiClient = {
       subject: string;
       description: string;
       category?: string;
-      priority?: "low" | "medium" | "high";
+      priority?: "low" | "medium" | "high" | "urgent" | "LOW" | "MEDIUM" | "HIGH" | "URGENT";
       attachmentFileId?: string;
     }) =>
       request<SupportTicket>("/api/portal/tickets", {
@@ -1676,5 +1709,246 @@ export const apiClient = {
           `/api/engineering/dashboard/team-metrics${buildQuery({ projectId })}`,
         ),
     },
+  },
+
+  helpdesk: {
+    listTickets: (params?: { status?: string; assignedToId?: string; search?: string }) =>
+      request<SupportTicket[]>(
+        `/api/helpdesk/tickets${buildQuery({
+          status: params?.status,
+          assignedToId: params?.assignedToId,
+          search: params?.search,
+        })}`,
+      ),
+    getTicket: (id: string) => request<SupportTicket>(`/api/helpdesk/tickets/${id}`),
+    assignTicket: (id: string, assignedToId: string | null) =>
+      request<SupportTicket>(`/api/helpdesk/tickets/${id}/assign`, {
+        method: "POST",
+        body: JSON.stringify({ assignedToId }),
+      }),
+    updateTicketStatus: (
+      id: string,
+      status: "OPEN" | "IN_PROGRESS" | "WAITING_FOR_EMPLOYEE" | "RESOLVED" | "CLOSED",
+    ) =>
+      request<SupportTicket>(`/api/helpdesk/tickets/${id}/status`, {
+        method: "POST",
+        body: JSON.stringify({ status }),
+      }),
+    replyToTicket: (
+      id: string,
+      data: { body: string; attachmentFileId?: string; setWaiting?: boolean },
+    ) =>
+      request<SupportTicket>(`/api/helpdesk/tickets/${id}/reply`, {
+        method: "POST",
+        body: JSON.stringify(data),
+      }),
+    escalateTicket: (id: string, data: EscalateTicketInput) =>
+      request<SupportTicket>(`/api/helpdesk/tickets/${id}/escalate`, {
+        method: "POST",
+        body: JSON.stringify(data),
+      }),
+    listSlaPolicies: () => request<SlaPolicy[]>("/api/helpdesk/sla"),
+    upsertSlaPolicy: (data: UpsertSlaPolicyInput) =>
+      request<SlaPolicy>("/api/helpdesk/sla", {
+        method: "PUT",
+        body: JSON.stringify(data),
+      }),
+    listKb: (params?: { publishedOnly?: boolean; category?: string; search?: string }) =>
+      request<KnowledgeBaseArticle[]>(
+        `/api/helpdesk/kb${buildQuery({
+          publishedOnly: params?.publishedOnly ? "true" : undefined,
+          category: params?.category,
+          search: params?.search,
+        })}`,
+      ),
+    getKb: (id: string) => request<KnowledgeBaseArticle>(`/api/helpdesk/kb/${id}`),
+    createKb: (data: CreateKbArticleInput) =>
+      request<KnowledgeBaseArticle>("/api/helpdesk/kb", {
+        method: "POST",
+        body: JSON.stringify(data),
+      }),
+    updateKb: (id: string, data: UpdateKbArticleInput) =>
+      request<KnowledgeBaseArticle>(`/api/helpdesk/kb/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify(data),
+      }),
+    deleteKb: (id: string) =>
+      request<{ id: string; deleted: boolean }>(`/api/helpdesk/kb/${id}`, { method: "DELETE" }),
+  },
+
+  notifications: {
+    list: (params?: { unreadOnly?: boolean; category?: string }) =>
+      request<AppNotification[]>(
+        `/api/notifications${buildQuery({
+          unreadOnly: params?.unreadOnly ? "true" : undefined,
+          category: params?.category,
+        })}`,
+      ),
+    unreadCount: () => request<{ count: number }>("/api/notifications/unread-count"),
+    markRead: (id: string) =>
+      request<AppNotification>(`/api/notifications/${id}/read`, { method: "POST" }),
+    markAllRead: () =>
+      request<{ count: number }>("/api/notifications/read-all", { method: "POST" }),
+    getPreferences: () => request<NotificationPreference[]>("/api/notifications/preferences"),
+    updatePreference: (data: UpdatePreferenceInput) =>
+      request<NotificationPreference>("/api/notifications/preferences", {
+        method: "PUT",
+        body: JSON.stringify(data),
+      }),
+    listAnnouncements: (activeOnly?: boolean) =>
+      request<Announcement[]>(
+        `/api/notifications/announcements${buildQuery(
+          activeOnly ? { activeOnly: "true" } : undefined,
+        )}`,
+      ),
+    createAnnouncement: (data: CreateAnnouncementInput) =>
+      request<Announcement>("/api/notifications/announcements", {
+        method: "POST",
+        body: JSON.stringify(data),
+      }),
+    updateAnnouncement: (id: string, data: UpdateAnnouncementInput) =>
+      request<Announcement>(`/api/notifications/announcements/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify(data),
+      }),
+    publishAnnouncement: (id: string) =>
+      request<Announcement>(`/api/notifications/announcements/${id}/publish`, {
+        method: "POST",
+      }),
+    deleteAnnouncement: (id: string) =>
+      request<{ id: string; deleted: boolean }>(`/api/notifications/announcements/${id}`, {
+        method: "DELETE",
+      }),
+  },
+
+  approvals: {
+    list: (params?: {
+      entityType?: string;
+      requesterId?: string;
+      approverId?: string;
+      status?: string;
+    }) =>
+      request<ApprovalRequest[]>(
+        `/api/approvals${buildQuery({
+          entityType: params?.entityType,
+          requesterId: params?.requesterId,
+          approverId: params?.approverId,
+          status: params?.status,
+        })}`,
+      ),
+    getPending: () => request<ApprovalRequest[]>("/api/approvals/pending/my"),
+    getStats: () => request<ApprovalStats>("/api/approvals/stats/my"),
+    getById: (id: string) => request<ApprovalRequest>(`/api/approvals/${id}`),
+    getHistory: (id: string) =>
+      request<ApprovalRequest["actions"]>(`/api/approvals/${id}/history`),
+    approve: (id: string, notes?: string) =>
+      request<ApprovalRequest>(`/api/approvals/${id}/approve`, {
+        method: "POST",
+        body: JSON.stringify({ notes }),
+      }),
+    reject: (id: string, notes: string) =>
+      request<ApprovalRequest>(`/api/approvals/${id}/reject`, {
+        method: "POST",
+        body: JSON.stringify({ notes }),
+      }),
+    cancel: (id: string, reason?: string) =>
+      request<ApprovalRequest>(`/api/approvals/${id}/cancel`, {
+        method: "POST",
+        body: JSON.stringify({ reason }),
+      }),
+    listWorkflows: (entityType?: string) =>
+      request<ApprovalWorkflow[]>(
+        `/api/approvals/workflows${buildQuery(entityType ? { entityType } : undefined)}`,
+      ),
+    getWorkflow: (id: string) => request<ApprovalWorkflow>(`/api/approvals/workflows/${id}`),
+    createWorkflow: (data: CreateWorkflowInput) =>
+      request<ApprovalWorkflow>("/api/approvals/workflows", {
+        method: "POST",
+        body: JSON.stringify(data),
+      }),
+    updateWorkflow: (id: string, data: UpdateWorkflowInput) =>
+      request<ApprovalWorkflow>(`/api/approvals/workflows/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify(data),
+      }),
+    deleteWorkflow: (id: string) =>
+      request<{ id: string; deleted: boolean }>(`/api/approvals/workflows/${id}`, {
+        method: "DELETE",
+      }),
+    listDelegations: () => request<ApprovalDelegation[]>("/api/approvals/delegations"),
+    createDelegation: (data: CreateDelegationInput) =>
+      request<ApprovalDelegation>("/api/approvals/delegations", {
+        method: "POST",
+        body: JSON.stringify(data),
+      }),
+    updateDelegation: (
+      id: string,
+      data: { startsAt?: string; endsAt?: string; reason?: string | null; isActive?: boolean },
+    ) =>
+      request<ApprovalDelegation>(`/api/approvals/delegations/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify(data),
+      }),
+    deleteDelegation: (id: string) =>
+      request<{ id: string; deleted: boolean }>(`/api/approvals/delegations/${id}`, {
+        method: "DELETE",
+      }),
+    processEscalations: () =>
+      request<{ processed: number }>("/api/approvals/process-escalations", { method: "POST" }),
+  },
+
+  documents: {
+    listCategories: () => request<DocumentCategory[]>("/api/documents/categories"),
+    createCategory: (data: CreateDocumentCategoryInput) =>
+      request<DocumentCategory>("/api/documents/categories", {
+        method: "POST",
+        body: JSON.stringify(data),
+      }),
+    updateCategory: (
+      id: string,
+      data: { name?: string; description?: string | null; context?: DocumentContext | null },
+    ) =>
+      request<DocumentCategory>(`/api/documents/categories/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify(data),
+      }),
+    deleteCategory: (id: string) =>
+      request<{ id: string; deleted: boolean }>(`/api/documents/categories/${id}`, {
+        method: "DELETE",
+      }),
+    list: (params?: {
+      search?: string;
+      context?: DocumentContext;
+      contextEntityId?: string;
+      categoryId?: string;
+      createdById?: string;
+    }) =>
+      request<ManagedDocument[]>(
+        `/api/documents${buildQuery({
+          search: params?.search,
+          context: params?.context,
+          contextEntityId: params?.contextEntityId,
+          categoryId: params?.categoryId,
+          createdById: params?.createdById,
+        })}`,
+      ),
+    getById: (id: string) => request<ManagedDocument>(`/api/documents/${id}`),
+    create: (data: CreateDocumentInput) =>
+      request<ManagedDocument>("/api/documents", {
+        method: "POST",
+        body: JSON.stringify(data),
+      }),
+    addVersion: (id: string, data: { fileId: string; changeNotes?: string }) =>
+      request<ManagedDocument>(`/api/documents/${id}/versions`, {
+        method: "POST",
+        body: JSON.stringify(data),
+      }),
+    setPermissions: (id: string, data: SetDocumentPermissionsInput) =>
+      request<ManagedDocument>(`/api/documents/${id}/permissions`, {
+        method: "PUT",
+        body: JSON.stringify(data),
+      }),
+    delete: (id: string) =>
+      request<{ id: string; deleted: boolean }>(`/api/documents/${id}`, { method: "DELETE" }),
   },
 };

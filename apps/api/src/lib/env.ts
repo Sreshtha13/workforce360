@@ -63,6 +63,14 @@ const envSchema = z.object({
 
   // Frontend base URL used to build payment redirect/return links (Phase 4)
   APP_PUBLIC_BASE_URL: z.string().default("http://localhost:3000"),
+
+  // Email (Phase 8/9). Optional — falls back to console log when unset.
+  SMTP_HOST: z.string().optional(),
+  SMTP_PORT: z.coerce.number().int().positive().optional(),
+  SMTP_USER: z.string().optional(),
+  SMTP_PASS: z.string().optional(),
+  SMTP_FROM: z.string().optional(),
+  SENDGRID_API_KEY: z.string().optional(),
 });
 
 const parsed = envSchema.safeParse(process.env);
