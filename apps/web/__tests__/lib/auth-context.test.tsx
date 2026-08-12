@@ -15,6 +15,11 @@ vi.mock("@/lib/api-client", () => ({
       getMe: vi.fn(),
       login: vi.fn(),
       logout: vi.fn(),
+      mfa: {
+        verify: vi.fn(),
+        setupChallenge: vi.fn(),
+        enableChallenge: vi.fn(),
+      },
     },
   },
   ApiClientError: class ApiClientError extends Error {
@@ -74,7 +79,7 @@ describe("AuthProvider / useAuth", () => {
 
   it("login calls API, refetches user, and navigates to dashboard", async () => {
     vi.mocked(apiClient.auth.login).mockResolvedValue({
-      data: { user: mockUser },
+      data: { mfaRequired: false, user: mockUser },
       error: null,
       meta: null,
     });
@@ -83,12 +88,61 @@ describe("AuthProvider / useAuth", () => {
 
     await waitFor(() => expect(result.current.loading).toBe(false));
 
+    let outcome: Awaited<ReturnType<typeof result.current.login>> | undefined;
     await act(async () => {
-      await result.current.login("user@example.com", "password");
+      outcome = await result.current.login("user@example.com", "password");
     });
 
+    expect(outcome).toEqual({ mfaRequired: false });
     expect(apiClient.auth.login).toHaveBeenCalledWith("user@example.com", "password");
     expect(mockPush).toHaveBeenCalledWith("/dashboard");
+  });
+
+  it("login returns mfa challenge without navigating when MFA is required", async () => {
+    vi.mocked(apiClient.auth.login).mockResolvedValue({
+      data: { mfaRequired: true, mfaToken: "mfa-token-1", user: mockUser },
+      error: null,
+      meta: null,
+    });
+
+    const { result } = renderHook(() => useAuth(), { wrapper });
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    let outcome: Awaited<ReturnType<typeof result.current.login>> | undefined;
+    await act(async () => {
+      outcome = await result.current.login("user@example.com", "password");
+    });
+
+    expect(outcome).toEqual({ mfaRequired: true, mfaToken: "mfa-token-1" });
+    expect(mockPush).not.toHaveBeenCalledWith("/dashboard");
+  });
+
+  it("login returns mfa setup flag when enrollment is required", async () => {
+    vi.mocked(apiClient.auth.login).mockResolvedValue({
+      data: {
+        mfaRequired: true,
+        mfaSetupRequired: true,
+        mfaToken: "mfa-token-setup",
+        user: mockUser,
+      },
+      error: null,
+      meta: null,
+    });
+
+    const { result } = renderHook(() => useAuth(), { wrapper });
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    let outcome: Awaited<ReturnType<typeof result.current.login>> | undefined;
+    await act(async () => {
+      outcome = await result.current.login("user@example.com", "password");
+    });
+
+    expect(outcome).toEqual({
+      mfaRequired: true,
+      mfaToken: "mfa-token-setup",
+      mfaSetupRequired: true,
+    });
+    expect(mockPush).not.toHaveBeenCalledWith("/dashboard");
   });
 
   it("login rethrows ApiClientError message", async () => {

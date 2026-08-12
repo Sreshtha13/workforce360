@@ -26,29 +26,6 @@ import type {
   UpdateTimesheetEntryInput,
 } from "@/types/attendance";
 import type {
-  CreateFinanceClientInput,
-  CreateInvoiceInput,
-  CreateReimbursementInput,
-  FinanceClient,
-  Invoice,
-  Payment,
-  RecordPaymentInput,
-  Reimbursement,
-  ReviewReimbursementInput,
-  UpdateFinanceClientInput,
-  UpdateInvoiceInput,
-} from "@/types/finance";
-import type {
-  CreatePayrollRunInput,
-  CreateSalaryStructureInput,
-  PayrollRun,
-  Payslip,
-  SalaryRevision,
-  SalaryStructure,
-  UpdatePayrollRunInput,
-  UpdateSalaryStructureInput,
-} from "@/types/payroll";
-import type {
   CodeReview,
   CreateCodeReviewInput,
   CreateDocumentationInput,
@@ -198,22 +175,58 @@ import type {
 import type {
   Client,
   CreateClientInput,
-  UpdateClientInput,
-  Invoice,
   CreateInvoiceInput,
-  UpdateInvoiceInput,
-  Payment,
-  RecordManualPaymentInput,
-  PublicPaymentConfig,
-  FinanceDashboard,
-  SalaryStructure,
-  CreateSalaryStructureInput,
-  SalaryRevision,
-  RequestSalaryRevisionInput,
-  PayrollRun,
   CreatePayrollRunInput,
+  CreateReimbursementInput,
+  CreateSalaryStructureInput,
+  FinanceDashboard,
+  Invoice,
+  Payment,
+  PayrollRun,
   Payslip,
+  PublicPaymentConfig,
+  RecordManualPaymentInput,
+  Reimbursement,
+  RequestSalaryRevisionInput,
+  SalaryRevision,
+  SalaryStructure,
+  UpdateClientInput,
+  UpdateInvoiceInput,
 } from "@/types/phase4";
+import type {
+  CreateReportScheduleInput,
+  DashboardKpis,
+  KpiScope,
+  ReportFilters,
+  ReportFormat,
+  ReportPayload,
+  ReportSchedule,
+  ReportType,
+  UpdateReportScheduleInput,
+} from "@/types/reports";
+import type {
+  AuditLog,
+  AuditLogQuery,
+  CreateNotificationTemplateInput,
+  IntegrationPlaceholder,
+  MasterDataSummary,
+  NotificationTemplate,
+  SecurityEvent,
+  SecurityEventQuery,
+  SystemSetting,
+  UpdateNotificationTemplateInput,
+  UpsertSettingsInput,
+} from "@/types/admin";
+import type {
+  DevicesListResult,
+  LoginResult,
+  MfaEnableResult,
+  MfaEnableChallengeResult,
+  MfaSetupResult,
+  MfaStatus,
+  MfaVerifyResult,
+} from "@/types/security";
+import { downloadBlob } from "@/lib/download";
 
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:4000";
@@ -223,11 +236,14 @@ const AUTH_LOGIN_PATH = "/api/auth/login";
 
 let refreshInFlight: Promise<boolean> | null = null;
 
-function buildQuery(params?: Record<string, string | undefined>): string {
+function buildQuery(
+  params?: Record<string, string | number | boolean | undefined>,
+): string {
   if (!params) return "";
   const search = new URLSearchParams();
   for (const [key, value] of Object.entries(params)) {
-    if (value) search.set(key, value);
+    if (value === undefined || value === null || value === "") continue;
+    search.set(key, String(value));
   }
   const query = search.toString();
   return query ? `?${query}` : "";
@@ -373,6 +389,48 @@ async function requestSession<T>(
   return body;
 }
 
+/** Binary download (CSV/PDF) — returns blob + filename from Content-Disposition when present. */
+async function requestBlob(
+  path: string,
+  init?: RequestInit,
+  retried = false,
+): Promise<{ blob: Blob; filename: string }> {
+  const url = `${API_BASE_URL}${path}`;
+  const response = await fetch(url, {
+    ...init,
+    headers: {
+      Accept: "*/*",
+      ...init?.headers,
+    },
+    credentials: "include",
+    cache: "no-store",
+  });
+
+  if (response.status === 401 && shouldAttemptRefresh(path, retried)) {
+    const refreshed = await tryRefreshSession();
+    if (refreshed) {
+      return requestBlob(path, init, true);
+    }
+  }
+
+  if (!response.ok) {
+    let message = `Request failed with status ${response.status}`;
+    try {
+      const body = (await response.json()) as ApiResponse<unknown>;
+      if (body.error?.message) message = body.error.message;
+    } catch {
+      /* non-JSON error body */
+    }
+    throw new ApiClientError(message, response.status);
+  }
+
+  const disposition = response.headers.get("Content-Disposition") ?? "";
+  const match = /filename="?([^";]+)"?/i.exec(disposition);
+  const filename = match?.[1] ?? "download";
+  const blob = await response.blob();
+  return { blob, filename };
+}
+
 /**
  * Typed HTTP client for the Workforce 360 API.
  * The web app must never import Prisma, Postgres drivers, or Supabase Admin SDK.
@@ -384,7 +442,7 @@ export const apiClient = {
 
   auth: {
     login: (email: string, password: string) =>
-      request<{ user: AuthUser }>("/api/auth/login", {
+      request<LoginResult>("/api/auth/login", {
         method: "POST",
         body: JSON.stringify({ email, password }),
       }),
@@ -412,6 +470,45 @@ export const apiClient = {
         method: "POST",
         body: JSON.stringify({ token, password }),
       }),
+
+    mfa: {
+      status: () => request<MfaStatus>("/api/auth/mfa/status"),
+      setup: () =>
+        request<MfaSetupResult>("/api/auth/mfa/setup", { method: "POST" }),
+      enable: (code: string) =>
+        request<MfaEnableResult>("/api/auth/mfa/enable", {
+          method: "POST",
+          body: JSON.stringify({ code }),
+        }),
+      disable: (code: string) =>
+        request<{ enabled: boolean }>("/api/auth/mfa/disable", {
+          method: "POST",
+          body: JSON.stringify({ code }),
+        }),
+      verify: (mfaToken: string, code: string) =>
+        request<MfaVerifyResult>("/api/auth/mfa/verify", {
+          method: "POST",
+          body: JSON.stringify({ mfaToken, code }),
+        }),
+      setupChallenge: (mfaToken: string) =>
+        request<MfaSetupResult>("/api/auth/mfa/setup-challenge", {
+          method: "POST",
+          body: JSON.stringify({ mfaToken }),
+        }),
+      enableChallenge: (mfaToken: string, code: string) =>
+        request<MfaEnableChallengeResult>("/api/auth/mfa/enable-challenge", {
+          method: "POST",
+          body: JSON.stringify({ mfaToken, code }),
+        }),
+    },
+
+    devices: {
+      list: () => request<DevicesListResult>("/api/auth/devices"),
+      revoke: (id: string) =>
+        request<{ id: string; revoked: boolean }>(`/api/auth/devices/${id}`, {
+          method: "DELETE",
+        }),
+    },
   },
 
   users: {
@@ -1950,5 +2047,130 @@ export const apiClient = {
       }),
     delete: (id: string) =>
       request<{ id: string; deleted: boolean }>(`/api/documents/${id}`, { method: "DELETE" }),
+  },
+
+  reports: {
+    getKpis: (scope: KpiScope, filters?: ReportFilters) =>
+      request<DashboardKpis>(
+        `/api/reports/kpis/${scope}${buildQuery({
+          dateFrom: filters?.dateFrom,
+          dateTo: filters?.dateTo,
+          departmentId: filters?.departmentId,
+        })}`,
+      ),
+
+    getReport: (type: ReportType, filters?: ReportFilters) =>
+      request<ReportPayload>(
+        `/api/reports/${type}${buildQuery({
+          dateFrom: filters?.dateFrom,
+          dateTo: filters?.dateTo,
+          departmentId: filters?.departmentId,
+        })}`,
+      ),
+
+    exportReport: async (
+      type: ReportType,
+      format: ReportFormat,
+      filters?: ReportFilters,
+    ) => {
+      const { blob, filename } = await requestBlob(
+        `/api/reports/${type}/export${buildQuery({
+          format,
+          dateFrom: filters?.dateFrom,
+          dateTo: filters?.dateTo,
+          departmentId: filters?.departmentId,
+        })}`,
+      );
+      downloadBlob(blob, filename);
+      return { filename };
+    },
+
+    listSchedules: () => request<ReportSchedule[]>("/api/reports/schedules"),
+
+    createSchedule: (data: CreateReportScheduleInput) =>
+      request<ReportSchedule>("/api/reports/schedules", {
+        method: "POST",
+        body: JSON.stringify(data),
+      }),
+
+    updateSchedule: (id: string, data: UpdateReportScheduleInput) =>
+      request<ReportSchedule>(`/api/reports/schedules/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify(data),
+      }),
+
+    deleteSchedule: (id: string) =>
+      request<{ id: string; deleted?: boolean }>(`/api/reports/schedules/${id}`, {
+        method: "DELETE",
+      }),
+
+    runDue: () =>
+      request<{ processed: number; errors: unknown[] }>("/api/reports/schedules/run-due", {
+        method: "POST",
+      }),
+  },
+
+  audit: {
+    list: (params?: AuditLogQuery) =>
+      request<AuditLog[]>(
+        `/api/audit-logs${buildQuery({
+          userId: params?.userId,
+          entity: params?.entity,
+          action: params?.action,
+          dateFrom: params?.dateFrom,
+          dateTo: params?.dateTo,
+          search: params?.search,
+          page: params?.page != null ? String(params.page) : undefined,
+          pageSize: params?.pageSize != null ? String(params.pageSize) : undefined,
+        })}`,
+      ),
+  },
+
+  securityEvents: {
+    list: (params?: SecurityEventQuery) =>
+      request<SecurityEvent[]>(
+        `/api/security-events${buildQuery({
+          userId: params?.userId,
+          eventType: params?.eventType,
+          severity: params?.severity,
+          dateFrom: params?.dateFrom,
+          dateTo: params?.dateTo,
+          search: params?.search,
+          page: params?.page != null ? String(params.page) : undefined,
+          pageSize: params?.pageSize != null ? String(params.pageSize) : undefined,
+        })}`,
+      ),
+  },
+
+  settings: {
+    list: () => request<SystemSetting[]>("/api/settings"),
+    upsert: (data: UpsertSettingsInput) =>
+      request<SystemSetting[]>("/api/settings", {
+        method: "PUT",
+        body: JSON.stringify(data),
+      }),
+  },
+
+  notificationTemplates: {
+    list: () => request<NotificationTemplate[]>("/api/notification-templates"),
+    create: (data: CreateNotificationTemplateInput) =>
+      request<NotificationTemplate>("/api/notification-templates", {
+        method: "POST",
+        body: JSON.stringify(data),
+      }),
+    update: (id: string, data: UpdateNotificationTemplateInput) =>
+      request<NotificationTemplate>(`/api/notification-templates/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify(data),
+      }),
+    delete: (id: string) =>
+      request<NotificationTemplate>(`/api/notification-templates/${id}`, {
+        method: "DELETE",
+      }),
+  },
+
+  admin: {
+    getMasterData: () => request<MasterDataSummary>("/api/admin/master-data"),
+    getIntegrations: () => request<IntegrationPlaceholder[]>("/api/admin/integrations"),
   },
 };

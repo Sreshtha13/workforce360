@@ -2,6 +2,8 @@ import type { NotificationCategory } from "@prisma/client";
 import { AppError } from "../lib/app-error";
 import { writeAuditLog } from "../lib/audit";
 import { sendEmail } from "../lib/email";
+import { prisma } from "../lib/prisma";
+import { renderTemplate } from "../lib/template-render";
 import { NotificationRepository } from "../repositories/notification.repository";
 
 /** Whether email should be sent given preference (missing pref = opt-in). */
@@ -31,6 +33,9 @@ export class NotificationService {
       category?: NotificationCategory;
       link?: string;
       sendEmail?: boolean;
+      /** Optional notification template code (e.g. ticket_assigned). Falls back to title/message. */
+      templateCode?: string;
+      templateVars?: Record<string, string>;
     },
     actorId?: string,
   ) {
@@ -53,11 +58,32 @@ export class NotificationService {
     if (wantsEmail) {
       const user = await this.repo.findUserEmail(input.userId);
       if (user?.email) {
+        let subject = input.title;
+        let text = input.message;
+
+        if (input.templateCode) {
+          try {
+            const tpl = await prisma.notificationTemplate.findFirst({
+              where: {
+                code: input.templateCode,
+                deletedAt: null,
+                isActive: true,
+              },
+            });
+            if (tpl) {
+              subject = renderTemplate(tpl.subject ?? subject, input.templateVars ?? {}) || subject;
+              text = renderTemplate(tpl.body, input.templateVars ?? {}) || text;
+            }
+          } catch {
+            // graceful fallback to hardcoded title/message
+          }
+        }
+
         const result = await sendEmail({
           to: user.email,
-          subject: input.title,
-          text: input.message,
-          html: `<p>${input.message}</p>`,
+          subject,
+          text,
+          html: `<p>${text.replace(/\n/g, "<br/>")}</p>`,
         });
         if (result.mode === "smtp" || result.mode === "console") {
           await this.repo.updateEmailSentAt(notification.id, new Date());

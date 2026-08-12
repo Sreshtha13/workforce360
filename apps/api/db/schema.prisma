@@ -299,6 +299,12 @@ model User {
   createdDocuments   ManagedDocument[] @relation("DocumentCreator")
   documentVersionsUploaded DocumentVersion[] @relation("DocumentVersionUploader")
   documentPermissions DocumentPermission[] @relation("DocumentPermissionUser")
+  mfaEnrollment      UserMfa?
+  trustedDevices     TrustedDevice[]
+  reportSchedulesCreated ReportSchedule[] @relation("ReportScheduleCreator")
+  notificationTemplatesUpdated NotificationTemplate[] @relation("NotificationTemplateUpdater")
+  systemSettingsUpdated SystemSetting[] @relation("SystemSettingUpdater")
+  securityEvents     SecurityEvent[] @relation("SecurityEventUser")
   deployedReleases   Release[] @relation("ReleaseDeployer")
   assignedTestCases  TestCase[] @relation("TestCaseAssignee")
   createdTestCases   TestCase[] @relation("TestCaseCreator")
@@ -378,6 +384,8 @@ model Role {
   description String?
   isSystem    Boolean   @default(false) @map("is_system")
   isActive    Boolean   @default(true) @map("is_active")
+  /// When true, users with this role must complete MFA before session is fully issued.
+  requiresMfa Boolean   @default(false) @map("requires_mfa")
   createdAt   DateTime  @default(now()) @map("created_at")
   updatedAt   DateTime  @updatedAt @map("updated_at")
   deletedAt   DateTime? @map("deleted_at")
@@ -2348,3 +2356,162 @@ model CodeReview {
   @@index([status])
   @@map("code_reviews")
 }
+
+// ============================================================================
+// PHASE 10: REPORTING & SCHEDULED REPORTS
+// ============================================================================
+
+enum ReportType {
+  ATTENDANCE
+  LEAVE
+  RECRUITMENT
+  INVOICE
+  PAYROLL
+  PROJECT
+  EXECUTIVE
+}
+
+enum ReportFormat {
+  CSV
+  PDF
+}
+
+enum ReportScheduleFrequency {
+  DAILY
+  WEEKLY
+  MONTHLY
+}
+
+model ReportSchedule {
+  id             String                   @id @default(cuid())
+  name           String
+  reportType     ReportType               @map("report_type")
+  format         ReportFormat             @default(CSV)
+  frequency      ReportScheduleFrequency  @default(WEEKLY)
+  /// Cron-like day: for WEEKLY = 0-6 (Sun-Sat); for MONTHLY = 1-28; unused for DAILY
+  dayOfPeriod    Int?                     @map("day_of_period")
+  /// Hour 0-23 in server local/UTC
+  hourUtc        Int                      @default(8) @map("hour_utc")
+  recipients     String[]                 @default([])
+  filters        Json?
+  isActive       Boolean                  @default(true) @map("is_active")
+  lastRunAt      DateTime?                @map("last_run_at")
+  nextRunAt      DateTime?                @map("next_run_at")
+  createdById    String                   @map("created_by_id")
+  createdAt      DateTime                 @default(now()) @map("created_at")
+  updatedAt      DateTime                 @updatedAt @map("updated_at")
+  deletedAt      DateTime?                @map("deleted_at")
+
+  createdBy      User                     @relation("ReportScheduleCreator", fields: [createdById], references: [id])
+
+  @@index([reportType])
+  @@index([isActive])
+  @@index([nextRunAt])
+  @@map("report_schedules")
+}
+
+// ============================================================================
+// PHASE 11: ADMIN — TEMPLATES & SYSTEM SETTINGS
+// ============================================================================
+
+model NotificationTemplate {
+  id          String    @id @default(cuid())
+  code        String    @unique
+  name        String
+  channel     String    @default("EMAIL") // EMAIL | IN_APP
+  subject     String?
+  body        String
+  description String?
+  isActive    Boolean   @default(true) @map("is_active")
+  updatedById String?   @map("updated_by_id")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+  deletedAt   DateTime? @map("deleted_at")
+
+  updatedBy   User?     @relation("NotificationTemplateUpdater", fields: [updatedById], references: [id])
+
+  @@index([channel])
+  @@map("notification_templates")
+}
+
+model SystemSetting {
+  id          String    @id @default(cuid())
+  key         String    @unique
+  value       String
+  category    String    @default("general")
+  description String?
+  isSecret    Boolean   @default(false) @map("is_secret")
+  updatedById String?   @map("updated_by_id")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  updatedBy   User?     @relation("SystemSettingUpdater", fields: [updatedById], references: [id])
+
+  @@index([category])
+  @@map("system_settings")
+}
+
+// ============================================================================
+// PHASE 12: SECURITY — MFA, DEVICES, ALERTS
+// ============================================================================
+
+model UserMfa {
+  id            String    @id @default(cuid())
+  userId        String    @unique @map("user_id")
+  secret        String
+  enabled       Boolean   @default(false)
+  backupCodes   String[]  @default([]) @map("backup_codes")
+  enforcedByRole Boolean  @default(false) @map("enforced_by_role")
+  verifiedAt    DateTime? @map("verified_at")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_mfa")
+}
+
+model TrustedDevice {
+  id             String    @id @default(cuid())
+  userId         String    @map("user_id")
+  deviceHash     String    @map("device_hash")
+  label          String?
+  userAgent      String?   @map("user_agent")
+  ipAddress      String?   @map("ip_address")
+  lastSeenAt     DateTime  @default(now()) @map("last_seen_at")
+  refreshTokenId String?   @map("refresh_token_id")
+  revokedAt      DateTime? @map("revoked_at")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, deviceHash])
+  @@index([userId])
+  @@index([revokedAt])
+  @@map("trusted_devices")
+}
+
+model SecurityEvent {
+  id          String    @id @default(cuid())
+  userId      String?   @map("user_id")
+  eventType   String    @map("event_type") // FAILED_LOGIN | PERMISSION_DENIED | MFA_FAILURE | SUSPICIOUS
+  severity    String    @default("INFO") // INFO | WARN | CRITICAL
+  message     String
+  ipAddress   String?   @map("ip_address")
+  userAgent   String?   @map("user_agent")
+  metadata    Json?
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  user        User?     @relation("SecurityEventUser", fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([eventType])
+  @@index([severity])
+  @@index([createdAt])
+  @@map("security_events")
+}
+
+/// Roles that require MFA when this flag is set on Role (via SystemSetting mfa.enforce_role_codes or Role.requiresMfa)
+/// Soft extension: add requiresMfa on Role without breaking existing rows.
+

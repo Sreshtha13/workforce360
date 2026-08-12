@@ -71,6 +71,8 @@ async function main() {
     const payrollResources = new Set(["salary_structure", "salary_revision", "payroll_run", "payslip"]);
     const documentResources = new Set(["document"]);
     const notificationResources = new Set(["notification", "announcement"]);
+    const reportResources = new Set(["report"]);
+    const adminExtraResources = new Set(["audit", "settings", "template", "security"]);
     const label = resource
       .split("_")
       .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
@@ -81,6 +83,12 @@ async function main() {
     }
     if (adminResources.has(resource)) {
       return { module: "Administration", feature: label };
+    }
+    if (adminExtraResources.has(resource)) {
+      return { module: "Administration", feature: label };
+    }
+    if (reportResources.has(resource)) {
+      return { module: "Reporting", feature: label };
     }
     if (resource === "dashboard") {
       return { module: "Administration", feature: "Dashboard" };
@@ -261,6 +269,15 @@ async function main() {
     { name: "Approve Payroll Runs", code: "payroll_run.approve", resource: "payroll_run", action: "approve" },
 
     { name: "Read Payslips", code: "payslip.read", resource: "payslip", action: "read" },
+
+    { name: "Read Reports", code: "report.read", resource: "report", action: "read" },
+    { name: "Export Reports", code: "report.export", resource: "report", action: "export" },
+    { name: "Manage Report Schedules", code: "report.schedule.manage", resource: "report", action: "schedule_manage" },
+    { name: "Executive Dashboard", code: "dashboard.executive.read", resource: "dashboard", action: "executive_read" },
+    { name: "Read Audit Logs", code: "audit.read", resource: "audit", action: "read" },
+    { name: "Manage Settings", code: "settings.manage", resource: "settings", action: "manage" },
+    { name: "Manage Notification Templates", code: "template.manage", resource: "template", action: "manage" },
+    { name: "Read Security Events", code: "security.read", resource: "security", action: "read" },
   ];
   
   const createdPermissions = [];

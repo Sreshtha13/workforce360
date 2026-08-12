@@ -21,7 +21,9 @@ import {
   hrNav,
   mainNav,
   payrollNav,
+  pmNav,
   portalNav,
+  reportsNav,
 } from "@/lib/navigation";
 import { glass, iconSize, motion } from "@/lib/design-system";
 import { typographyScale } from "@/lib/design-tokens";
@@ -48,6 +50,8 @@ export function DashboardShell({ children }: { children: ReactNode }) {
   const [hrExpanded, setHrExpanded] = useState(true);
   const [financeExpanded, setFinanceExpanded] = useState(true);
   const [payrollExpanded, setPayrollExpanded] = useState(true);
+  const [reportsExpanded, setReportsExpanded] = useState(true);
+  const [pmExpanded, setPmExpanded] = useState(true);
   const [portalExpanded, setPortalExpanded] = useState(true);
 
   const unreadQuery = useQuery({
@@ -65,6 +69,8 @@ export function DashboardShell({ children }: { children: ReactNode }) {
   const visibleHr = filterNavByPermissions(hrNav, navUser);
   const visibleFinance = filterNavByPermissions(financeNav, navUser);
   const visiblePayroll = filterNavByPermissions(payrollNav, navUser);
+  const visibleReports = filterNavByPermissions(reportsNav, navUser);
+  const visiblePm = filterNavByPermissions(pmNav, navUser);
   const visiblePortal = filterNavByPermissions(portalNav, navUser);
   const visibleAdmin = filterNavByPermissions(adminNav, navUser);
   const breadcrumbs = buildBreadcrumbs(pathname);
@@ -216,6 +222,72 @@ export function DashboardShell({ children }: { children: ReactNode }) {
             </button>
             {payrollExpanded &&
               visiblePayroll.map((item) => (
+                <SidebarLink
+                  key={item.href}
+                  href={item.href}
+                  label={item.label}
+                  icon={item.icon}
+                  active={pathname === item.href || pathname.startsWith(`${item.href}/`)}
+                  onNavigate={() => setMobileOpen(false)}
+                />
+              ))}
+          </div>
+        )}
+
+        {visibleReports.length > 0 && (
+          <div className="mt-4">
+            <button
+              type="button"
+              onClick={() => setReportsExpanded((v) => !v)}
+              className={cn(
+                typographyScale.overline.className,
+                "flex w-full items-center justify-between px-2 py-2 text-sidebar-foreground/70",
+              )}
+            >
+              Reports
+              <ChevronDown
+                className={cn(
+                  iconSize.sm,
+                  "transition-transform",
+                  reportsExpanded ? "rotate-0" : "-rotate-90",
+                )}
+              />
+            </button>
+            {reportsExpanded &&
+              visibleReports.map((item) => (
+                <SidebarLink
+                  key={item.href}
+                  href={item.href}
+                  label={item.label}
+                  icon={item.icon}
+                  active={pathname === item.href || pathname.startsWith(`${item.href}/`)}
+                  onNavigate={() => setMobileOpen(false)}
+                />
+              ))}
+          </div>
+        )}
+
+        {visiblePm.length > 0 && (
+          <div className="mt-4">
+            <button
+              type="button"
+              onClick={() => setPmExpanded((v) => !v)}
+              className={cn(
+                typographyScale.overline.className,
+                "flex w-full items-center justify-between px-2 py-2 text-sidebar-foreground/70",
+              )}
+            >
+              Projects
+              <ChevronDown
+                className={cn(
+                  iconSize.sm,
+                  "transition-transform",
+                  pmExpanded ? "rotate-0" : "-rotate-90",
+                )}
+              />
+            </button>
+            {pmExpanded &&
+              visiblePm.map((item) => (
                 <SidebarLink
                   key={item.href}
                   href={item.href}

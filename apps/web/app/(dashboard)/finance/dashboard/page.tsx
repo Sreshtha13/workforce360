@@ -20,6 +20,14 @@ export default function FinanceDashboardPage() {
     },
   });
 
+  const kpisQuery = useQuery({
+    queryKey: ["reports", "kpis", "finance"],
+    queryFn: async () => {
+      const res = await apiClient.reports.getKpis("finance");
+      return res.data!;
+    },
+  });
+
   if (query.isLoading) return <LoadingState message="Loading finance dashboard..." />;
   if (query.isError) {
     return <ErrorState message="Failed to load finance dashboard." onRetry={() => query.refetch()} />;
@@ -61,6 +69,22 @@ export default function FinanceDashboardPage() {
           description="Awaiting review"
           icon={Receipt}
         />
+        {kpisQuery.data && "arOutstanding" in kpisQuery.data ? (
+          <>
+            <MetricStatCard
+              title="AR (reports)"
+              value={formatMoney(kpisQuery.data.arOutstanding)}
+              description="Reports KPI outstanding receivables"
+              icon={Wallet}
+            />
+            <MetricStatCard
+              title="Collected (reports)"
+              value={formatMoney(kpisQuery.data.revenueCollected)}
+              description={`${kpisQuery.data.invoiceCount} invoices in range`}
+              icon={CreditCard}
+            />
+          </>
+        ) : null}
       </div>
 
       <div className="grid gap-4 lg:grid-cols-12">

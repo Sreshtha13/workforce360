@@ -37,6 +37,7 @@ const emptyRoleForm = {
   name: "",
   code: "",
   description: "",
+  requiresMfa: false,
 };
 
 type PermissionSheetMode = "view" | "edit" | null;
@@ -110,6 +111,7 @@ export default function RolesAdminPage() {
         name: roleForm.name.trim(),
         code: roleForm.code.trim() || undefined,
         description: roleForm.description.trim() || undefined,
+        requiresMfa: roleForm.requiresMfa,
       };
 
       if (editingRole) {
@@ -213,6 +215,7 @@ export default function RolesAdminPage() {
       name: role.name,
       code: role.code ?? "",
       description: role.description ?? "",
+      requiresMfa: Boolean(role.requiresMfa),
     });
     setRoleSheetOpen(true);
   };
@@ -324,6 +327,7 @@ export default function RolesAdminPage() {
                   <Badge variant={r.isActive ? "success" : "warning"}>
                     {r.isActive ? "Active" : "Inactive"}
                   </Badge>
+                  {r.requiresMfa && <Badge variant="secondary">MFA required</Badge>}
                 </div>
               ),
             },
@@ -428,6 +432,15 @@ export default function RolesAdminPage() {
           value={roleForm.description}
           onChange={(v) => setRoleForm({ ...roleForm, description: v })}
         />
+        <label className="flex items-center gap-2 text-sm">
+          <input
+            type="checkbox"
+            checked={roleForm.requiresMfa}
+            onChange={(e) => setRoleForm({ ...roleForm, requiresMfa: e.target.checked })}
+            className="size-4 rounded border"
+          />
+          Require MFA for users with this role
+        </label>
         {!editingRole && (
           <div className="space-y-2">
             <p className="text-sm font-medium">

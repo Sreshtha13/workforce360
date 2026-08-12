@@ -6,15 +6,20 @@ import {
   ClipboardCheck,
   ClipboardList,
   CreditCard,
+  Database,
   DollarSign,
+  FileBarChart,
   FileText,
   Headphones,
   KeyRound,
   LayoutDashboard,
+  Link2,
   MapPin,
   Megaphone,
   BookOpen,
   Receipt,
+  ScrollText,
+  Settings,
   Shield,
   Tags,
   Timer,
@@ -202,6 +207,12 @@ export const financeNav: NavItem[] = [
 
 export const payrollNav: NavItem[] = [
   {
+    label: "Payroll Dashboard",
+    href: "/payroll/dashboard",
+    icon: LayoutDashboard,
+    permissions: ["payroll_run.read", "report.read", "dashboard.read"],
+  },
+  {
     label: "Salary Structures",
     href: "/payroll/salary-structures",
     icon: Wallet,
@@ -221,6 +232,36 @@ export const payrollNav: NavItem[] = [
   },
 ];
 
+export const reportsNav: NavItem[] = [
+  {
+    label: "Reports",
+    href: "/reports",
+    icon: FileBarChart,
+    permissions: ["report.read"],
+  },
+  {
+    label: "Report schedules",
+    href: "/reports/schedules",
+    icon: Timer,
+    permissions: ["report.schedule.manage"],
+  },
+];
+
+export const pmNav: NavItem[] = [
+  {
+    label: "PM Dashboard",
+    href: "/pm/dashboard",
+    icon: LayoutDashboard,
+    permissions: ["project.read", "report.read", "dashboard.read"],
+  },
+  {
+    label: "Projects",
+    href: "/pm/projects",
+    icon: Briefcase,
+    permissions: ["project.read", "project.manage"],
+  },
+];
+
 export const portalNav: NavItem[] = [
   {
     label: "Portal Home",
@@ -232,6 +273,12 @@ export const portalNav: NavItem[] = [
     label: "My Profile",
     href: "/portal/profile",
     icon: UserCircle,
+    permissions: ["portal.read"],
+  },
+  {
+    label: "Security",
+    href: "/portal/security",
+    icon: Shield,
     permissions: ["portal.read"],
   },
   {
@@ -322,6 +369,12 @@ export const adminNav: NavItem[] = [
     permissions: ["permission.read"],
   },
   {
+    label: "Master Data",
+    href: "/admin/master-data",
+    icon: Database,
+    permissions: ["settings.manage", "dashboard.read", "department.read"],
+  },
+  {
     label: "Departments",
     href: "/admin/departments",
     icon: Building2,
@@ -373,6 +426,36 @@ export const adminNav: NavItem[] = [
     href: "/admin/announcements",
     icon: Megaphone,
     permissions: ["announcement.manage"],
+  },
+  {
+    label: "Audit Logs",
+    href: "/admin/audit-logs",
+    icon: ScrollText,
+    permissions: ["audit.read"],
+  },
+  {
+    label: "Security Events",
+    href: "/admin/security-events",
+    icon: Shield,
+    permissions: ["security.read"],
+  },
+  {
+    label: "Notification Templates",
+    href: "/admin/notification-templates",
+    icon: Bell,
+    permissions: ["template.manage"],
+  },
+  {
+    label: "System Settings",
+    href: "/admin/settings",
+    icon: Settings,
+    permissions: ["settings.manage"],
+  },
+  {
+    label: "Integrations",
+    href: "/admin/integrations",
+    icon: Link2,
+    permissions: ["settings.manage", "dashboard.read"],
   },
 ];
 

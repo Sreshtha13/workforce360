@@ -5,6 +5,7 @@ export const createRoleSchema = z.object({
   code: z.string().max(50).optional(),
   description: z.string().optional(),
   isSystem: z.boolean().optional(),
+  requiresMfa: z.boolean().optional(),
 });
 
 export const updateRoleSchema = createRoleSchema.partial();

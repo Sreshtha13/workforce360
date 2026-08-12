@@ -108,6 +108,8 @@ export class DashboardService {
       ? await this.search(search.trim())
       : undefined;
 
+    const enrichment = await this.loadLiveEnrichment();
+
     return {
       stats: {
         totalEmployees: activeEmployees + inactiveEmployees,
@@ -129,6 +131,7 @@ export class DashboardService {
         teams: teamCount,
         designations: designationCount,
         offices: officeCount,
+        ...enrichment.metrics,
       },
       departmentBreakdown: departments.map((d) => ({
         id: d.id,
@@ -139,14 +142,12 @@ export class DashboardService {
         total: pendingBreakdown.reduce((sum, item) => sum + item.count, 0),
         breakdown: pendingBreakdown,
       },
-      attendance: {
-        available: false as const,
-        message: "Attendance module is not yet enabled. Data will appear here once tracking is live.",
-      },
-      leave: {
-        available: false as const,
-        message: "Leave management is not yet enabled. Request counts will appear here once the module ships.",
-      },
+      attendance: enrichment.attendance,
+      leave: enrichment.leave,
+      finance: enrichment.finance,
+      payroll: enrichment.payroll,
+      projects: enrichment.projects,
+      tickets: enrichment.tickets,
       hiring: {
         openJobs,
         pipeline: pipelineSummary,
@@ -167,6 +168,111 @@ export class DashboardService {
       })),
       searchResults,
     };
+  }
+
+  private async loadLiveEnrichment() {
+    const empty = {
+      metrics: {} as Record<string, number>,
+      attendance: {
+        available: false as const,
+        message: "Attendance data unavailable",
+      },
+      leave: {
+        available: false as const,
+        message: "Leave data unavailable",
+      },
+      finance: { available: false as const, arOutstanding: 0, invoiceCount: 0 },
+      payroll: { available: false as const, runCount: 0 },
+      projects: { available: false as const, total: 0, active: 0 },
+      tickets: { available: false as const, open: 0 },
+    };
+
+    try {
+      const todayStart = new Date();
+      todayStart.setHours(0, 0, 0, 0);
+
+      const [
+        attendanceToday,
+        leavePending,
+        invoices,
+        payrollRuns,
+        projectsTotal,
+        projectsActive,
+        openTickets,
+      ] = await Promise.all([
+        prisma.attendanceRecord.groupBy({
+          by: ["status"],
+          where: { deletedAt: null, date: { gte: todayStart } },
+          _count: { _all: true },
+        }),
+        prisma.leaveApplication.count({
+          where: { deletedAt: null, status: "PENDING" },
+        }),
+        prisma.invoice.findMany({
+          where: {
+            deletedAt: null,
+            status: { in: ["SENT", "PARTIALLY_PAID", "OVERDUE", "APPROVED"] },
+          },
+          select: { total: true, amountPaid: true },
+        }),
+        prisma.payrollRun.count({ where: { deletedAt: null } }),
+        prisma.project.count({ where: { deletedAt: null } }),
+        prisma.project.count({
+          where: { deletedAt: null, status: { in: ["ACTIVE", "PLANNING"] } },
+        }),
+        prisma.supportTicket.count({
+          where: {
+            deletedAt: null,
+            status: { in: ["OPEN", "IN_PROGRESS"] },
+          },
+        }),
+      ]);
+
+      let arOutstanding = 0;
+      for (const inv of invoices) {
+        arOutstanding += Math.max(0, Number(inv.total) - Number(inv.amountPaid));
+      }
+
+      const presentToday =
+        attendanceToday.find((r) => r.status === "PRESENT")?._count._all ?? 0;
+      const absentToday =
+        attendanceToday.find((r) => r.status === "ABSENT")?._count._all ?? 0;
+
+      return {
+        metrics: {
+          arOutstanding,
+          payrollRuns,
+          openTickets,
+          projectsActive,
+          leavePending,
+          presentToday,
+        },
+        attendance: {
+          available: true as const,
+          presentToday,
+          absentToday,
+          byStatus: attendanceToday,
+        },
+        leave: {
+          available: true as const,
+          pending: leavePending,
+        },
+        finance: {
+          available: true as const,
+          arOutstanding,
+          invoiceCount: invoices.length,
+        },
+        payroll: { available: true as const, runCount: payrollRuns },
+        projects: {
+          available: true as const,
+          total: projectsTotal,
+          active: projectsActive,
+        },
+        tickets: { available: true as const, open: openTickets },
+      };
+    } catch {
+      return empty;
+    }
   }
 
   async search(query: string): Promise<DashboardSearchResult> {

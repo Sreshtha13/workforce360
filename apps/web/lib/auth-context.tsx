@@ -14,10 +14,15 @@ import { isSuperAdmin as checkIsSuperAdmin } from "./super-admin";
 
 export type { AuthUser };
 
+export type LoginOutcome =
+  | { mfaRequired: true; mfaToken: string; mfaSetupRequired?: boolean }
+  | { mfaRequired: false };
+
 type AuthContextType = {
   user: AuthUser | null;
   loading: boolean;
-  login: (email: string, password: string) => Promise<void>;
+  login: (email: string, password: string) => Promise<LoginOutcome>;
+  verifyMfa: (mfaToken: string, code: string) => Promise<void>;
   logout: () => Promise<void>;
   refetch: () => Promise<void>;
   hasPermission: (permission: string) => boolean;
@@ -47,9 +52,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     fetchUser();
   }, []);
 
-  const login = async (email: string, password: string) => {
+  const login = async (email: string, password: string): Promise<LoginOutcome> => {
     try {
-      await apiClient.auth.login(email, password);
+      const response = await apiClient.auth.login(email, password);
+      const data = response.data;
+      if (!data) {
+        throw new Error("Empty login response");
+      }
+      if (data.mfaRequired) {
+        return {
+          mfaRequired: true,
+          mfaToken: data.mfaToken,
+          mfaSetupRequired: data.mfaSetupRequired,
+        };
+      }
+      await fetchUser();
+      router.push("/dashboard");
+      return { mfaRequired: false };
+    } catch (error) {
+      if (error instanceof ApiClientError) {
+        throw new Error(error.message);
+      }
+      throw error;
+    }
+  };
+
+  const verifyMfa = async (mfaToken: string, code: string) => {
+    try {
+      await apiClient.auth.mfa.verify(mfaToken, code);
       await fetchUser();
       router.push("/dashboard");
     } catch (error) {
@@ -90,6 +120,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         user,
         loading,
         login,
+        verifyMfa,
         logout,
         refetch,
         hasPermission,

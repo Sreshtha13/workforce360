@@ -8,6 +8,9 @@ import {
   refreshTokenSchema,
   requestPasswordResetSchema,
   resetPasswordSchema,
+  mfaVerifySchema,
+  mfaChallengeTokenSchema,
+  mfaCodeSchema,
 } from "../schemas/auth.schema";
 
 const router = Router();
@@ -221,5 +224,20 @@ router.post(
  *         description: Not authenticated
  */
 router.get("/me", requireAuth, authController.getMe);
+
+router.post("/mfa/verify", validate(mfaVerifySchema), authController.mfaVerify);
+router.post(
+  "/mfa/setup-challenge",
+  validate(mfaChallengeTokenSchema),
+  authController.mfaSetupChallenge,
+);
+router.post("/mfa/enable-challenge", validate(mfaVerifySchema), authController.mfaEnableChallenge);
+router.post("/mfa/setup", requireAuth, authController.mfaSetup);
+router.post("/mfa/enable", requireAuth, validate(mfaCodeSchema), authController.mfaEnable);
+router.post("/mfa/disable", requireAuth, validate(mfaCodeSchema), authController.mfaDisable);
+router.get("/mfa/status", requireAuth, authController.mfaStatus);
+
+router.get("/devices", requireAuth, authController.listDevices);
+router.delete("/devices/:id", requireAuth, authController.revokeDevice);
 
 export { router as authRouter };

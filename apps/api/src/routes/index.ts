@@ -22,6 +22,14 @@ import { payrollRouter } from "./payroll.routes";
 import { notificationRouter } from "./notification.routes";
 import { helpdeskRouter } from "./helpdesk.routes";
 import { documentRouter } from "./document.routes";
+import { reportRouter } from "./report.routes";
+import { auditRouter } from "./audit.routes";
+import {
+  settingsRouter,
+  templateRouter,
+  adminExtrasRouter,
+} from "./settings.routes";
+import { securityRouter } from "./security.routes";
 
 const apiRouter = Router();
 
@@ -48,5 +56,11 @@ apiRouter.use("/payroll", payrollRouter);
 apiRouter.use("/notifications", notificationRouter);
 apiRouter.use("/helpdesk", helpdeskRouter);
 apiRouter.use("/documents", documentRouter);
+apiRouter.use("/reports", reportRouter);
+apiRouter.use("/audit-logs", auditRouter);
+apiRouter.use("/settings", settingsRouter);
+apiRouter.use("/notification-templates", templateRouter);
+apiRouter.use("/admin", adminExtrasRouter);
+apiRouter.use("/security-events", securityRouter);
 
 export { apiRouter };

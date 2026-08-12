@@ -35,6 +35,14 @@ export default function HrDashboardPage() {
     },
   });
 
+  const kpisQuery = useQuery({
+    queryKey: ["reports", "kpis", "hr"],
+    queryFn: async () => {
+      const res = await apiClient.reports.getKpis("hr");
+      return res.data!;
+    },
+  });
+
   const quickActions = useMemo(
     () =>
       filterNavByPermissions(hrNav, user?.permissions ?? []).filter((item) =>
@@ -137,6 +145,22 @@ export default function HrDashboardPage() {
           description="Employee birthdays today"
           icon={Cake}
         />
+        {kpisQuery.data && "applications" in kpisQuery.data ? (
+          <>
+            <MetricStatCard
+              title="Applications (reports)"
+              value={String(kpisQuery.data.applications)}
+              description="From reports HR KPIs"
+              icon={Users}
+            />
+            <MetricStatCard
+              title="Onboarding (reports)"
+              value={String(kpisQuery.data.onboarding)}
+              description="Pre-onboarding + onboarding"
+              icon={ClipboardList}
+            />
+          </>
+        ) : null}
         <MetricStatCard
           title="Probation"
           value={String(data.probation ?? 0)}

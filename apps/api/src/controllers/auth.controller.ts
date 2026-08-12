@@ -1,8 +1,10 @@
 import type { Request, Response } from "express";
 import { AuthService } from "../services/auth.service";
+import { mfaService } from "../services/mfa.service";
 import { authCookieOptions, clearAuthCookieOptions } from "../lib/cookies";
 import { getAccessTokenMaxAgeMs, getRefreshTokenMaxAgeMs } from "../lib/token-expiry";
 import { sendSuccess, sendError } from "../lib/response";
+import { AppError } from "../lib/app-error";
 import type {
   LoginInput,
   GoogleLoginInput,
@@ -52,10 +54,23 @@ export class AuthController {
         ipAddress,
         userAgent,
       );
+
+      if ("mfaRequired" in result && result.mfaRequired) {
+        sendSuccess(res, {
+          mfaRequired: true,
+          mfaSetupRequired: result.mfaSetupRequired,
+          mfaToken: result.mfaToken,
+          user: result.user,
+        });
+        return;
+      }
       
-      this.setSessionCookies(res, result);
+      this.setSessionCookies(res, {
+        accessToken: result.accessToken!,
+        refreshToken: result.refreshToken!,
+      });
       
-      sendSuccess(res, { user: result.user });
+      sendSuccess(res, { mfaRequired: false, user: result.user });
     } catch (error) {
       sendError(res, 401, {
         code: "LOGIN_FAILED",
@@ -75,10 +90,23 @@ export class AuthController {
         ipAddress,
         userAgent,
       );
+
+      if ("mfaRequired" in result && result.mfaRequired) {
+        sendSuccess(res, {
+          mfaRequired: true,
+          mfaSetupRequired: result.mfaSetupRequired,
+          mfaToken: result.mfaToken,
+          user: result.user,
+        });
+        return;
+      }
       
-      this.setSessionCookies(res, result);
+      this.setSessionCookies(res, {
+        accessToken: result.accessToken!,
+        refreshToken: result.refreshToken!,
+      });
       
-      sendSuccess(res, { user: result.user });
+      sendSuccess(res, { mfaRequired: false, user: result.user });
     } catch (error) {
       sendError(res, 401, {
         code: "GOOGLE_LOGIN_FAILED",
@@ -184,6 +212,145 @@ export class AuthController {
       sendError(res, 500, {
         code: "GET_ME_FAILED",
         message: error instanceof Error ? error.message : "Failed to get user info",
+      });
+    }
+  };
+
+  mfaVerify = async (req: Request, res: Response): Promise<void> => {
+    try {
+      const { mfaToken, code } = req.body as { mfaToken: string; code: string };
+      const result = await mfaService.verifyChallenge(mfaToken, code, {
+        ipAddress: req.ip,
+        userAgent: req.get("user-agent"),
+      });
+      this.setSessionCookies(res, {
+        accessToken: result.accessToken,
+        refreshToken: result.refreshToken,
+      });
+      sendSuccess(res, { user: result.user, mfaRequired: false });
+    } catch (error) {
+      const status = error instanceof AppError ? error.statusCode : 401;
+      sendError(res, status, {
+        code: error instanceof AppError ? error.code : "MFA_VERIFY_FAILED",
+        message: error instanceof Error ? error.message : "MFA verification failed",
+      });
+    }
+  };
+
+  mfaSetupChallenge = async (req: Request, res: Response): Promise<void> => {
+    try {
+      const { mfaToken } = req.body as { mfaToken: string };
+      const data = await mfaService.setupChallenge(mfaToken);
+      sendSuccess(res, data);
+    } catch (error) {
+      const status = error instanceof AppError ? error.statusCode : 400;
+      sendError(res, status, {
+        code: error instanceof AppError ? error.code : "MFA_SETUP_FAILED",
+        message: error instanceof Error ? error.message : "MFA setup failed",
+      });
+    }
+  };
+
+  mfaEnableChallenge = async (req: Request, res: Response): Promise<void> => {
+    try {
+      const { mfaToken, code } = req.body as { mfaToken: string; code: string };
+      const result = await mfaService.enableChallenge(mfaToken, code, {
+        ipAddress: req.ip,
+        userAgent: req.get("user-agent"),
+      });
+      this.setSessionCookies(res, {
+        accessToken: result.accessToken,
+        refreshToken: result.refreshToken,
+      });
+      sendSuccess(res, {
+        enabled: result.enabled,
+        backupCodes: result.backupCodes,
+        user: result.user,
+        mfaRequired: false,
+      });
+    } catch (error) {
+      const status = error instanceof AppError ? error.statusCode : 400;
+      sendError(res, status, {
+        code: error instanceof AppError ? error.code : "MFA_ENABLE_FAILED",
+        message: error instanceof Error ? error.message : "MFA enable failed",
+      });
+    }
+  };
+
+  mfaSetup = async (req: Request, res: Response): Promise<void> => {
+    try {
+      const data = await mfaService.setup(req.user!.userId);
+      sendSuccess(res, data);
+    } catch (error) {
+      const status = error instanceof AppError ? error.statusCode : 500;
+      sendError(res, status, {
+        code: error instanceof AppError ? error.code : "MFA_SETUP_FAILED",
+        message: error instanceof Error ? error.message : "MFA setup failed",
+      });
+    }
+  };
+
+  mfaEnable = async (req: Request, res: Response): Promise<void> => {
+    try {
+      const { code } = req.body as { code: string };
+      const data = await mfaService.enable(req.user!.userId, code);
+      sendSuccess(res, data);
+    } catch (error) {
+      const status = error instanceof AppError ? error.statusCode : 400;
+      sendError(res, status, {
+        code: error instanceof AppError ? error.code : "MFA_ENABLE_FAILED",
+        message: error instanceof Error ? error.message : "MFA enable failed",
+      });
+    }
+  };
+
+  mfaDisable = async (req: Request, res: Response): Promise<void> => {
+    try {
+      const { code } = req.body as { code: string };
+      const data = await mfaService.disable(req.user!.userId, code);
+      sendSuccess(res, data);
+    } catch (error) {
+      const status = error instanceof AppError ? error.statusCode : 400;
+      sendError(res, status, {
+        code: error instanceof AppError ? error.code : "MFA_DISABLE_FAILED",
+        message: error instanceof Error ? error.message : "MFA disable failed",
+      });
+    }
+  };
+
+  mfaStatus = async (req: Request, res: Response): Promise<void> => {
+    try {
+      const data = await mfaService.getStatus(req.user!.userId);
+      sendSuccess(res, data);
+    } catch (error) {
+      sendError(res, 500, {
+        code: "MFA_STATUS_FAILED",
+        message: error instanceof Error ? error.message : "Failed to get MFA status",
+      });
+    }
+  };
+
+  listDevices = async (req: Request, res: Response): Promise<void> => {
+    try {
+      const data = await mfaService.listDevices(req.user!.userId);
+      sendSuccess(res, data);
+    } catch (error) {
+      sendError(res, 500, {
+        code: "DEVICES_LIST_FAILED",
+        message: error instanceof Error ? error.message : "Failed to list devices",
+      });
+    }
+  };
+
+  revokeDevice = async (req: Request, res: Response): Promise<void> => {
+    try {
+      const data = await mfaService.revokeDevice(req.user!.userId, req.params.id);
+      sendSuccess(res, data);
+    } catch (error) {
+      const status = error instanceof AppError ? error.statusCode : 500;
+      sendError(res, status, {
+        code: error instanceof AppError ? error.code : "DEVICE_REVOKE_FAILED",
+        message: error instanceof Error ? error.message : "Failed to revoke device",
       });
     }
   };
