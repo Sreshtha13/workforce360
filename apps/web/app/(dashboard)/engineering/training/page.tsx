@@ -1,39 +1,44 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { format } from "date-fns";
 import { apiClient } from "@/lib/api-client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Progress } from "@/components/ui/progress-bar";
+import { SimpleTabs } from "@/components/ui/simple-tabs";
 import { GraduationCap, Clock, Award, ExternalLink } from "lucide-react";
 import { TrainingStatus } from "@/types/engineering";
+
+function formatDate(value: string) {
+  return new Date(value).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}
 
 export default function TrainingPage() {
   const queryClient = useQueryClient();
 
   const { data: allTrainings, isLoading: trainingsLoading } = useQuery({
     queryKey: ["engineering", "training"],
-    queryFn: () => apiClient.engineering.training.list({}),
+    queryFn: async () => {
+      const res = await apiClient.engineering.training.list({});
+      return res.data ?? [];
+    },
   });
 
   const { data: myEnrollments, isLoading: enrollmentsLoading } = useQuery({
     queryKey: ["engineering", "training", "my-enrollments"],
-    queryFn: () => apiClient.engineering.training.myEnrollments(),
+    queryFn: async () => {
+      const res = await apiClient.engineering.training.myEnrollments();
+      return res.data ?? [];
+    },
   });
 
   const enrollMutation = useMutation({
     mutationFn: (trainingId: string) => apiClient.engineering.training.enroll({ trainingId }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["engineering", "training"] });
-    },
-  });
-
-  const updateEnrollmentMutation = useMutation({
-    mutationFn: ({ id, status }: { id: string; status: TrainingStatus }) =>
-      apiClient.engineering.training.updateEnrollment(id, { status }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["engineering", "training"] });
     },
@@ -59,7 +64,6 @@ export default function TrainingPage() {
         <p className="text-muted-foreground">Learning and development resources</p>
       </div>
 
-      {/* Progress Overview */}
       <div className="grid gap-4 md:grid-cols-3">
         <Card>
           <CardHeader className="pb-3">
@@ -102,212 +106,218 @@ export default function TrainingPage() {
         </Card>
       </div>
 
-      {/* Training Tabs */}
-      <Tabs defaultValue="my-trainings">
-        <TabsList>
-          <TabsTrigger value="my-trainings">My Trainings</TabsTrigger>
-          <TabsTrigger value="available">Available</TabsTrigger>
-          <TabsTrigger value="required">Required</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="my-trainings" className="mt-6">
-          <div className="grid gap-4 md:grid-cols-2">
-            {enrollmentsLoading ? (
-              <div className="col-span-full text-center py-8">Loading...</div>
-            ) : myEnrollments && myEnrollments.length > 0 ? (
-              myEnrollments.map((enrollment) => (
-                <Card key={enrollment.id}>
-                  <CardHeader>
-                    <div className="flex items-start justify-between">
-                      <div>
-                        <CardTitle className="text-lg">{enrollment.training?.title}</CardTitle>
-                        {enrollment.training?.category && (
-                          <Badge variant="outline" className="mt-2">
-                            {enrollment.training.category}
-                          </Badge>
-                        )}
-                      </div>
-                      <Badge
-                        variant={enrollment.status === TrainingStatus.COMPLETED ? "default" : "secondary"}
-                        className={enrollment.status === TrainingStatus.COMPLETED ? "bg-green-500" : ""}
-                      >
-                        {enrollment.status}
-                      </Badge>
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-3">
-                      {enrollment.training?.description && (
-                        <p className="text-sm text-muted-foreground">
-                          {enrollment.training.description}
-                        </p>
-                      )}
-                      {enrollment.training?.duration && (
-                        <p className="text-xs text-muted-foreground flex items-center gap-1">
-                          <Clock className="h-3 w-3" />
-                          {enrollment.training.duration} minutes
-                        </p>
-                      )}
-                      {enrollment.completedAt && (
-                        <p className="text-xs text-muted-foreground">
-                          Completed: {format(new Date(enrollment.completedAt), "MMM d, yyyy")}
-                        </p>
-                      )}
-                      {enrollment.score !== null && enrollment.score !== undefined && (
-                        <p className="text-sm font-medium">Score: {enrollment.score}%</p>
-                      )}
-                      {enrollment.training?.url && (
-                        <a
-                          href={enrollment.training.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center text-sm text-primary hover:underline"
-                        >
-                          <ExternalLink className="mr-1 h-3 w-3" />
-                          Start Training
-                        </a>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
-              ))
-            ) : (
-              <div className="col-span-full text-center text-muted-foreground py-8">
-                No enrollments yet. Browse available trainings to get started.
-              </div>
-            )}
-          </div>
-        </TabsContent>
-
-        <TabsContent value="available" className="mt-6">
-          <div className="grid gap-4 md:grid-cols-2">
-            {trainingsLoading ? (
-              <div className="col-span-full text-center py-8">Loading...</div>
-            ) : allTrainings && allTrainings.length > 0 ? (
-              allTrainings.map((training) => {
-                const enrolled = isEnrolled(training.id);
-                const enrollment = getEnrollment(training.id);
-                
-                return (
-                  <Card key={training.id}>
-                    <CardHeader>
-                      <div className="flex items-start justify-between">
-                        <div>
-                          <CardTitle className="text-lg">{training.title}</CardTitle>
-                          {training.category && (
-                            <Badge variant="outline" className="mt-2">
-                              {training.category}
-                            </Badge>
-                          )}
-                        </div>
-                        {training.isRequired && (
-                          <Badge variant="destructive">Required</Badge>
-                        )}
-                      </div>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="space-y-3">
-                        {training.description && (
-                          <p className="text-sm text-muted-foreground">
-                            {training.description}
-                          </p>
-                        )}
-                        {training.duration && (
-                          <p className="text-xs text-muted-foreground flex items-center gap-1">
-                            <Clock className="h-3 w-3" />
-                            {training.duration} minutes
-                          </p>
-                        )}
-                        {!enrolled ? (
-                          <Button
-                            onClick={() => enrollMutation.mutate(training.id)}
-                            disabled={enrollMutation.isPending}
-                            className="w-full"
-                          >
-                            Enroll
-                          </Button>
-                        ) : (
-                          <Badge variant="secondary" className="w-full justify-center">
-                            Enrolled ({enrollment?.status})
-                          </Badge>
-                        )}
-                      </div>
-                    </CardContent>
-                  </Card>
-                );
-              })
-            ) : (
-              <div className="col-span-full text-center text-muted-foreground py-8">
-                No trainings available
-              </div>
-            )}
-          </div>
-        </TabsContent>
-
-        <TabsContent value="required" className="mt-6">
-          <div className="grid gap-4 md:grid-cols-2">
-            {trainingsLoading ? (
-              <div className="col-span-full text-center py-8">Loading...</div>
-            ) : (
-              allTrainings
-                ?.filter((t) => t.isRequired)
-                .map((training) => {
-                  const enrolled = isEnrolled(training.id);
-                  const enrollment = getEnrollment(training.id);
-                  
-                  return (
-                    <Card key={training.id}>
+      <SimpleTabs
+        defaultValue="my-trainings"
+        tabs={[
+          {
+            value: "my-trainings",
+            label: "My Trainings",
+            content: (
+              <div className="grid gap-4 md:grid-cols-2">
+                {enrollmentsLoading ? (
+                  <div className="col-span-full text-center py-8">Loading...</div>
+                ) : myEnrollments && myEnrollments.length > 0 ? (
+                  myEnrollments.map((enrollment) => (
+                    <Card key={enrollment.id}>
                       <CardHeader>
-                        <CardTitle className="text-lg">{training.title}</CardTitle>
-                        <CardDescription>{training.category}</CardDescription>
+                        <div className="flex items-start justify-between">
+                          <div>
+                            <CardTitle className="text-lg">{enrollment.training?.title}</CardTitle>
+                            {enrollment.training?.category && (
+                              <Badge variant="outline" className="mt-2">
+                                {enrollment.training.category}
+                              </Badge>
+                            )}
+                          </div>
+                          <Badge
+                            variant={enrollment.status === TrainingStatus.COMPLETED ? "default" : "secondary"}
+                            className={enrollment.status === TrainingStatus.COMPLETED ? "bg-green-500" : ""}
+                          >
+                            {enrollment.status}
+                          </Badge>
+                        </div>
                       </CardHeader>
                       <CardContent>
                         <div className="space-y-3">
-                          {training.description && (
+                          {enrollment.training?.description && (
                             <p className="text-sm text-muted-foreground">
-                              {training.description}
+                              {enrollment.training.description}
                             </p>
                           )}
-                          {!enrolled ? (
-                            <Button
-                              onClick={() => enrollMutation.mutate(training.id)}
-                              disabled={enrollMutation.isPending}
-                              variant="destructive"
-                              className="w-full"
+                          {enrollment.training?.duration && (
+                            <p className="text-xs text-muted-foreground flex items-center gap-1">
+                              <Clock className="h-3 w-3" />
+                              {enrollment.training.duration} minutes
+                            </p>
+                          )}
+                          {enrollment.completedAt && (
+                            <p className="text-xs text-muted-foreground">
+                              Completed: {formatDate(enrollment.completedAt)}
+                            </p>
+                          )}
+                          {enrollment.score !== null && enrollment.score !== undefined && (
+                            <p className="text-sm font-medium">Score: {enrollment.score}%</p>
+                          )}
+                          {enrollment.training?.url && (
+                            <a
+                              href={enrollment.training.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center text-sm text-primary hover:underline"
                             >
-                              Enroll Now (Required)
-                            </Button>
-                          ) : (
-                            <div className="flex items-center justify-between">
-                              <Badge
-                                variant={enrollment?.status === TrainingStatus.COMPLETED ? "default" : "secondary"}
-                                className={enrollment?.status === TrainingStatus.COMPLETED ? "bg-green-500" : ""}
-                              >
-                                {enrollment?.status}
-                              </Badge>
-                              {training.url && (
-                                <a
-                                  href={training.url}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                >
-                                  <Button variant="outline" size="sm">
-                                    <ExternalLink className="mr-1 h-3 w-3" />
-                                    Start
-                                  </Button>
-                                </a>
-                              )}
-                            </div>
+                              <ExternalLink className="mr-1 h-3 w-3" />
+                              Start Training
+                            </a>
                           )}
                         </div>
                       </CardContent>
                     </Card>
-                  );
-                })
-            )}
-          </div>
-        </TabsContent>
-      </Tabs>
+                  ))
+                ) : (
+                  <div className="col-span-full text-center text-muted-foreground py-8">
+                    No enrollments yet. Browse available trainings to get started.
+                  </div>
+                )}
+              </div>
+            ),
+          },
+          {
+            value: "available",
+            label: "Available",
+            content: (
+              <div className="grid gap-4 md:grid-cols-2">
+                {trainingsLoading ? (
+                  <div className="col-span-full text-center py-8">Loading...</div>
+                ) : allTrainings && allTrainings.length > 0 ? (
+                  allTrainings.map((training) => {
+                    const enrolled = isEnrolled(training.id);
+                    const enrollment = getEnrollment(training.id);
+
+                    return (
+                      <Card key={training.id}>
+                        <CardHeader>
+                          <div className="flex items-start justify-between">
+                            <div>
+                              <CardTitle className="text-lg">{training.title}</CardTitle>
+                              {training.category && (
+                                <Badge variant="outline" className="mt-2">
+                                  {training.category}
+                                </Badge>
+                              )}
+                            </div>
+                            {training.isRequired && (
+                              <Badge variant="destructive">Required</Badge>
+                            )}
+                          </div>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="space-y-3">
+                            {training.description && (
+                              <p className="text-sm text-muted-foreground">
+                                {training.description}
+                              </p>
+                            )}
+                            {training.duration && (
+                              <p className="text-xs text-muted-foreground flex items-center gap-1">
+                                <Clock className="h-3 w-3" />
+                                {training.duration} minutes
+                              </p>
+                            )}
+                            {!enrolled ? (
+                              <Button
+                                onClick={() => enrollMutation.mutate(training.id)}
+                                disabled={enrollMutation.isPending}
+                                className="w-full"
+                              >
+                                Enroll
+                              </Button>
+                            ) : (
+                              <Badge variant="secondary" className="w-full justify-center">
+                                Enrolled ({enrollment?.status})
+                              </Badge>
+                            )}
+                          </div>
+                        </CardContent>
+                      </Card>
+                    );
+                  })
+                ) : (
+                  <div className="col-span-full text-center text-muted-foreground py-8">
+                    No trainings available
+                  </div>
+                )}
+              </div>
+            ),
+          },
+          {
+            value: "required",
+            label: "Required",
+            content: (
+              <div className="grid gap-4 md:grid-cols-2">
+                {trainingsLoading ? (
+                  <div className="col-span-full text-center py-8">Loading...</div>
+                ) : (
+                  allTrainings
+                    ?.filter((t) => t.isRequired)
+                    .map((training) => {
+                      const enrolled = isEnrolled(training.id);
+                      const enrollment = getEnrollment(training.id);
+
+                      return (
+                        <Card key={training.id}>
+                          <CardHeader>
+                            <CardTitle className="text-lg">{training.title}</CardTitle>
+                            <CardDescription>{training.category}</CardDescription>
+                          </CardHeader>
+                          <CardContent>
+                            <div className="space-y-3">
+                              {training.description && (
+                                <p className="text-sm text-muted-foreground">
+                                  {training.description}
+                                </p>
+                              )}
+                              {!enrolled ? (
+                                <Button
+                                  onClick={() => enrollMutation.mutate(training.id)}
+                                  disabled={enrollMutation.isPending}
+                                  variant="destructive"
+                                  className="w-full"
+                                >
+                                  Enroll Now (Required)
+                                </Button>
+                              ) : (
+                                <div className="flex items-center justify-between">
+                                  <Badge
+                                    variant={enrollment?.status === TrainingStatus.COMPLETED ? "default" : "secondary"}
+                                    className={enrollment?.status === TrainingStatus.COMPLETED ? "bg-green-500" : ""}
+                                  >
+                                    {enrollment?.status}
+                                  </Badge>
+                                  {training.url && (
+                                    <a
+                                      href={training.url}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                    >
+                                      <Button variant="outline" size="sm">
+                                        <ExternalLink className="mr-1 h-3 w-3" />
+                                        Start
+                                      </Button>
+                                    </a>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          </CardContent>
+                        </Card>
+                      );
+                    })
+                )}
+              </div>
+            ),
+          },
+        ]}
+      />
     </div>
   );
 }

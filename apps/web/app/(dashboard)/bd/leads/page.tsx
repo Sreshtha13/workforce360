@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiClient } from "@/lib/api-client";
@@ -122,10 +123,10 @@ export default function BdLeadsPage() {
             </div>
             <div className="p-2 space-y-2 max-h-[calc(100vh-20rem)] overflow-y-auto">
               {groupedLeads[status].map((lead) => (
-                <div
+                <Link
                   key={lead.id}
-                  className="p-3 rounded-lg border bg-background hover:shadow-md transition-shadow cursor-pointer"
-                  onClick={() => window.location.href = `/bd/leads/${lead.id}`}
+                  href={`/bd/leads/${lead.id}`}
+                  className="block p-3 rounded-lg border bg-background hover:shadow-md transition-shadow"
                 >
                   <h4 className="font-medium mb-1">{lead.title}</h4>
                   {lead.companyName && (
@@ -141,7 +142,7 @@ export default function BdLeadsPage() {
                       Assigned to: {lead.assignedTo.firstName} {lead.assignedTo.lastName}
                     </p>
                   )}
-                </div>
+                </Link>
               ))}
               {groupedLeads[status].length === 0 && (
                 <p className="text-sm text-muted-foreground text-center py-8">

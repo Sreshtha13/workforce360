@@ -31,6 +31,7 @@ import {
 } from "./settings.routes";
 import { securityRouter } from "./security.routes";
 import { integrationRouter } from "./integration.routes";
+import engineeringRouter from "./engineering.routes";
 
 const apiRouter = Router();
 
@@ -64,5 +65,6 @@ apiRouter.use("/notification-templates", templateRouter);
 apiRouter.use("/admin", adminExtrasRouter);
 apiRouter.use("/security-events", securityRouter);
 apiRouter.use("/integrations", integrationRouter);
+apiRouter.use("/engineering", engineeringRouter);
 
 export { apiRouter };

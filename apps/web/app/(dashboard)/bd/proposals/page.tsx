@@ -16,24 +16,24 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import type { Bid, BidStatus, CreateBidInput } from "@/types/bd";
+import type { CreateProposalInput, Proposal, ProposalStatus } from "@/types/bd";
 
-const STATUS_LABELS: Record<BidStatus, string> = {
+const STATUS_LABELS: Record<ProposalStatus, string> = {
   DRAFT: "Draft",
-  SUBMITTED: "Submitted",
+  SENT: "Sent",
   UNDER_REVIEW: "Under Review",
   ACCEPTED: "Accepted",
   REJECTED: "Rejected",
-  WITHDRAWN: "Withdrawn",
+  REVISED: "Revised",
 };
 
-export default function BidsPage() {
+export default function ProposalsPage() {
   const searchParams = useSearchParams();
   const leadIdFilter = searchParams.get("leadId") ?? undefined;
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
   const [open, setOpen] = useState(false);
-  const [form, setForm] = useState<CreateBidInput>({
+  const [form, setForm] = useState<CreateProposalInput>({
     leadId: leadIdFilter ?? "",
     title: "",
     currency: "USD",
@@ -45,82 +45,77 @@ export default function BidsPage() {
     queryFn: async () => (await apiClient.bd.leads.list()).data ?? [],
   });
 
-  const bidsQuery = useQuery({
-    queryKey: ["bd", "bids", leadIdFilter],
+  const proposalsQuery = useQuery({
+    queryKey: ["bd", "proposals", leadIdFilter],
     queryFn: async () => {
-      const res = await apiClient.bd.bids.list({ leadId: leadIdFilter });
+      const res = await apiClient.bd.proposals.list({ leadId: leadIdFilter });
       return res.data ?? [];
     },
   });
 
   const createMutation = useMutation({
-    mutationFn: (data: CreateBidInput) => apiClient.bd.bids.create(data),
+    mutationFn: (data: CreateProposalInput) => apiClient.bd.proposals.create(data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["bd", "bids"] });
+      queryClient.invalidateQueries({ queryKey: ["bd", "proposals"] });
       setOpen(false);
       setForm({ leadId: leadIdFilter ?? "", title: "", currency: "USD", status: "DRAFT" });
     },
   });
 
-  const filtered = (bidsQuery.data ?? []).filter(
-    (bid) =>
+  const filtered = (proposalsQuery.data ?? []).filter(
+    (p) =>
       !search ||
-      bid.title.toLowerCase().includes(search.toLowerCase()) ||
-      bid.lead?.title?.toLowerCase().includes(search.toLowerCase()),
+      p.title.toLowerCase().includes(search.toLowerCase()) ||
+      p.lead?.title?.toLowerCase().includes(search.toLowerCase()),
   );
 
-  if (bidsQuery.isLoading) return <LoadingState message="Loading bids..." />;
-  if (bidsQuery.isError) {
-    return <ErrorState message="Failed to load bids." onRetry={() => bidsQuery.refetch()} />;
+  if (proposalsQuery.isLoading) return <LoadingState message="Loading proposals..." />;
+  if (proposalsQuery.isError) {
+    return <ErrorState message="Failed to load proposals." onRetry={() => proposalsQuery.refetch()} />;
   }
 
   return (
     <div className="space-y-6">
       <AdminPageHeader
-        title="Bids"
-        description="Track and manage bid submissions."
+        title="Proposals"
+        description="Create and track client proposals."
         actions={
           <Button onClick={() => setOpen(true)}>
             <Plus className="mr-2 h-4 w-4" />
-            New Bid
+            New Proposal
           </Button>
         }
       />
 
-      <SearchBar value={search} onChange={setSearch} placeholder="Search bids..." />
+      <SearchBar value={search} onChange={setSearch} placeholder="Search proposals..." />
 
       <div className="space-y-3">
-        {filtered.map((bid: Bid) => (
+        {filtered.map((proposal: Proposal) => (
           <Link
-            key={bid.id}
-            href={`/bd/bids/${bid.id}`}
+            key={proposal.id}
+            href={`/bd/proposals/${proposal.id}`}
             className="flex items-center justify-between p-4 border rounded-lg hover:bg-accent transition-colors"
           >
             <div className="space-y-1">
               <div className="flex items-center gap-2">
-                <p className="font-medium">{bid.title}</p>
-                <Badge variant="secondary">{STATUS_LABELS[bid.status]}</Badge>
+                <p className="font-medium">{proposal.title}</p>
+                <Badge variant="secondary">{STATUS_LABELS[proposal.status]}</Badge>
               </div>
-              {bid.lead && (
-                <p className="text-sm text-muted-foreground">Lead: {bid.lead.title}</p>
-              )}
-              {bid.amount && (
-                <p className="text-sm text-muted-foreground">
-                  {bid.currency} {parseFloat(bid.amount).toLocaleString()}
-                </p>
+              {proposal.lead && (
+                <p className="text-sm text-muted-foreground">Lead: {proposal.lead.title}</p>
               )}
             </div>
           </Link>
         ))}
         {filtered.length === 0 && (
-          <p className="text-center text-muted-foreground py-8">No bids found</p>
+          <p className="text-center text-muted-foreground py-8">No proposals found</p>
         )}
       </div>
 
       <Sheet open={open} onOpenChange={setOpen}>
         <SheetContent>
           <SheetHeader>
-            <SheetTitle>Create bid</SheetTitle>
+            <SheetTitle>Create proposal</SheetTitle>
           </SheetHeader>
           <form
             className="mt-6 space-y-4"
@@ -131,10 +126,7 @@ export default function BidsPage() {
           >
             <div className="space-y-2">
               <Label>Lead *</Label>
-              <Select
-                value={form.leadId}
-                onValueChange={(v) => setForm({ ...form, leadId: v })}
-              >
+              <Select value={form.leadId} onValueChange={(v) => setForm({ ...form, leadId: v })}>
                 <SelectTrigger>
                   <SelectValue placeholder="Select lead" />
                 </SelectTrigger>
@@ -156,25 +148,15 @@ export default function BidsPage() {
               />
             </div>
             <div className="space-y-2">
-              <Label>Amount</Label>
-              <Input
-                type="number"
-                value={form.amount ?? ""}
-                onChange={(e) =>
-                  setForm({ ...form, amount: e.target.value ? parseFloat(e.target.value) : undefined })
-                }
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Description</Label>
+              <Label>Content</Label>
               <Textarea
-                value={form.description}
-                onChange={(e) => setForm({ ...form, description: e.target.value })}
-                rows={3}
+                value={form.content}
+                onChange={(e) => setForm({ ...form, content: e.target.value })}
+                rows={4}
               />
             </div>
             <Button type="submit" className="w-full" disabled={createMutation.isPending || !form.leadId}>
-              {createMutation.isPending ? "Creating..." : "Create bid"}
+              {createMutation.isPending ? "Creating..." : "Create proposal"}
             </Button>
           </form>
         </SheetContent>

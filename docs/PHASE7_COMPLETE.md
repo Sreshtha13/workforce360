@@ -413,14 +413,11 @@ apps/web/lib/api-client.ts                              (extended)
 
 ## ⚡ Next Steps
 
-### Immediate (To Complete Phase 7)
-1. **Backend Implementation**: Build APIs for Phase 7 if not yet done
-2. **Permissions**: Add RBAC for engineering module
-   - `engineering.release.read/create/update/deploy`
-   - `engineering.testcase.read/create/execute`
-   - `engineering.docs.read/create/publish`
-   - `engineering.training.read/create/enroll`
-   - `engineering.codereview.read/create/approve`
+### Completed in this phase
+1. **Backend API** — Full `/api/engineering/*` REST surface (releases, test cases, docs, training, code reviews, dashboard)
+2. **Database migration** — `20260813120000_phase7_engineering`
+3. **RBAC** — `engineering.*` permissions in `seed.ts` + `db/seeds/phase7-engineering-permissions.sql`; assigned to `developer` role
+4. **Frontend** — Engineering sidebar nav, all list + detail pages, API `.data` unwrapping, native UI components
 
 ### Short-term (Enhancements)
 1. **Sprint Detail Page**: Deep-dive into sprint with burndown charts

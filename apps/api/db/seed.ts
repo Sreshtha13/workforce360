@@ -123,6 +123,16 @@ async function main() {
     if (notificationResources.has(resource)) {
       return { module: "Notifications", feature: label };
     }
+    const engineeringResources = new Set([
+      "engineering_release",
+      "engineering_testcase",
+      "engineering_doc",
+      "engineering_training",
+      "engineering_codereview",
+    ]);
+    if (engineeringResources.has(resource)) {
+      return { module: "Engineering", feature: label };
+    }
     return { module: "General", feature: label };
   }
   
@@ -278,6 +288,27 @@ async function main() {
     { name: "Manage Settings", code: "settings.manage", resource: "settings", action: "manage" },
     { name: "Manage Notification Templates", code: "template.manage", resource: "template", action: "manage" },
     { name: "Read Security Events", code: "security.read", resource: "security", action: "read" },
+
+    { name: "View Releases", code: "engineering.release.read", resource: "engineering_release", action: "read" },
+    { name: "Create Releases", code: "engineering.release.create", resource: "engineering_release", action: "create" },
+    { name: "Update Releases", code: "engineering.release.update", resource: "engineering_release", action: "update" },
+    { name: "Deploy Releases", code: "engineering.release.deploy", resource: "engineering_release", action: "deploy" },
+
+    { name: "View Test Cases", code: "engineering.testcase.read", resource: "engineering_testcase", action: "read" },
+    { name: "Manage Test Cases", code: "engineering.testcase.create", resource: "engineering_testcase", action: "create" },
+    { name: "Execute Test Cases", code: "engineering.testcase.execute", resource: "engineering_testcase", action: "execute" },
+
+    { name: "View Engineering Docs", code: "engineering.doc.read", resource: "engineering_doc", action: "read" },
+    { name: "Manage Engineering Docs", code: "engineering.doc.create", resource: "engineering_doc", action: "create" },
+    { name: "Publish Engineering Docs", code: "engineering.doc.publish", resource: "engineering_doc", action: "publish" },
+
+    { name: "View Training", code: "engineering.training.read", resource: "engineering_training", action: "read" },
+    { name: "Manage Training", code: "engineering.training.create", resource: "engineering_training", action: "create" },
+    { name: "Enroll Training", code: "engineering.training.enroll", resource: "engineering_training", action: "enroll" },
+
+    { name: "View Code Reviews", code: "engineering.codereview.read", resource: "engineering_codereview", action: "read" },
+    { name: "Create Code Reviews", code: "engineering.codereview.create", resource: "engineering_codereview", action: "create" },
+    { name: "Approve Code Reviews", code: "engineering.codereview.approve", resource: "engineering_codereview", action: "approve" },
   ];
   
   const createdPermissions = [];
@@ -508,6 +539,26 @@ async function main() {
     "department.read",
     "designation.read",
     "ticket.create",
+    "pm.project.read",
+    "pm.task.read",
+    "pm.task.update",
+    "pm.sprint.read",
+    "pm.time.create",
+    "pm.time.read",
+    "engineering.release.read",
+    "engineering.release.create",
+    "engineering.release.update",
+    "engineering.release.deploy",
+    "engineering.testcase.read",
+    "engineering.testcase.create",
+    "engineering.testcase.execute",
+    "engineering.doc.read",
+    "engineering.doc.create",
+    "engineering.training.read",
+    "engineering.training.enroll",
+    "engineering.codereview.read",
+    "engineering.codereview.create",
+    "engineering.codereview.approve",
   ]);
   const developerPermissions = createdPermissions.filter((p) =>
     developerPermissionCodes.has(p.code),

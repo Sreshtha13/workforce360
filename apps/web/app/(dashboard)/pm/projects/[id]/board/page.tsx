@@ -5,13 +5,13 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiClient } from "@/lib/api-client";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { LoadingState, ErrorState } from "@/components/admin/admin-states";
+import { KanbanBoard } from "@/components/pm/kanban-board";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Badge } from "@/components/ui/badge";
 import type { Task, TaskStatus, TaskPriority, CreateTaskInput } from "@/types/pm";
 
 const TASK_STATUSES: TaskStatus[] = ["TODO", "IN_PROGRESS", "IN_REVIEW", "DONE"];
@@ -29,12 +29,6 @@ const STATUS_COLORS: Record<TaskStatus, string> = {
   DONE: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200",
   CANCELLED: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200",
 };
-const PRIORITY_COLORS: Record<TaskPriority, string> = {
-  LOW: "bg-green-500",
-  MEDIUM: "bg-blue-500",
-  HIGH: "bg-orange-500",
-  URGENT: "bg-red-500",
-};
 
 export default function ProjectBoardPage({ params }: { params: Promise<{ id: string }> }) {
   const { id: projectId } = use(params);
@@ -50,10 +44,7 @@ export default function ProjectBoardPage({ params }: { params: Promise<{ id: str
 
   const projectQuery = useQuery({
     queryKey: ["pm", "projects", projectId],
-    queryFn: async () => {
-      const res = await apiClient.pm.projects.get(projectId);
-      return res.data;
-    },
+    queryFn: async () => (await apiClient.pm.projects.get(projectId)).data,
   });
 
   const tasksQuery = useQuery({
@@ -62,6 +53,7 @@ export default function ProjectBoardPage({ params }: { params: Promise<{ id: str
       const res = await apiClient.pm.tasks.list({ projectId });
       return res.data ?? [];
     },
+    refetchInterval: 30_000,
   });
 
   const createMutation = useMutation({
@@ -80,8 +72,8 @@ export default function ProjectBoardPage({ params }: { params: Promise<{ id: str
   });
 
   const updateStatusMutation = useMutation({
-    mutationFn: ({ id, status }: { id: string; status: TaskStatus }) =>
-      apiClient.pm.tasks.update(id, { status }),
+    mutationFn: ({ id, status, sortOrder }: { id: string; status: TaskStatus; sortOrder?: number }) =>
+      apiClient.pm.tasks.update(id, { status, sortOrder }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["pm", "tasks"] });
     },
@@ -100,80 +92,33 @@ export default function ProjectBoardPage({ params }: { params: Promise<{ id: str
   }
 
   const project = projectQuery.data;
-  const groupedTasks = TASK_STATUSES.reduce((acc, status) => {
-    acc[status] = (tasksQuery.data ?? []).filter((task) => task.status === status);
-    return acc;
-  }, {} as Record<TaskStatus, Task[]>);
+  const groupedTasks = TASK_STATUSES.reduce(
+    (acc, status) => {
+      acc[status] = (tasksQuery.data ?? [])
+        .filter((task) => task.status === status)
+        .sort((a, b) => a.sortOrder - b.sortOrder);
+      return acc;
+    },
+    {} as Record<TaskStatus, Task[]>,
+  );
 
   return (
     <div className="space-y-6">
       <AdminPageHeader
-        title={`${project?.name} - Kanban Board`}
-        description={project?.description ?? "Manage tasks in Kanban view"}
-        actions={
-          <Button onClick={() => setIsSheetOpen(true)}>
-            Add Task
-          </Button>
-        }
+        title={`${project?.name} — Kanban Board`}
+        description="Drag tasks between columns. Updates sync every 30s."
+        actions={<Button onClick={() => setIsSheetOpen(true)}>Add Task</Button>}
       />
 
-      <div className="flex gap-4 overflow-x-auto pb-4">
-        {TASK_STATUSES.map((status) => (
-          <div
-            key={status}
-            className="flex-shrink-0 w-80 rounded-lg border bg-card"
-          >
-            <div className={`px-4 py-3 rounded-t-lg ${STATUS_COLORS[status]}`}>
-              <h3 className="font-semibold">
-                {STATUS_LABELS[status]}
-                <span className="ml-2 text-sm font-normal">
-                  ({groupedTasks[status].length})
-                </span>
-              </h3>
-            </div>
-            <div className="p-2 space-y-2 max-h-[calc(100vh-20rem)] overflow-y-auto">
-              {groupedTasks[status].map((task) => (
-                <div
-                  key={task.id}
-                  className="p-3 rounded-lg border bg-background hover:shadow-md transition-shadow cursor-pointer"
-                  onClick={() => window.location.href = `/pm/tasks/${task.id}`}
-                >
-                  <div className="flex items-start justify-between mb-2">
-                    <h4 className="font-medium flex-1">{task.title}</h4>
-                    <div className={`w-2 h-2 rounded-full ml-2 mt-1 ${PRIORITY_COLORS[task.priority]}`} title={task.priority} />
-                  </div>
-                  {task.description && (
-                    <p className="text-sm text-muted-foreground mb-2 line-clamp-2">{task.description}</p>
-                  )}
-                  <div className="flex items-center justify-between text-xs">
-                    {task.assignee && (
-                      <span className="text-muted-foreground">
-                        {task.assignee.firstName} {task.assignee.lastName}
-                      </span>
-                    )}
-                    {task.estimatedHours && (
-                      <Badge variant="outline" className="text-xs">
-                        {task.estimatedHours}h
-                      </Badge>
-                    )}
-                  </div>
-                  {task._count && (task._count.comments > 0 || task._count.timeEntries > 0) && (
-                    <div className="flex gap-2 mt-2 text-xs text-muted-foreground">
-                      {task._count.comments > 0 && <span>💬 {task._count.comments}</span>}
-                      {task._count.timeEntries > 0 && <span>⏱️ {task._count.timeEntries}</span>}
-                    </div>
-                  )}
-                </div>
-              ))}
-              {groupedTasks[status].length === 0 && (
-                <p className="text-sm text-muted-foreground text-center py-8">
-                  No tasks
-                </p>
-              )}
-            </div>
-          </div>
-        ))}
-      </div>
+      <KanbanBoard
+        columns={TASK_STATUSES}
+        columnLabels={STATUS_LABELS}
+        columnColors={STATUS_COLORS}
+        grouped={groupedTasks}
+        onStatusChange={(taskId, status, sortOrder) =>
+          updateStatusMutation.mutate({ id: taskId, status, sortOrder })
+        }
+      />
 
       <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
         <SheetContent>
@@ -223,7 +168,12 @@ export default function ProjectBoardPage({ params }: { params: Promise<{ id: str
                 type="number"
                 step="0.5"
                 value={formData.estimatedHours ?? ""}
-                onChange={(e) => setFormData({ ...formData, estimatedHours: e.target.value ? parseFloat(e.target.value) : undefined })}
+                onChange={(e) =>
+                  setFormData({
+                    ...formData,
+                    estimatedHours: e.target.value ? parseFloat(e.target.value) : undefined,
+                  })
+                }
               />
             </div>
             <Button type="submit" className="w-full" disabled={createMutation.isPending}>

@@ -7,7 +7,6 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { FileText, ExternalLink, Search } from "lucide-react";
 import Link from "next/link";
 
@@ -17,7 +16,10 @@ export default function DocumentationPage() {
 
   const { data: docs, isLoading } = useQuery({
     queryKey: ["engineering", "docs", search, category],
-    queryFn: () => apiClient.engineering.documentation.list({ search, category }),
+    queryFn: async () => {
+      const res = await apiClient.engineering.documentation.list({ search, category });
+      return res.data ?? [];
+    },
   });
 
   const categories = docs
@@ -55,22 +57,33 @@ export default function DocumentationPage() {
       </div>
 
       {/* Categories Tabs */}
-      <Tabs value={category || "all"} onValueChange={(v) => setCategory(v === "all" ? undefined : v)}>
-        <TabsList>
-          <TabsTrigger value="all">All</TabsTrigger>
-          {categories.map((cat) => (
-            <TabsTrigger key={cat} value={cat!}>
-              {cat}
-            </TabsTrigger>
-          ))}
-        </TabsList>
+      <div className="flex flex-wrap gap-2">
+        <Button
+          type="button"
+          size="sm"
+          variant={category === undefined ? "default" : "outline"}
+          onClick={() => setCategory(undefined)}
+        >
+          All
+        </Button>
+        {categories.map((cat) => (
+          <Button
+            key={cat}
+            type="button"
+            size="sm"
+            variant={category === cat ? "default" : "outline"}
+            onClick={() => setCategory(cat!)}
+          >
+            {cat}
+          </Button>
+        ))}
+      </div>
 
-        <TabsContent value={category || "all"} className="mt-6">
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {isLoading ? (
-              <div className="col-span-full text-center py-8">Loading...</div>
-            ) : filteredDocs && filteredDocs.length > 0 ? (
-              filteredDocs.map((doc) => (
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        {isLoading ? (
+          <div className="col-span-full text-center py-8">Loading...</div>
+        ) : filteredDocs && filteredDocs.length > 0 ? (
+          filteredDocs.map((doc) => (
                 <Card key={doc.id} className="hover:shadow-md transition-shadow">
                   <CardHeader>
                     <div className="flex items-start justify-between">
@@ -125,14 +138,12 @@ export default function DocumentationPage() {
                   </CardContent>
                 </Card>
               ))
-            ) : (
-              <div className="col-span-full text-center text-muted-foreground py-8">
-                No documentation found
-              </div>
-            )}
+        ) : (
+          <div className="col-span-full text-center text-muted-foreground py-8">
+            No documentation found
           </div>
-        </TabsContent>
-      </Tabs>
+        )}
+      </div>
     </div>
   );
 }

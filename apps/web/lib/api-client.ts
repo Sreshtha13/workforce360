@@ -1805,10 +1805,10 @@ export const apiClient = {
         request<CodeReview>(`/api/engineering/code-reviews/${id}/approve`, {
           method: "POST",
         }),
-      requestChanges: (id: string, notes: string) =>
+      requestChanges: (id: string, reviewNotes: string) =>
         request<CodeReview>(`/api/engineering/code-reviews/${id}/request-changes`, {
           method: "POST",
-          body: JSON.stringify({ notes }),
+          body: JSON.stringify({ reviewNotes }),
         }),
     },
 

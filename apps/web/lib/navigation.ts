@@ -29,6 +29,12 @@ import {
   UsersRound,
   Wallet,
   Workflow,
+  Target,
+  Handshake,
+  GitBranch,
+  FlaskConical,
+  GitPullRequest,
+  GraduationCap,
 } from "lucide-react";
 import { isPortalModuleEnabled } from "@/lib/module-availability";
 
@@ -247,18 +253,101 @@ export const reportsNav: NavItem[] = [
   },
 ];
 
+export const bdNav: NavItem[] = [
+  {
+    label: "BD Dashboard",
+    href: "/bd/dashboard",
+    icon: LayoutDashboard,
+    permissions: ["bd.lead.read", "bd.contact.read", "report.read"],
+  },
+  {
+    label: "Leads",
+    href: "/bd/leads",
+    icon: Target,
+    permissions: ["bd.lead.read", "bd.lead.create", "bd.lead.update"],
+  },
+  {
+    label: "Contacts",
+    href: "/bd/contacts",
+    icon: Users,
+    permissions: ["bd.contact.read", "bd.contact.create", "bd.contact.update"],
+  },
+  {
+    label: "Bids",
+    href: "/bd/bids",
+    icon: FileText,
+    permissions: ["bd.bid.read", "bd.bid.create", "bd.bid.update"],
+  },
+  {
+    label: "Proposals",
+    href: "/bd/proposals",
+    icon: Handshake,
+    permissions: ["bd.proposal.read", "bd.proposal.create", "bd.proposal.update"],
+  },
+];
+
+export const engineeringNav: NavItem[] = [
+  {
+    label: "Engineering Dashboard",
+    href: "/engineering/dashboard",
+    icon: LayoutDashboard,
+    permissions: [
+      "engineering.release.read",
+      "engineering.testcase.read",
+      "engineering.codereview.read",
+      "report.read",
+    ],
+  },
+  {
+    label: "Releases",
+    href: "/engineering/releases",
+    icon: GitBranch,
+    permissions: ["engineering.release.read", "engineering.release.create"],
+  },
+  {
+    label: "Test Cases",
+    href: "/engineering/test-cases",
+    icon: FlaskConical,
+    permissions: ["engineering.testcase.read", "engineering.testcase.create"],
+  },
+  {
+    label: "Code Reviews",
+    href: "/engineering/code-reviews",
+    icon: GitPullRequest,
+    permissions: ["engineering.codereview.read", "engineering.codereview.create"],
+  },
+  {
+    label: "Documentation",
+    href: "/engineering/docs",
+    icon: FileText,
+    permissions: ["engineering.doc.read", "engineering.doc.create"],
+  },
+  {
+    label: "Training",
+    href: "/engineering/training",
+    icon: GraduationCap,
+    permissions: ["engineering.training.read", "engineering.training.enroll"],
+  },
+];
+
 export const pmNav: NavItem[] = [
   {
     label: "PM Dashboard",
     href: "/pm/dashboard",
     icon: LayoutDashboard,
-    permissions: ["project.read", "report.read", "dashboard.read"],
+    permissions: ["pm.project.read", "report.read", "dashboard.read"],
   },
   {
     label: "Projects",
     href: "/pm/projects",
     icon: Briefcase,
-    permissions: ["project.read", "project.manage"],
+    permissions: ["pm.project.read", "pm.project.create", "pm.project.update"],
+  },
+  {
+    label: "Documents",
+    href: "/pm/documents",
+    icon: FileText,
+    permissions: ["document.read", "pm.project.read"],
   },
 ];
 
