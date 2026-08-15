@@ -17,6 +17,8 @@ import {
   adminNav,
   candidateNav,
   filterNavByPermissions,
+  bdNav,
+  engineeringNav,
   financeNav,
   hrNav,
   mainNav,
@@ -51,7 +53,9 @@ export function DashboardShell({ children }: { children: ReactNode }) {
   const [financeExpanded, setFinanceExpanded] = useState(true);
   const [payrollExpanded, setPayrollExpanded] = useState(true);
   const [reportsExpanded, setReportsExpanded] = useState(true);
+  const [bdExpanded, setBdExpanded] = useState(true);
   const [pmExpanded, setPmExpanded] = useState(true);
+  const [engineeringExpanded, setEngineeringExpanded] = useState(true);
   const [portalExpanded, setPortalExpanded] = useState(true);
 
   const unreadQuery = useQuery({
@@ -70,7 +74,9 @@ export function DashboardShell({ children }: { children: ReactNode }) {
   const visibleFinance = filterNavByPermissions(financeNav, navUser);
   const visiblePayroll = filterNavByPermissions(payrollNav, navUser);
   const visibleReports = filterNavByPermissions(reportsNav, navUser);
+  const visibleBd = filterNavByPermissions(bdNav, navUser);
   const visiblePm = filterNavByPermissions(pmNav, navUser);
+  const visibleEngineering = filterNavByPermissions(engineeringNav, navUser);
   const visiblePortal = filterNavByPermissions(portalNav, navUser);
   const visibleAdmin = filterNavByPermissions(adminNav, navUser);
   const breadcrumbs = buildBreadcrumbs(pathname);
@@ -267,6 +273,39 @@ export function DashboardShell({ children }: { children: ReactNode }) {
           </div>
         )}
 
+        {visibleBd.length > 0 && (
+          <div className="mt-4">
+            <button
+              type="button"
+              onClick={() => setBdExpanded((v) => !v)}
+              className={cn(
+                typographyScale.overline.className,
+                "flex w-full items-center justify-between px-2 py-2 text-sidebar-foreground/70",
+              )}
+            >
+              Business Development
+              <ChevronDown
+                className={cn(
+                  iconSize.sm,
+                  "transition-transform",
+                  bdExpanded ? "rotate-0" : "-rotate-90",
+                )}
+              />
+            </button>
+            {bdExpanded &&
+              visibleBd.map((item) => (
+                <SidebarLink
+                  key={item.href}
+                  href={item.href}
+                  label={item.label}
+                  icon={item.icon}
+                  active={pathname === item.href || pathname.startsWith(`${item.href}/`)}
+                  onNavigate={() => setMobileOpen(false)}
+                />
+              ))}
+          </div>
+        )}
+
         {visiblePm.length > 0 && (
           <div className="mt-4">
             <button
@@ -277,7 +316,7 @@ export function DashboardShell({ children }: { children: ReactNode }) {
                 "flex w-full items-center justify-between px-2 py-2 text-sidebar-foreground/70",
               )}
             >
-              Projects
+              Project Management
               <ChevronDown
                 className={cn(
                   iconSize.sm,
@@ -288,6 +327,39 @@ export function DashboardShell({ children }: { children: ReactNode }) {
             </button>
             {pmExpanded &&
               visiblePm.map((item) => (
+                <SidebarLink
+                  key={item.href}
+                  href={item.href}
+                  label={item.label}
+                  icon={item.icon}
+                  active={pathname === item.href || pathname.startsWith(`${item.href}/`)}
+                  onNavigate={() => setMobileOpen(false)}
+                />
+              ))}
+          </div>
+        )}
+
+        {visibleEngineering.length > 0 && (
+          <div className="mt-4">
+            <button
+              type="button"
+              onClick={() => setEngineeringExpanded((v) => !v)}
+              className={cn(
+                typographyScale.overline.className,
+                "flex w-full items-center justify-between px-2 py-2 text-sidebar-foreground/70",
+              )}
+            >
+              Engineering
+              <ChevronDown
+                className={cn(
+                  iconSize.sm,
+                  "transition-transform",
+                  engineeringExpanded ? "rotate-0" : "-rotate-90",
+                )}
+              />
+            </button>
+            {engineeringExpanded &&
+              visibleEngineering.map((item) => (
                 <SidebarLink
                   key={item.href}
                   href={item.href}

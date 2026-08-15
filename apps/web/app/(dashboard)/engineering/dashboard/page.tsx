@@ -1,51 +1,65 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { format } from "date-fns";
+import Link from "next/link";
 import { apiClient } from "@/lib/api-client";
+import { useAuth } from "@/lib/auth-context";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
-import { Code, FileText, GraduationCap, GitBranch, CheckCircle, AlertCircle } from "lucide-react";
-import { TaskStatus } from "@/types/pm";
-import Link from "next/link";
+import { Progress } from "@/components/ui/progress-bar";
+import { Code, GraduationCap, GitBranch, CheckCircle, AlertCircle } from "lucide-react";
+import type { TaskStatus } from "@/types/pm";
+
+function formatDate(value: string, options?: Intl.DateTimeFormatOptions) {
+  return new Date(value).toLocaleDateString("en-US", options);
+}
+
+const taskStatusColors: Record<TaskStatus, string> = {
+  TODO: "bg-gray-500",
+  IN_PROGRESS: "bg-blue-500",
+  IN_REVIEW: "bg-purple-500",
+  DONE: "bg-green-500",
+  CANCELLED: "bg-red-500",
+};
 
 export default function EngineeringDashboardPage() {
-  const { data: sprintDashboard, isLoading: sprintLoading } = useQuery({
+  const { user } = useAuth();
+
+  const { data: sprintDashboard } = useQuery({
     queryKey: ["engineering", "dashboard", "my-sprint"],
-    queryFn: () => apiClient.engineering.dashboard.mySprintDashboard(),
+    queryFn: async () => (await apiClient.engineering.dashboard.mySprintDashboard()).data,
   });
 
-  const { data: metrics, isLoading: metricsLoading } = useQuery({
+  const { data: metrics } = useQuery({
     queryKey: ["engineering", "dashboard", "my-metrics"],
-    queryFn: () => apiClient.engineering.dashboard.myMetrics(),
+    queryFn: async () => (await apiClient.engineering.dashboard.myMetrics()).data,
   });
 
   const { data: myTasks, isLoading: tasksLoading } = useQuery({
-    queryKey: ["pm", "tasks", "my-tasks"],
-    queryFn: () => apiClient.pm.tasks.list({ assignedToMe: true }),
+    queryKey: ["pm", "tasks", "my-tasks", user?.id],
+    queryFn: async () => {
+      if (!user?.id) return [];
+      const res = await apiClient.pm.tasks.list({ assigneeId: user.id });
+      return res.data ?? [];
+    },
+    enabled: Boolean(user?.id),
   });
 
-  const { data: myCodeReviews, isLoading: reviewsLoading } = useQuery({
+  const { data: myCodeReviews } = useQuery({
     queryKey: ["engineering", "code-reviews", "assigned"],
-    queryFn: () => apiClient.engineering.codeReviews.list({ reviewerId: "me" }),
+    queryFn: async () => {
+      const res = await apiClient.engineering.codeReviews.list({ reviewerId: "me" });
+      return res.data ?? [];
+    },
   });
 
-  const { data: myTrainings, isLoading: trainingsLoading } = useQuery({
+  const { data: myTrainings } = useQuery({
     queryKey: ["engineering", "training", "my-enrollments"],
-    queryFn: () => apiClient.engineering.training.myEnrollments(),
+    queryFn: async () => {
+      const res = await apiClient.engineering.training.myEnrollments();
+      return res.data ?? [];
+    },
   });
-
-  const getTaskStatusColor = (status: TaskStatus) => {
-    const colors = {
-      [TaskStatus.TODO]: "bg-gray-500",
-      [TaskStatus.IN_PROGRESS]: "bg-blue-500",
-      [TaskStatus.IN_REVIEW]: "bg-purple-500",
-      [TaskStatus.DONE]: "bg-green-500",
-      [TaskStatus.BLOCKED]: "bg-red-500",
-    };
-    return colors[status] || "bg-gray-500";
-  };
 
   return (
     <div className="space-y-6">
@@ -54,7 +68,6 @@ export default function EngineeringDashboardPage() {
         <p className="text-muted-foreground">Your development and QA workspace</p>
       </div>
 
-      {/* Current Sprint Overview */}
       {sprintDashboard && (
         <Card>
           <CardHeader>
@@ -64,7 +77,7 @@ export default function EngineeringDashboardPage() {
             </CardTitle>
             <CardDescription>
               {sprintDashboard.sprint.startDate && sprintDashboard.sprint.endDate &&
-                `${format(new Date(sprintDashboard.sprint.startDate), "MMM d")} - ${format(new Date(sprintDashboard.sprint.endDate), "MMM d, yyyy")}`
+                `${formatDate(sprintDashboard.sprint.startDate, { month: "short", day: "numeric" })} - ${formatDate(sprintDashboard.sprint.endDate, { month: "short", day: "numeric", year: "numeric" })}`
               }
             </CardDescription>
           </CardHeader>
@@ -100,7 +113,6 @@ export default function EngineeringDashboardPage() {
         </Card>
       )}
 
-      {/* Metrics Cards */}
       {metrics && (
         <div className="grid gap-4 md:grid-cols-4">
           <Card>
@@ -154,11 +166,10 @@ export default function EngineeringDashboardPage() {
         </div>
       )}
 
-      {/* My Sprint Items */}
       <Card>
         <CardHeader>
           <CardTitle>My Sprint Items</CardTitle>
-          <CardDescription>Tasks assigned to you in the current sprint</CardDescription>
+          <CardDescription>Tasks assigned to you</CardDescription>
         </CardHeader>
         <CardContent>
           {tasksLoading ? (
@@ -170,7 +181,7 @@ export default function EngineeringDashboardPage() {
                   <div className="flex-1">
                     <div className="flex items-center gap-2">
                       <p className="font-medium">{task.title}</p>
-                      <Badge className={getTaskStatusColor(task.status)}>
+                      <Badge className={taskStatusColors[task.status]}>
                         {task.status}
                       </Badge>
                     </div>
@@ -190,7 +201,6 @@ export default function EngineeringDashboardPage() {
         </CardContent>
       </Card>
 
-      {/* Code Reviews Pending */}
       {myCodeReviews && myCodeReviews.length > 0 && (
         <Card>
           <CardHeader>
@@ -204,8 +214,8 @@ export default function EngineeringDashboardPage() {
                   <div>
                     <p className="font-medium">{review.title}</p>
                     <p className="text-sm text-muted-foreground">
-                      By: {review.author?.firstName} {review.author?.lastName} • 
-                      {format(new Date(review.requestedAt), "MMM d, yyyy")}
+                      By: {review.author?.firstName} {review.author?.lastName} •{" "}
+                      {formatDate(review.requestedAt, { month: "short", day: "numeric", year: "numeric" })}
                     </p>
                   </div>
                   <Link href={`/engineering/code-reviews/${review.id}`}>
@@ -218,7 +228,6 @@ export default function EngineeringDashboardPage() {
         </Card>
       )}
 
-      {/* Training Progress */}
       {myTrainings && myTrainings.length > 0 && (
         <Card>
           <CardHeader>

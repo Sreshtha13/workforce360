@@ -108,7 +108,7 @@ export default function PmProjectsPage() {
             render: (row) => (
               <div>
                 <Link
-                  href={`/pm/projects/${row.id}/board`}
+                  href={`/pm/projects/${row.id}`}
                   className="font-medium text-brand-600 hover:underline dark:text-brand-300"
                 >
                   {row.name}
