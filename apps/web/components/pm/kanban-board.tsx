@@ -1,8 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
 import type { Task, TaskPriority, TaskStatus } from "@/types/pm";
 
 const PRIORITY_COLORS: Record<TaskPriority, string> = {
@@ -29,12 +30,15 @@ export function KanbanBoard({
   onStatusChange,
   taskHref = (id) => `/pm/tasks/${id}`,
 }: KanbanBoardProps) {
+  const router = useRouter();
   const [draggedId, setDraggedId] = useState<string | null>(null);
+  const [dragOverColumn, setDragOverColumn] = useState<TaskStatus | null>(null);
 
   const handleDrop = (status: TaskStatus, index: number) => {
     if (!draggedId) return;
     onStatusChange(draggedId, status, index);
     setDraggedId(null);
+    setDragOverColumn(null);
   };
 
   return (
@@ -42,8 +46,15 @@ export function KanbanBoard({
       {columns.map((status) => (
         <div
           key={status}
-          className="flex-shrink-0 w-80 rounded-lg border bg-card"
-          onDragOver={(e) => e.preventDefault()}
+          className={cn(
+            "flex-shrink-0 w-80 rounded-lg border bg-card transition-shadow",
+            dragOverColumn === status && "ring-2 ring-brand-500 shadow-md",
+          )}
+          onDragOver={(e) => {
+            e.preventDefault();
+            setDragOverColumn(status);
+          }}
+          onDragLeave={() => setDragOverColumn((prev) => (prev === status ? null : prev))}
           onDrop={() => handleDrop(status, grouped[status].length)}
         >
           <div className={`px-4 py-3 rounded-t-lg ${columnColors[status]}`}>
@@ -57,50 +68,65 @@ export function KanbanBoard({
               <div
                 key={task.id}
                 draggable
-                onDragStart={() => setDraggedId(task.id)}
+                onDragStart={(e) => {
+                  setDraggedId(task.id);
+                  e.dataTransfer.effectAllowed = "move";
+                  e.dataTransfer.setData("text/plain", task.id);
+                }}
+                onDragEnd={() => {
+                  setDraggedId(null);
+                  setDragOverColumn(null);
+                }}
                 onDragOver={(e) => e.preventDefault()}
                 onDrop={(e) => {
                   e.stopPropagation();
                   handleDrop(status, index);
                 }}
-                className="p-3 rounded-lg border bg-background hover:shadow-md transition-shadow cursor-grab active:cursor-grabbing"
+                className={cn(
+                  "p-3 rounded-lg border bg-background hover:shadow-md transition-shadow cursor-grab active:cursor-grabbing",
+                  draggedId === task.id && "opacity-50",
+                )}
               >
-                <Link href={taskHref(task.id)} className="block">
-                  <div className="flex items-start justify-between mb-2">
-                    <h4 className="font-medium flex-1">{task.title}</h4>
-                    <div
-                      className={`w-2 h-2 rounded-full ml-2 mt-1 shrink-0 ${PRIORITY_COLORS[task.priority]}`}
-                      title={task.priority}
-                    />
-                  </div>
-                  {task.description && (
-                    <p className="text-sm text-muted-foreground mb-2 line-clamp-2">
-                      {task.description}
-                    </p>
+                <div className="flex items-start justify-between mb-2">
+                  <button
+                    type="button"
+                    className="font-medium flex-1 text-left hover:underline"
+                    onClick={() => router.push(taskHref(task.id))}
+                  >
+                    {task.title}
+                  </button>
+                  <div
+                    className={`w-2 h-2 rounded-full ml-2 mt-1 shrink-0 ${PRIORITY_COLORS[task.priority]}`}
+                    title={task.priority}
+                  />
+                </div>
+                {task.description && (
+                  <p className="text-sm text-muted-foreground mb-2 line-clamp-2">
+                    {task.description}
+                  </p>
+                )}
+                <div className="flex items-center justify-between text-xs">
+                  {task.assignee && (
+                    <span className="text-muted-foreground">
+                      {task.assignee.firstName} {task.assignee.lastName}
+                    </span>
                   )}
-                  <div className="flex items-center justify-between text-xs">
-                    {task.assignee && (
-                      <span className="text-muted-foreground">
-                        {task.assignee.firstName} {task.assignee.lastName}
-                      </span>
-                    )}
-                    {task.estimatedHours && (
-                      <Badge variant="outline" className="text-xs">
-                        {task.estimatedHours}h
-                      </Badge>
-                    )}
-                  </div>
-                  {task._count && (task._count.comments > 0 || task._count.timeEntries > 0) && (
-                    <div className="flex gap-2 mt-2 text-xs text-muted-foreground">
-                      {task._count.comments > 0 && <span>💬 {task._count.comments}</span>}
-                      {task._count.timeEntries > 0 && <span>⏱️ {task._count.timeEntries}</span>}
-                    </div>
+                  {task.estimatedHours && (
+                    <Badge variant="outline" className="text-xs">
+                      {task.estimatedHours}h
+                    </Badge>
                   )}
-                </Link>
+                </div>
+                {task._count && (task._count.comments > 0 || task._count.timeEntries > 0) && (
+                  <div className="flex gap-2 mt-2 text-xs text-muted-foreground">
+                    {task._count.comments > 0 && <span>💬 {task._count.comments}</span>}
+                    {task._count.timeEntries > 0 && <span>⏱️ {task._count.timeEntries}</span>}
+                  </div>
+                )}
               </div>
             ))}
             {grouped[status].length === 0 && (
-              <p className="text-sm text-muted-foreground text-center py-8">No tasks</p>
+              <p className="text-sm text-muted-foreground text-center py-8">Drop tasks here</p>
             )}
           </div>
         </div>

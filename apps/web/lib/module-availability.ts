@@ -1,9 +1,9 @@
 /** Central registry for modules not yet shipped. Toggle here to re-enable portal nav items. */
 export const PORTAL_MODULE_FLAGS = {
-  attendance: false,
-  leave: false,
-  timesheets: false,
-  requests: false,
+  attendance: true,
+  leave: true,
+  timesheets: true,
+  requests: true,
   payslips: true,
   documents: true,
 } as const;

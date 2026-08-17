@@ -11,6 +11,21 @@ vi.mock("./approval.service");
 vi.mock("./payslip-pdf.service");
 vi.mock("../lib/storage");
 vi.mock("../lib/audit");
+vi.mock("../lib/payroll-lop", () => ({
+  daysBetweenInclusive: (start: Date, end: Date) => {
+    const ms = end.getTime() - start.getTime();
+    return Math.round(ms / (1000 * 60 * 60 * 24)) + 1;
+  },
+  prorateAmount: (amount: number, paid: number, working: number) =>
+    working <= 0 ? 0 : Math.round((amount * paid) / working * 100) / 100,
+  computeBatchEmployeeLop: vi.fn().mockImplementation(async ({ employeeIds }: { employeeIds: string[] }) => {
+    const map = new Map<string, { workingDays: number; lopDays: number; paidDays: number }>();
+    for (const id of employeeIds) {
+      map.set(id, { workingDays: 31, lopDays: 0, paidDays: 31 });
+    }
+    return map;
+  }),
+}));
 vi.mock("../lib/prisma", () => ({
   prisma: {
     payrollRunItem: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },

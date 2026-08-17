@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { USER_ACCOUNT_STATUSES } from "../constants/user-status";
+import { optionalPaginationQuerySchema } from "../lib/pagination";
 
 const userAccountStatusSchema = z.enum(USER_ACCOUNT_STATUSES);
 
@@ -41,7 +42,7 @@ export const removeRoleSchema = z.object({
   roleId: z.string().min(1, "Role ID is required"),
 });
 
-export const listUsersQuerySchema = z.object({
+export const listUsersQuerySchema = optionalPaginationQuerySchema.extend({
   departmentId: z.string().optional(),
   officeId: z.string().optional(),
   employeeTypeId: z.string().optional(),

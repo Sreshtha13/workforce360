@@ -16,6 +16,7 @@ import {
 } from "./employee-id.service";
 import { employeeMasterService } from "./employee-master.service";
 import type { CreateUserInput, UpdateUserInput } from "../repositories/user.repository";
+import type { PaginationQuery } from "../lib/pagination";
 
 const CREATE_USER_MAX_RETRIES = 3;
 
@@ -35,6 +36,7 @@ export class UserService {
       status?: string;
       search?: string;
       includeDeleted?: boolean;
+      pagination?: PaginationQuery;
     },
     requesterId?: string,
   ) {

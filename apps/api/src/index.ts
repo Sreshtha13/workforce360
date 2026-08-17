@@ -1,7 +1,9 @@
 import { createApp } from "./app";
 import { env } from "./lib/env";
+import { initSentry } from "./lib/sentry";
 import { startScheduler } from "./jobs/scheduler";
 
+initSentry();
 const app = createApp();
 
 app.listen(env.PORT, () => {

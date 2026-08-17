@@ -1,10 +1,11 @@
 import { prisma } from "../lib/prisma";
-import type { User, UserRole } from "@prisma/client";
+import type { User, UserRole, Prisma } from "@prisma/client";
 import { findHighestEmployeeId } from "../lib/employee-id";
 import {
   activeUserSummarySelect,
   sanitizeUserReference,
 } from "../lib/organization-metrics";
+import type { PaginationQuery } from "../lib/pagination";
 
 export type CreateUserInput = {
   email: string;
@@ -29,6 +30,68 @@ export type UpdateUserInput = Partial<CreateUserInput> & {
 };
 
 export class UserRepository {
+  private buildUserWhere(filters?: {
+    departmentId?: string;
+    officeId?: string;
+    employeeTypeId?: string;
+    employmentStatusId?: string;
+    status?: string;
+    search?: string;
+    includeDeleted?: boolean;
+    ids?: string[];
+  }): Prisma.UserWhereInput {
+    if (filters?.ids && filters.ids.length === 0) {
+      return { id: { in: [] } };
+    }
+
+    return {
+      ...(filters?.includeDeleted ? {} : { deletedAt: null }),
+      ...(filters?.ids && { id: { in: filters.ids } }),
+      ...(filters?.departmentId && { departmentId: filters.departmentId }),
+      ...(filters?.officeId && { officeId: filters.officeId }),
+      ...(filters?.employeeTypeId && { employeeTypeId: filters.employeeTypeId }),
+      ...(filters?.employmentStatusId && { employmentStatusId: filters.employmentStatusId }),
+      ...(filters?.status && { status: filters.status }),
+      ...(filters?.search && {
+        OR: [
+          { email: { contains: filters.search, mode: "insensitive" } },
+          { firstName: { contains: filters.search, mode: "insensitive" } },
+          { lastName: { contains: filters.search, mode: "insensitive" } },
+          { employeeId: { contains: filters.search, mode: "insensitive" } },
+        ],
+      }),
+    };
+  }
+
+  private readonly userListSelect = {
+    id: true,
+    email: true,
+    firstName: true,
+    lastName: true,
+    phone: true,
+    avatar: true,
+    status: true,
+    employeeId: true,
+    dateOfJoining: true,
+    deletedAt: true,
+    department: { select: { id: true, name: true, managerId: true } },
+    designation: { select: { id: true, name: true } },
+    office: { select: { id: true, name: true } },
+    employeeType: { select: { id: true, name: true, code: true } },
+    employmentStatus: { select: { id: true, name: true } },
+    manager: { select: activeUserSummarySelect },
+    managedDepartments: {
+      where: { deletedAt: null },
+      select: { id: true, name: true },
+    },
+    userRoles: {
+      where: { deletedAt: null },
+      include: { role: { select: { id: true, name: true } } },
+    },
+    createdAt: true,
+    updatedAt: true,
+  } as const;
+
   async findAllUsers(filters?: {
     departmentId?: string;
     officeId?: string;
@@ -39,64 +102,52 @@ export class UserRepository {
     includeDeleted?: boolean;
     /** When set, restrict results to these user ids (employee visibility scope). */
     ids?: string[];
+    pagination?: PaginationQuery;
   }) {
+    const where = this.buildUserWhere(filters);
     if (filters?.ids && filters.ids.length === 0) {
-      return [];
+      return { rows: [], total: 0 };
+    }
+
+    const orderBy: Prisma.UserOrderByWithRelationInput[] = [
+      { deletedAt: "asc" },
+      { createdAt: "desc" },
+    ];
+
+    if (filters?.pagination) {
+      const skip = (filters.pagination.page - 1) * filters.pagination.pageSize;
+      const [total, rows] = await Promise.all([
+        prisma.user.count({ where }),
+        prisma.user.findMany({
+          where,
+          select: this.userListSelect,
+          orderBy,
+          skip,
+          take: filters.pagination.pageSize,
+        }),
+      ]);
+      return {
+        rows: rows.map((row) => ({
+          ...row,
+          manager: sanitizeUserReference(row.manager),
+        })),
+        total,
+      };
     }
 
     const rows = await prisma.user.findMany({
-      where: {
-        ...(filters?.includeDeleted ? {} : { deletedAt: null }),
-        ...(filters?.ids && { id: { in: filters.ids } }),
-        ...(filters?.departmentId && { departmentId: filters.departmentId }),
-        ...(filters?.officeId && { officeId: filters.officeId }),
-        ...(filters?.employeeTypeId && { employeeTypeId: filters.employeeTypeId }),
-        ...(filters?.employmentStatusId && { employmentStatusId: filters.employmentStatusId }),
-        ...(filters?.status && { status: filters.status }),
-        ...(filters?.search && {
-          OR: [
-            { email: { contains: filters.search, mode: "insensitive" } },
-            { firstName: { contains: filters.search, mode: "insensitive" } },
-            { lastName: { contains: filters.search, mode: "insensitive" } },
-            { employeeId: { contains: filters.search, mode: "insensitive" } },
-          ],
-        }),
-      },
-      select: {
-        id: true,
-        email: true,
-        firstName: true,
-        lastName: true,
-        phone: true,
-        avatar: true,
-        status: true,
-        employeeId: true,
-        dateOfJoining: true,
-        deletedAt: true,
-        department: { select: { id: true, name: true, managerId: true } },
-        designation: { select: { id: true, name: true } },
-        office: { select: { id: true, name: true } },
-        employeeType: { select: { id: true, name: true, code: true } },
-        employmentStatus: { select: { id: true, name: true } },
-        manager: { select: activeUserSummarySelect },
-        managedDepartments: {
-          where: { deletedAt: null },
-          select: { id: true, name: true },
-        },
-        userRoles: {
-          where: { deletedAt: null },
-          include: { role: { select: { id: true, name: true } } },
-        },
-        createdAt: true,
-        updatedAt: true,
-      },
-      orderBy: [{ deletedAt: "asc" }, { createdAt: "desc" }],
+      where,
+      select: this.userListSelect,
+      orderBy,
     });
 
-    return rows.map((row) => ({
-      ...row,
-      manager: sanitizeUserReference(row.manager),
-    }));
+    return {
+      rows: rows.map((row) => ({
+        ...row,
+        manager: sanitizeUserReference(row.manager),
+      })),
+      total: rows.length,
+    };
   }
   
   async findUserById(id: string) {

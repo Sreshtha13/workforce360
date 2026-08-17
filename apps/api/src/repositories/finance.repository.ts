@@ -1,5 +1,6 @@
 import { prisma } from "../lib/prisma";
 import type { Prisma } from "@prisma/client";
+import type { PaginationQuery } from "../lib/pagination";
 
 const invoiceInclude = {
   client: true,
@@ -55,12 +56,28 @@ export class FinanceRepository {
     });
   }
 
-  async findManyInvoices(where?: Prisma.InvoiceWhereInput) {
-    return prisma.invoice.findMany({
-      where: { ...where, deletedAt: null },
+  async findManyInvoices(where?: Prisma.InvoiceWhereInput, pagination?: PaginationQuery) {
+    const baseWhere = { ...where, deletedAt: null };
+    if (pagination) {
+      const skip = (pagination.page - 1) * pagination.pageSize;
+      const [total, rows] = await Promise.all([
+        prisma.invoice.count({ where: baseWhere }),
+        prisma.invoice.findMany({
+          where: baseWhere,
+          include: invoiceInclude,
+          orderBy: { createdAt: "desc" },
+          skip,
+          take: pagination.pageSize,
+        }),
+      ]);
+      return { rows, total };
+    }
+    const rows = await prisma.invoice.findMany({
+      where: baseWhere,
       include: invoiceInclude,
       orderBy: { createdAt: "desc" },
     });
+    return { rows, total: rows.length };
   }
 
   async updateInvoice(id: string, data: Prisma.InvoiceUncheckedUpdateInput) {

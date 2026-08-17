@@ -117,6 +117,7 @@ JSON: { data, error, meta } — meta may include page, pageSize, total for lists
       { name: "Payroll", description: "Salary, payroll runs, payslips" },
       { name: "Business Development", description: "Contacts, leads, bids, proposals" },
       { name: "Project Management", description: "Projects, tasks, sprints, timesheets" },
+      { name: "Engineering", description: "Releases, test cases, docs, training, code reviews" },
       { name: "Helpdesk", description: "Support tickets, SLA, knowledge base" },
       { name: "Notifications", description: "In-app notifications and announcements" },
       { name: "Documents", description: "Document management (DMS)" },

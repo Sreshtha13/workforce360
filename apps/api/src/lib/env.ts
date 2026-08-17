@@ -74,6 +74,9 @@ const envSchema = z.object({
 
   // MFA (Phase 12)
   MFA_ISSUER: z.string().default("Workforce360"),
+
+  // Error monitoring (optional — Sentry)
+  SENTRY_DSN: z.string().optional(),
 });
 
 const parsed = envSchema.safeParse(process.env);

@@ -10,6 +10,7 @@ const nextConfig = {
   experimental: {
     // Monorepo: keep file tracing rooted at the repo root (Next 14).
     outputFileTracingRoot: path.join(__dirname, "../.."),
+    instrumentationHook: true,
   },
 };
 

@@ -5,6 +5,7 @@ import { generatePayslipPdf } from "./payslip-pdf.service";
 import { writeStoredFile, createPresignedDownload, readStoredFile } from "../lib/storage";
 import { AppError } from "../lib/app-error";
 import { writeAuditLog } from "../lib/audit";
+import { computeBatchEmployeeLop, daysBetweenInclusive, prorateAmount } from "../lib/payroll-lop";
 import { prisma } from "../lib/prisma";
 import type { Prisma } from "@prisma/client";
 
@@ -33,11 +34,6 @@ function computeStructureTotals(input: {
     throw new AppError("INVALID_SALARY_STRUCTURE", "Net salary cannot be negative", 400);
   }
   return { grossSalary, totalDeductions, netSalary };
-}
-
-function daysBetweenInclusive(start: Date, end: Date): number {
-  const ms = end.getTime() - start.getTime();
-  return Math.round(ms / (1000 * 60 * 60 * 24)) + 1;
 }
 
 export class PayrollService {
@@ -280,7 +276,12 @@ export class PayrollService {
     await prisma.payrollRunItem.deleteMany({ where: { payrollRunId: id } });
 
     const employeeIds = await this.payrollRepo.findActiveEmployeeIds();
-    const workingDays = daysBetweenInclusive(run.payPeriodStart, run.payPeriodEnd);
+    const lopByEmployee = await computeBatchEmployeeLop({
+      employeeIds,
+      periodStart: run.payPeriodStart,
+      periodEnd: run.payPeriodEnd,
+    });
+    const defaultWorkingDays = daysBetweenInclusive(run.payPeriodStart, run.payPeriodEnd);
 
     const items: Prisma.PayrollRunItemUncheckedCreateInput[] = [];
     let totalGross = 0;
@@ -299,33 +300,46 @@ export class PayrollService {
       const deductions = Number(structure.totalDeductions);
       const netSalary = Number(structure.netSalary);
 
+      const lopResult = lopByEmployee.get(employeeId) ?? {
+        workingDays: defaultWorkingDays,
+        lopDays: 0,
+        paidDays: defaultWorkingDays,
+      };
+      const { workingDays, lopDays, paidDays } = lopResult;
+      const ratio = workingDays > 0 ? paidDays / workingDays : 1;
+
+      const proratedGross = prorateAmount(grossSalary, paidDays, workingDays);
+      const proratedDeductions = prorateAmount(deductions, paidDays, workingDays);
+      const proratedNet = prorateAmount(netSalary, paidDays, workingDays);
+
       items.push({
         payrollRunId: id,
         employeeId,
         salaryStructureId: structure.id,
         workingDays,
-        paidDays: workingDays,
-        lopDays: 0,
-        grossSalary,
-        totalDeductions: deductions,
-        netSalary,
+        paidDays,
+        lopDays,
+        grossSalary: proratedGross,
+        totalDeductions: proratedDeductions,
+        netSalary: proratedNet,
         breakdown: {
-          basic: Number(structure.basic),
-          hra: Number(structure.hra),
-          conveyanceAllowance: Number(structure.conveyanceAllowance),
-          medicalAllowance: Number(structure.medicalAllowance),
-          specialAllowance: Number(structure.specialAllowance),
-          otherAllowances: Number(structure.otherAllowances),
-          providentFund: Number(structure.providentFund),
-          professionalTax: Number(structure.professionalTax),
-          incomeTax: Number(structure.incomeTax),
-          otherDeductions: Number(structure.otherDeductions),
+          basic: prorateAmount(Number(structure.basic), paidDays, workingDays),
+          hra: prorateAmount(Number(structure.hra), paidDays, workingDays),
+          conveyanceAllowance: prorateAmount(Number(structure.conveyanceAllowance), paidDays, workingDays),
+          medicalAllowance: prorateAmount(Number(structure.medicalAllowance), paidDays, workingDays),
+          specialAllowance: prorateAmount(Number(structure.specialAllowance), paidDays, workingDays),
+          otherAllowances: prorateAmount(Number(structure.otherAllowances), paidDays, workingDays),
+          providentFund: prorateAmount(Number(structure.providentFund), paidDays, workingDays),
+          professionalTax: prorateAmount(Number(structure.professionalTax), paidDays, workingDays),
+          incomeTax: prorateAmount(Number(structure.incomeTax), paidDays, workingDays),
+          otherDeductions: prorateAmount(Number(structure.otherDeductions), paidDays, workingDays),
+          lopRatio: ratio,
         },
       });
 
-      totalGross = round2(totalGross + grossSalary);
-      totalDeductions = round2(totalDeductions + deductions);
-      totalNet = round2(totalNet + netSalary);
+      totalGross = round2(totalGross + proratedGross);
+      totalDeductions = round2(totalDeductions + proratedDeductions);
+      totalNet = round2(totalNet + proratedNet);
     }
 
     if (items.length > 0) {
