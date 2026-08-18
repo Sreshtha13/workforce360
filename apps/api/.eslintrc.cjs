@@ -20,7 +20,25 @@ module.exports = {
   rules: {
     "@typescript-eslint/no-unused-vars": [
       "error",
-      { argsIgnorePattern: "^_", varsIgnorePattern: "^_" },
+      {
+        argsIgnorePattern: "^_",
+        varsIgnorePattern: "^_",
+        caughtErrorsIgnorePattern: "^_",
+      },
     ],
   },
+  overrides: [
+    {
+      files: ["**/*.test.ts"],
+      rules: {
+        "@typescript-eslint/no-explicit-any": "off",
+      },
+    },
+    {
+      files: ["src/types/express.ts"],
+      rules: {
+        "@typescript-eslint/no-namespace": "off",
+      },
+    },
+  ],
 };

@@ -77,7 +77,7 @@ export default function DepartmentsPage() {
     },
   });
 
-  const departments = query.data ?? [];
+  const departments = useMemo(() => query.data ?? [], [query.data]);
 
   const hierarchyRows = useMemo(() => {
     const byParent = new Map<string | null, DepartmentRow[]>();

@@ -1,5 +1,5 @@
 import { prisma } from "../lib/prisma";
-import type { Prisma } from "@prisma/client";
+import type { Prisma, AttendanceStatus } from "@prisma/client";
 
 export class AttendanceRepository {
   async createShift(data: Prisma.ShiftUncheckedCreateInput) {
@@ -165,7 +165,7 @@ export class AttendanceRepository {
       where: {
         employeeId,
         date: { gte: from, lte: to },
-        status: status as any,
+        status: status as AttendanceStatus,
         deletedAt: null,
       },
     });

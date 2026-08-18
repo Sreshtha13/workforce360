@@ -1,3 +1,4 @@
+import type { Prisma, AttendanceStatus, AttendanceCorrectionStatus } from "@prisma/client";
 import { AttendanceRepository } from "../repositories/attendance.repository";
 import { AppError } from "../lib/app-error";
 import { writeAuditLog } from "../lib/audit";
@@ -90,7 +91,7 @@ export class AttendanceService {
   }
 
   async listShifts(filters: { isActive?: boolean }) {
-    const where: any = {};
+    const where: Prisma.ShiftWhereInput = {};
     if (filters.isActive !== undefined) {
       where.isActive = filters.isActive;
     }
@@ -140,7 +141,7 @@ export class AttendanceService {
       throw new AppError("HOLIDAY_NOT_FOUND", "Holiday not found", 404);
     }
 
-    const updateData: any = {};
+    const updateData: Prisma.HolidayUpdateInput = {};
     if (data.name) updateData.name = data.name;
     if (data.date) updateData.date = new Date(data.date);
     if (data.description !== undefined) updateData.description = data.description;
@@ -291,7 +292,7 @@ export class AttendanceService {
       {
         employeeId: data.employeeId,
         date,
-        status: data.status as any,
+        status: data.status as AttendanceStatus,
         shiftId: data.shiftId,
         checkInTime: data.checkInTime ? new Date(data.checkInTime) : undefined,
         checkOutTime: data.checkOutTime ? new Date(data.checkOutTime) : undefined,
@@ -299,7 +300,7 @@ export class AttendanceService {
         notes: data.notes,
       },
       {
-        status: data.status as any,
+        status: data.status as AttendanceStatus,
         shiftId: data.shiftId,
         checkInTime: data.checkInTime ? new Date(data.checkInTime) : undefined,
         checkOutTime: data.checkOutTime ? new Date(data.checkOutTime) : undefined,
@@ -325,9 +326,9 @@ export class AttendanceService {
     to?: string;
     status?: string;
   }) {
-    const where: any = {};
+    const where: Prisma.AttendanceRecordWhereInput = {};
     if (filters.employeeId) where.employeeId = filters.employeeId;
-    if (filters.status) where.status = filters.status;
+    if (filters.status) where.status = filters.status as AttendanceStatus;
     if (filters.from || filters.to) {
       where.date = {};
       if (filters.from) where.date.gte = new Date(filters.from);
@@ -356,7 +357,7 @@ export class AttendanceService {
       attendanceRecordId: attendanceRecord?.id,
       employeeId,
       date,
-      requestedStatus: data.requestedStatus as any,
+      requestedStatus: data.requestedStatus as AttendanceStatus,
       requestedCheckIn: data.requestedCheckIn ? new Date(data.requestedCheckIn) : undefined,
       requestedCheckOut: data.requestedCheckOut ? new Date(data.requestedCheckOut) : undefined,
       reason: data.reason,
@@ -425,9 +426,9 @@ export class AttendanceService {
     employeeId?: string;
     status?: string;
   }) {
-    const where: any = {};
+    const where: Prisma.AttendanceCorrectionRequestWhereInput = {};
     if (filters.employeeId) where.employeeId = filters.employeeId;
-    if (filters.status) where.status = filters.status;
+    if (filters.status) where.status = filters.status as AttendanceCorrectionStatus;
     return this.attendanceRepo.findManyAttendanceCorrectionRequests(where);
   }
 

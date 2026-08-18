@@ -1,5 +1,5 @@
 import { prisma } from "../lib/prisma";
-import type { Prisma } from "@prisma/client";
+import type { Prisma, AssetStatus } from "@prisma/client";
 
 export class AssetRepository {
   async createAsset(data: Prisma.AssetUncheckedCreateInput) {
@@ -103,7 +103,7 @@ export class AssetRepository {
   async countAssetsByStatus(status: string) {
     return prisma.asset.count({
       where: {
-        status: status as any,
+        status: status as AssetStatus,
         deletedAt: null,
       },
     });

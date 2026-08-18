@@ -1,3 +1,4 @@
+import type { ApprovalRequestStatus, Prisma } from "@prisma/client";
 import { ApprovalRepository } from "../repositories/approval.repository";
 import { AppError } from "../lib/app-error";
 import { writeAuditLog } from "../lib/audit";
@@ -13,7 +14,7 @@ export class ApprovalService {
     entityId: string;
     requesterId: string;
     approverIds: string[];
-    metadata?: Record<string, any>;
+    metadata?: Prisma.InputJsonValue;
     workflowId?: string;
     dueAt?: Date | null;
   }, actorId: string) {
@@ -133,7 +134,7 @@ export class ApprovalService {
         entityId,
         requesterId,
         approverIds,
-        metadata,
+        metadata: metadata as Prisma.InputJsonValue,
         workflowId: matched.id,
         dueAt: overallDue,
       },
@@ -373,10 +374,10 @@ export class ApprovalService {
     approverId?: string;
     status?: string;
   }) {
-    const where: any = {};
+    const where: Prisma.ApprovalRequestWhereInput = {};
     if (filters.entityType) where.entityType = filters.entityType;
     if (filters.requesterId) where.requesterId = filters.requesterId;
-    if (filters.status) where.status = filters.status;
+    if (filters.status) where.status = filters.status as ApprovalRequestStatus;
     
     if (filters.approverId) {
       where.steps = {

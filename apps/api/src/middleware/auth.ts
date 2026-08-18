@@ -107,7 +107,8 @@ export function optionalAuth(
       ...payload,
       permissions: [],
     };
-  } catch (error) {
+  } catch {
+    // Invalid or expired token — continue as unauthenticated
   }
   
   next();

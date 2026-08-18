@@ -1,4 +1,4 @@
-import type { Prisma, ProjectStatus, TaskStatus, TaskPriority, SprintStatus } from "@prisma/client";
+import type { Prisma, ProjectStatus, TaskStatus, SprintStatus } from "@prisma/client";
 import { prisma } from "../lib/prisma";
 
 export class PmRepository {

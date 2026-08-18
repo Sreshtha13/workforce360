@@ -10,7 +10,7 @@ export class HrController {
       const userId = req.user!.userId;
       const data = await hrService.getHrDashboard(userId);
       sendSuccess(res, data);
-    } catch (error) {
+    } catch {
       sendError(res, 500, { code: "HR_DASHBOARD_FAILED", message: "Failed to load HR dashboard" });
     }
   };
@@ -22,7 +22,7 @@ export class HrController {
         req.user?.userId,
       );
       sendSuccess(res, employees);
-    } catch (error) {
+    } catch {
       sendError(res, 500, { code: "LIST_EMPLOYEES_FAILED", message: "Failed to list employees" });
     }
   };
@@ -65,7 +65,7 @@ export class HrController {
     try {
       const interviews = await hrService.listInterviews(req.query as { from?: string; to?: string });
       sendSuccess(res, interviews);
-    } catch (error) {
+    } catch {
       sendError(res, 500, { code: "LIST_INTERVIEWS_FAILED", message: "Failed" });
     }
   };
@@ -74,7 +74,7 @@ export class HrController {
     try {
       const offers = await hrService.listOffers(req.query as { status?: string });
       sendSuccess(res, offers);
-    } catch (error) {
+    } catch {
       sendError(res, 500, { code: "LIST_OFFERS_FAILED", message: "Failed" });
     }
   };
@@ -85,7 +85,7 @@ export class HrController {
         req.query as { status?: string; familyId?: string },
       );
       sendSuccess(res, policies);
-    } catch (error) {
+    } catch {
       sendError(res, 500, { code: "LIST_POLICIES_FAILED", message: "Failed" });
     }
   };
@@ -160,7 +160,7 @@ export class HrController {
     try {
       const assignments = await hrService.listPolicyAssignments(req.params.familyId);
       sendSuccess(res, assignments);
-    } catch (error) {
+    } catch {
       sendError(res, 500, { code: "LIST_POLICY_ASSIGNMENTS_FAILED", message: "Failed" });
     }
   };
@@ -212,7 +212,7 @@ export class HrController {
     try {
       const assets = await hrService.listAssets(req.query as { status?: string; employeeId?: string });
       sendSuccess(res, assets);
-    } catch (error) {
+    } catch {
       sendError(res, 500, { code: "LIST_ASSETS_FAILED", message: "Failed" });
     }
   };
@@ -241,7 +241,7 @@ export class HrController {
         req.query as { status?: string; assignedToId?: string; search?: string },
       );
       sendSuccess(res, tickets);
-    } catch (error) {
+    } catch {
       sendError(res, 500, { code: "LIST_TICKETS_FAILED", message: "Failed to list tickets" });
     }
   };
@@ -316,7 +316,7 @@ export class PortalController {
     try {
       const data = await portalService.getDashboard(req.user!.userId);
       sendSuccess(res, data);
-    } catch (error) {
+    } catch {
       sendError(res, 500, { code: "PORTAL_DASHBOARD_FAILED", message: "Failed" });
     }
   };
@@ -343,7 +343,7 @@ export class PortalController {
     try {
       const notifications = await portalService.listNotifications(req.user!.userId);
       sendSuccess(res, notifications);
-    } catch (error) {
+    } catch {
       sendError(res, 500, { code: "LIST_NOTIFICATIONS_FAILED", message: "Failed" });
     }
   };
@@ -352,7 +352,7 @@ export class PortalController {
     try {
       await portalService.markNotificationRead(req.user!.userId, req.params.id);
       sendSuccess(res, { ok: true });
-    } catch (error) {
+    } catch {
       sendError(res, 400, { code: "MARK_READ_FAILED", message: "Failed" });
     }
   };
@@ -361,7 +361,7 @@ export class PortalController {
     try {
       const tickets = await portalService.listTickets(req.user!.userId);
       sendSuccess(res, tickets);
-    } catch (error) {
+    } catch {
       sendError(res, 500, { code: "LIST_TICKETS_FAILED", message: "Failed" });
     }
   };
@@ -414,7 +414,7 @@ export class PortalController {
     try {
       const assets = await portalService.listMyAssets(req.user!.userId);
       sendSuccess(res, assets);
-    } catch (error) {
+    } catch {
       sendError(res, 500, { code: "LIST_MY_ASSETS_FAILED", message: "Failed" });
     }
   };
@@ -423,7 +423,7 @@ export class PortalController {
     try {
       const policies = await portalService.listPortalPolicies(req.user!.userId);
       sendSuccess(res, policies);
-    } catch (error) {
+    } catch {
       sendError(res, 500, { code: "LIST_POLICIES_FAILED", message: "Failed" });
     }
   };
@@ -432,7 +432,7 @@ export class PortalController {
     try {
       const payslips = await portalService.listMyPayslips(req.user!.userId);
       sendSuccess(res, payslips);
-    } catch (error) {
+    } catch {
       sendError(res, 500, { code: "LIST_PAYSLIPS_FAILED", message: "Failed" });
     }
   };

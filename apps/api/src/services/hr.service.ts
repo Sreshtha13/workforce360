@@ -70,7 +70,7 @@ export class HrService {
       return candidate.employee;
     }
 
-    let userId = candidate.userId;
+    const userId = candidate.userId;
     if (!userId) {
       throw new Error("Candidate must have a user account before hiring");
     }

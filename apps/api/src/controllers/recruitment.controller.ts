@@ -72,7 +72,7 @@ export class RecruitmentController {
     try {
       const jobs = await recruitmentService.listJobs(req.query as { status?: string; search?: string });
       sendSuccess(res, jobs);
-    } catch (error) {
+    } catch {
       sendError(res, 500, { code: "LIST_JOBS_FAILED", message: "Failed to list jobs" });
     }
   };
@@ -99,7 +99,7 @@ export class RecruitmentController {
     try {
       const candidates = await recruitmentService.listCandidates(req.query as { status?: string; search?: string });
       sendSuccess(res, candidates);
-    } catch (error) {
+    } catch {
       sendError(res, 500, { code: "LIST_CANDIDATES_FAILED", message: "Failed to list candidates" });
     }
   };
@@ -112,7 +112,7 @@ export class RecruitmentController {
         return;
       }
       sendSuccess(res, candidate);
-    } catch (error) {
+    } catch {
       sendError(res, 500, { code: "GET_CANDIDATE_FAILED", message: "Failed to get candidate" });
     }
   };
@@ -134,7 +134,7 @@ export class RecruitmentController {
         return;
       }
       sendSuccess(res, candidate);
-    } catch (error) {
+    } catch {
       sendError(res, 500, { code: "GET_PROFILE_FAILED", message: "Failed to get profile" });
     }
   };
@@ -168,7 +168,7 @@ export class RecruitmentController {
         req.query as { status?: string; statuses?: string[]; jobPostingId?: string },
       );
       sendSuccess(res, applications);
-    } catch (error) {
+    } catch {
       sendError(res, 500, { code: "LIST_APPLICATIONS_FAILED", message: "Failed" });
     }
   };
@@ -181,7 +181,7 @@ export class RecruitmentController {
         return;
       }
       sendSuccess(res, application);
-    } catch (error) {
+    } catch {
       sendError(res, 500, { code: "GET_APPLICATION_FAILED", message: "Failed" });
     }
   };
@@ -247,7 +247,7 @@ export class RecruitmentController {
         recruitmentService.listApplications(),
       ]);
       sendSuccess(res, { summary, applications });
-    } catch (error) {
+    } catch {
       sendError(res, 500, { code: "PIPELINE_FAILED", message: "Failed to load pipeline" });
     }
   };

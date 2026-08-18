@@ -1,3 +1,4 @@
+import type { Prisma, LeaveApplicationStatus } from "@prisma/client";
 import { LeaveRepository } from "../repositories/leave.repository";
 import { AppError } from "../lib/app-error";
 import { writeAuditLog } from "../lib/audit";
@@ -110,7 +111,7 @@ export class LeaveService {
   }
 
   async listLeaveTypes(filters: { isActive?: boolean }) {
-    const where: any = {};
+    const where: Prisma.LeaveTypeWhereInput = {};
     if (filters.isActive !== undefined) {
       where.isActive = filters.isActive;
     }
@@ -223,7 +224,7 @@ export class LeaveService {
     leaveTypeId?: string;
     year?: number;
   }) {
-    const where: any = {};
+    const where: Prisma.LeaveBalanceWhereInput = {};
     if (filters.employeeId) where.employeeId = filters.employeeId;
     if (filters.leaveTypeId) where.leaveTypeId = filters.leaveTypeId;
     if (filters.year) where.year = filters.year;
@@ -443,10 +444,10 @@ export class LeaveService {
     from?: string;
     to?: string;
   }) {
-    const where: any = {};
+    const where: Prisma.LeaveApplicationWhereInput = {};
     if (filters.employeeId) where.employeeId = filters.employeeId;
     if (filters.leaveTypeId) where.leaveTypeId = filters.leaveTypeId;
-    if (filters.status) where.status = filters.status;
+    if (filters.status) where.status = filters.status as LeaveApplicationStatus;
     if (filters.from || filters.to) {
       where.startDate = {};
       if (filters.from) where.startDate.gte = new Date(filters.from);
