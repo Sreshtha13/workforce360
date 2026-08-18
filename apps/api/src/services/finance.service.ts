@@ -1,4 +1,5 @@
 import { FinanceRepository } from "../repositories/finance.repository";
+import type { PaginationQuery } from "../lib/pagination";
 import { ApprovalService } from "./approval.service";
 import { paymentGatewayService } from "./payment-gateway.service";
 import { AppError } from "../lib/app-error";
@@ -296,7 +297,13 @@ export class FinanceService {
     return invoice;
   }
 
-  async listInvoices(filters: { clientId?: string; status?: string; from?: string; to?: string }) {
+  async listInvoices(filters: {
+    clientId?: string;
+    status?: string;
+    from?: string;
+    to?: string;
+    pagination?: PaginationQuery;
+  }) {
     const where: Prisma.InvoiceWhereInput = {};
     if (filters.clientId) where.clientId = filters.clientId;
     if (filters.status) where.status = filters.status as Prisma.InvoiceWhereInput["status"];
@@ -305,7 +312,7 @@ export class FinanceService {
       if (filters.from) where.issueDate.gte = new Date(filters.from);
       if (filters.to) where.issueDate.lte = new Date(filters.to);
     }
-    return this.financeRepo.findManyInvoices(where);
+    return this.financeRepo.findManyInvoices(where, filters.pagination);
   }
 
   async markOverdueInvoices(actorId?: string) {
@@ -495,15 +502,15 @@ export class FinanceService {
     actorId: string,
   ) {
     let reimbursement = await this.financeRepo.createReimbursement({
-      userId: employeeId,
+      employeeId,
       category: data.category,
       description: data.description,
       amount: data.amount,
       currency: data.currency,
+      expenseDate: new Date(data.expenseDate),
       receiptFileId: data.receiptFileId,
       status: "PENDING",
-      notes: `Expense date: ${data.expenseDate}`,
-    } as Prisma.ReimbursementUncheckedCreateInput);
+    });
 
     if (data.approverIds && data.approverIds.length > 0) {
       const approval = await this.approvalService.createApprovalRequest(

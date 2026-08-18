@@ -2,6 +2,7 @@ import type { NextFunction, Request, Response } from "express";
 import { ZodError } from "zod";
 import { AppError } from "../lib/app-error";
 import { sendError } from "../lib/response";
+import { Sentry } from "../lib/sentry";
 
 export function notFoundHandler(_req: Request, res: Response): void {
   sendError(res, 404, {
@@ -34,6 +35,11 @@ export function errorHandler(
   }
 
   console.error(err);
+  if (err instanceof Error) {
+    Sentry.captureException(err);
+  } else {
+    Sentry.captureMessage(String(err));
+  }
   sendError(res, 500, {
     code: "INTERNAL_ERROR",
     message: "An unexpected error occurred",

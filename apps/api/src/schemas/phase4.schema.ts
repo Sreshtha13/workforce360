@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { optionalPaginationQuerySchema } from "../lib/pagination";
 
 const dateOnly = () => z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Invalid date format (YYYY-MM-DD)");
 const money = () => z.number().min(0);
@@ -64,7 +65,7 @@ export const submitInvoiceApprovalSchema = z.object({
   approverIds: z.array(z.string().min(1)).min(1),
 });
 
-export const listInvoicesQuerySchema = z.object({
+export const listInvoicesQuerySchema = optionalPaginationQuerySchema.extend({
   clientId: z.string().optional(),
   status: z.string().optional(),
   from: z.string().optional(),

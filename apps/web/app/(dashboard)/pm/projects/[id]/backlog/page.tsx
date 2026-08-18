@@ -1,92 +1,184 @@
 "use client";
 
 import { use } from "react";
-import { useQuery } from "@tanstack/react-query";
+import Link from "next/link";
+import { useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiClient } from "@/lib/api-client";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { AdminPageHeader } from "@/components/admin/admin-page-header";
+import { LoadingState, ErrorState } from "@/components/admin/admin-states";
 import { Button } from "@/components/ui/button";
-import { Plus } from "lucide-react";
-import { TaskStatus, TaskPriority } from "@/types/pm";
+import { Badge } from "@/components/ui/badge";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import type { CreateTaskInput, Task, TaskPriority } from "@/types/pm";
 
-interface PageProps {
-  params: Promise<{ id: string }>;
-}
+const PRIORITY_COLORS: Record<TaskPriority, string> = {
+  LOW: "bg-gray-500",
+  MEDIUM: "bg-blue-500",
+  HIGH: "bg-orange-500",
+  URGENT: "bg-red-500",
+};
 
-export default function ProjectBacklogPage({ params }: PageProps) {
-  const { id } = use(params);
+export default function ProjectBacklogPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id: projectId } = use(params);
+  const [isSheetOpen, setIsSheetOpen] = useState(false);
+  const [formData, setFormData] = useState<CreateTaskInput>({
+    projectId,
+    title: "",
+    description: "",
+    status: "TODO",
+    priority: "MEDIUM",
+  });
+  const queryClient = useQueryClient();
 
-  const { data: project } = useQuery({
-    queryKey: ["pm", "projects", id],
-    queryFn: () => apiClient.pm.projects.get(id),
+  const projectQuery = useQuery({
+    queryKey: ["pm", "projects", projectId],
+    queryFn: async () => (await apiClient.pm.projects.get(projectId)).data,
   });
 
-  const { data: tasks, isLoading } = useQuery({
-    queryKey: ["pm", "tasks", id, "backlog"],
-    queryFn: () => apiClient.pm.tasks.list({ projectId: id, status: TaskStatus.TODO }),
+  const tasksQuery = useQuery({
+    queryKey: ["pm", "tasks", { projectId, backlog: true }],
+    queryFn: async () => {
+      const res = await apiClient.pm.tasks.list({ projectId });
+      return (res.data ?? []).filter((t) => !t.sprintId && t.status !== "DONE" && t.status !== "CANCELLED");
+    },
   });
 
-  const getPriorityColor = (priority: TaskPriority) => {
-    const colors = {
-      [TaskPriority.LOW]: "bg-gray-500",
-      [TaskPriority.MEDIUM]: "bg-blue-500",
-      [TaskPriority.HIGH]: "bg-orange-500",
-      [TaskPriority.URGENT]: "bg-red-500",
-    };
-    return colors[priority];
-  };
+  const createMutation = useMutation({
+    mutationFn: (data: CreateTaskInput) => apiClient.pm.tasks.create(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["pm", "tasks"] });
+      setIsSheetOpen(false);
+      setFormData({
+        projectId,
+        title: "",
+        description: "",
+        status: "TODO",
+        priority: "MEDIUM",
+      });
+    },
+  });
+
+  if (projectQuery.isLoading || tasksQuery.isLoading) {
+    return <LoadingState message="Loading backlog..." />;
+  }
+  if (projectQuery.isError || tasksQuery.isError) {
+    return <ErrorState message="Failed to load backlog." onRetry={() => tasksQuery.refetch()} />;
+  }
+
+  const project = projectQuery.data;
+  const tasks = tasksQuery.data ?? [];
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold">Backlog</h1>
-          <p className="text-muted-foreground">{project?.name}</p>
-        </div>
-        <Button>
-          <Plus className="mr-2 h-4 w-4" />
-          Add Task
-        </Button>
-      </div>
+      <AdminPageHeader
+        title={`${project?.name ?? "Project"} — Backlog`}
+        description="Unscheduled tasks not yet assigned to a sprint."
+        actions={
+          <Button onClick={() => setIsSheetOpen(true)}>Add task</Button>
+        }
+      />
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Backlog Items</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {isLoading ? (
-            <div>Loading...</div>
-          ) : tasks && tasks.length > 0 ? (
-            <div className="space-y-2">
-              {tasks.map((task) => (
-                <div key={task.id} className="flex items-center justify-between p-4 border rounded-lg hover:bg-accent transition-colors">
-                  <div className="space-y-1 flex-1">
-                    <div className="flex items-center gap-2">
-                      <p className="font-medium">{task.title}</p>
-                      <Badge className={getPriorityColor(task.priority)}>
-                        {task.priority}
-                      </Badge>
-                    </div>
-                    {task.description && (
-                      <p className="text-sm text-muted-foreground line-clamp-2">{task.description}</p>
-                    )}
-                    <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                      {task.assignee && (
-                        <span>Assigned to: {task.assignee.firstName} {task.assignee.lastName}</span>
-                      )}
-                      {task.estimatedHours && (
-                        <span>Est: {task.estimatedHours}h</span>
-                      )}
-                    </div>
-                  </div>
+      {tasks.length === 0 ? (
+        <p className="text-center text-muted-foreground py-12">No backlog items. Create a task to get started.</p>
+      ) : (
+        <div className="space-y-2">
+          {tasks.map((task: Task) => (
+            <div
+              key={task.id}
+              className="flex items-center justify-between gap-4 rounded-lg border p-4 hover:bg-muted/50 transition-colors"
+            >
+              <div className="space-y-1 flex-1 min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <Link
+                    href={`/pm/tasks/${task.id}`}
+                    className="font-medium text-brand-700 hover:underline"
+                  >
+                    {task.title}
+                  </Link>
+                  <Badge className={PRIORITY_COLORS[task.priority]}>{task.priority}</Badge>
+                  <Badge variant="outline">{task.status.replace(/_/g, " ")}</Badge>
                 </div>
-              ))}
+                {task.description && (
+                  <p className="text-sm text-muted-foreground line-clamp-2">{task.description}</p>
+                )}
+                <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                  {task.assignee && (
+                    <span>
+                      {task.assignee.firstName} {task.assignee.lastName}
+                    </span>
+                  )}
+                  {task.estimatedHours && <span>Est. {task.estimatedHours}h</span>}
+                </div>
+              </div>
+              <Link
+                href={`/pm/projects/${projectId}/sprints`}
+                className="text-xs text-brand-700 hover:underline shrink-0"
+              >
+                Assign to sprint
+              </Link>
             </div>
-          ) : (
-            <p className="text-center text-muted-foreground py-8">No backlog items</p>
-          )}
-        </CardContent>
-      </Card>
+          ))}
+        </div>
+      )}
+
+      <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
+        <SheetContent>
+          <SheetHeader>
+            <SheetTitle>Add backlog task</SheetTitle>
+          </SheetHeader>
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              createMutation.mutate(formData);
+            }}
+            className="mt-6 space-y-4"
+          >
+            <div className="space-y-2">
+              <Label htmlFor="title">Title</Label>
+              <Input
+                id="title"
+                value={formData.title}
+                onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="priority">Priority</Label>
+              <Select
+                value={formData.priority}
+                onValueChange={(v) => setFormData({ ...formData, priority: v as TaskPriority })}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="LOW">Low</SelectItem>
+                  <SelectItem value="MEDIUM">Medium</SelectItem>
+                  <SelectItem value="HIGH">High</SelectItem>
+                  <SelectItem value="URGENT">Urgent</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="description">Description</Label>
+              <Textarea
+                id="description"
+                value={formData.description ?? ""}
+                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                rows={3}
+              />
+            </div>
+            <Button type="submit" className="w-full" disabled={createMutation.isPending}>
+              {createMutation.isPending ? "Creating..." : "Create task"}
+            </Button>
+          </form>
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }

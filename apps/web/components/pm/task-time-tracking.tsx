@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiClient } from "@/lib/api-client";
 import { useAuth } from "@/lib/auth-context";
-import type { Task } from "@/types/pm";
+import type { Task, TaskTimeEntry } from "@/types/pm";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -20,6 +20,10 @@ export function TaskTimeTracking({ task }: { task: Task }) {
   const [hours, setHours] = useState("");
   const [date, setDate] = useState(todayIso());
   const [description, setDescription] = useState("");
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editHours, setEditHours] = useState("");
+  const [editDate, setEditDate] = useState("");
+  const [editDescription, setEditDescription] = useState("");
 
   const entriesQuery = useQuery({
     queryKey: ["pm", "time-entries", { taskId: task.id }],
@@ -46,10 +50,33 @@ export function TaskTimeTracking({ task }: { task: Task }) {
     },
   });
 
+  const updateMutation = useMutation({
+    mutationFn: (entry: TaskTimeEntry) =>
+      apiClient.pm.timeEntries.update(entry.id, {
+        hours: parseFloat(editHours),
+        date: editDate,
+        description: editDescription.trim() || null,
+      }),
+    onSuccess: () => {
+      setEditingId(null);
+      queryClient.invalidateQueries({ queryKey: ["pm", "time-entries", { taskId: task.id }] });
+      queryClient.invalidateQueries({ queryKey: ["pm", "tasks", task.id] });
+    },
+  });
+
   const totalHours = (entriesQuery.data ?? []).reduce(
     (sum, entry) => sum + parseFloat(entry.hours || "0"),
     0,
   );
+
+  const startEdit = (entry: TaskTimeEntry) => {
+    setEditingId(entry.id);
+    setEditHours(entry.hours);
+    setEditDate(entry.date.slice(0, 10));
+    setEditDescription(entry.description ?? "");
+  };
+
+  const canEdit = (entry: TaskTimeEntry) => user && entry.userId === user.id;
 
   return (
     <div className="space-y-4">
@@ -99,21 +126,63 @@ export function TaskTimeTracking({ task }: { task: Task }) {
         {mutation.isPending ? "Logging..." : "Log time"}
       </Button>
 
-      <ul className="space-y-2 max-h-48 overflow-y-auto">
+      <ul className="space-y-2 max-h-64 overflow-y-auto">
         {(entriesQuery.data ?? []).map((entry) => (
-          <li
-            key={entry.id}
-            className="flex items-center justify-between rounded-md border px-3 py-2 text-sm"
-          >
-            <span>
-              {entry.user
-                ? `${entry.user.firstName} ${entry.user.lastName}`
-                : "User"}{" "}
-              — {entry.description || "No note"}
-            </span>
-            <span className="tabular-nums font-medium">
-              {parseFloat(entry.hours).toFixed(1)}h · {entry.date.slice(0, 10)}
-            </span>
+          <li key={entry.id} className="rounded-md border px-3 py-2 text-sm space-y-2">
+            {editingId === entry.id ? (
+              <div className="space-y-2">
+                <div className="grid gap-2 sm:grid-cols-2">
+                  <Input
+                    type="number"
+                    step="0.25"
+                    min="0.25"
+                    value={editHours}
+                    onChange={(e) => setEditHours(e.target.value)}
+                  />
+                  <Input
+                    type="date"
+                    value={editDate}
+                    onChange={(e) => setEditDate(e.target.value)}
+                  />
+                </div>
+                <Textarea
+                  value={editDescription}
+                  onChange={(e) => setEditDescription(e.target.value)}
+                  rows={1}
+                />
+                <div className="flex gap-2">
+                  <Button
+                    size="sm"
+                    disabled={!editHours || updateMutation.isPending}
+                    onClick={() => updateMutation.mutate(entry)}
+                  >
+                    Save
+                  </Button>
+                  <Button size="sm" variant="ghost" onClick={() => setEditingId(null)}>
+                    Cancel
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <div className="flex items-center justify-between gap-2">
+                <span>
+                  {entry.user
+                    ? `${entry.user.firstName} ${entry.user.lastName}`
+                    : "User"}{" "}
+                  — {entry.description || "No note"}
+                </span>
+                <div className="flex items-center gap-2 shrink-0">
+                  <span className="tabular-nums font-medium">
+                    {parseFloat(entry.hours).toFixed(1)}h · {entry.date.slice(0, 10)}
+                  </span>
+                  {canEdit(entry) && (
+                    <Button size="sm" variant="ghost" className="h-7 px-2" onClick={() => startEdit(entry)}>
+                      Edit
+                    </Button>
+                  )}
+                </div>
+              </div>
+            )}
           </li>
         ))}
       </ul>

@@ -213,7 +213,7 @@ export class DashboardService {
             deletedAt: null,
             status: { in: ["SENT", "PARTIALLY_PAID", "OVERDUE", "APPROVED"] },
           },
-          select: { total: true, amountPaid: true },
+          select: { totalAmount: true, amountPaid: true },
         }),
         prisma.payrollRun.count({ where: { deletedAt: null } }),
         prisma.project.count({ where: { deletedAt: null } }),
@@ -230,7 +230,7 @@ export class DashboardService {
 
       let arOutstanding = 0;
       for (const inv of invoices) {
-        arOutstanding += Math.max(0, Number(inv.total) - Number(inv.amountPaid));
+        arOutstanding += Math.max(0, Number(inv.totalAmount) - Number(inv.amountPaid));
       }
 
       const presentToday =

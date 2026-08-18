@@ -92,7 +92,9 @@ export default function ProjectSprintsPage({ params }: { params: Promise<{ id: s
           return (
             <section key={sprint.id} className="rounded-xl border p-5 space-y-3">
               <div className="flex items-center justify-between">
-                <h3 className="font-semibold">{sprint.name}</h3>
+                <Link href={`/pm/sprints/${sprint.id}`} className="font-semibold hover:underline">
+                  {sprint.name}
+                </Link>
                 <Badge variant="secondary">{STATUS_LABELS[sprint.status]}</Badge>
               </div>
               {sprint.goal && <p className="text-sm text-muted-foreground">{sprint.goal}</p>}

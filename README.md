@@ -204,11 +204,11 @@ Frontend-focused: [PHASE3_PHASE4_FRONTEND_COMPLETE.md](./PHASE3_PHASE4_FRONTEND_
 
 ## Known limitations (MVP)
 
-- Pagination helper exists but is not yet applied to all list endpoints.
-- OpenAPI docs cover ~60% of routes — extend `*.docs.ts` files for remaining modules.
-- UAT is manual; automated E2E (Playwright/Cypress) is post-MVP.
+- Pagination is available on users and invoices (`page` / `pageSize` query params); other list endpoints return full sets unless extended.
+- OpenAPI docs cover most modules; extend `*.docs.ts` files for any remaining routes.
+- E2E smoke tests live in `/e2e` (Playwright); full UAT remains manual per `docs/UAT_FULL_SYSTEM.md`.
 - CD workflow is Docker-based locally; host-specific deploy pipeline TBD.
-- Structured console logging only; external APM (Sentry/Datadog) not wired yet.
+- Sentry is optional — set `SENTRY_DSN` (API) and `NEXT_PUBLIC_SENTRY_DSN` (web) to enable.
 
 ---
 

@@ -2,6 +2,7 @@ import type { Request, Response } from "express";
 import { UserService } from "../services/user.service";
 import { sendSuccess, sendError } from "../lib/response";
 import { toClientError } from "../lib/app-error";
+import { paginationMeta, resolveOptionalPagination } from "../lib/pagination";
 
 export class UserController {
   private userService: UserService;
@@ -20,6 +21,8 @@ export class UserController {
         status,
         search,
         includeDeleted,
+        page,
+        pageSize,
       } = req.query as {
         departmentId?: string;
         officeId?: string;
@@ -28,8 +31,11 @@ export class UserController {
         status?: string;
         search?: string;
         includeDeleted?: boolean;
+        page?: number;
+        pageSize?: number;
       };
-      const users = await this.userService.getAllUsers(
+      const pagination = resolveOptionalPagination({ page, pageSize });
+      const result = await this.userService.getAllUsers(
         {
           departmentId,
           officeId,
@@ -38,10 +44,16 @@ export class UserController {
           status,
           search,
           includeDeleted,
+          pagination: pagination ?? undefined,
         },
         req.user?.userId,
       );
-      sendSuccess(res, users);
+      sendSuccess(
+        res,
+        result.rows,
+        200,
+        pagination ? paginationMeta(pagination, result.total) : null,
+      );
     } catch (error) {
       const message = error instanceof Error ? error.message : "Failed to get users";
       const statusCode = message.includes("Super Administrators") ? 403 : 500;

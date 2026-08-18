@@ -9,7 +9,6 @@ import {
   ChevronDown,
   LogOut,
   Menu,
-  Sparkles,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { apiClient } from "@/lib/api-client";
@@ -33,6 +32,7 @@ import { cn } from "@/lib/utils";
 import { Breadcrumbs, buildBreadcrumbs } from "@/components/design-system/breadcrumbs";
 import { ThemeToggle } from "@/components/design-system/theme-toggle";
 import { GlobalSearch } from "@/components/dashboard/global-search";
+import { WorkspaceSelector } from "@/components/layout/workspace-selector";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -97,23 +97,7 @@ export function DashboardShell({ children }: { children: ReactNode }) {
         </div>
       </div>
 
-      <div className="px-3 pb-3">
-        <button
-          type="button"
-          className={cn(
-            glass.panelSubtle,
-            "flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-left text-sm transition-colors hover:bg-white/50 dark:hover:bg-white/10",
-          )}
-          disabled
-          aria-label="Workspace selector (coming soon)"
-        >
-          <span className="flex items-center gap-2">
-            <Sparkles className={cn(iconSize.sm, "text-brand-600 dark:text-brand-400")} />
-            <span className="font-medium">Default Workspace</span>
-          </span>
-          <ChevronDown className={cn(iconSize.sm, "text-muted-foreground")} />
-        </button>
-      </div>
+      <WorkspaceSelector />
 
       <Separator className="bg-white/10 dark:bg-white/5" />
 

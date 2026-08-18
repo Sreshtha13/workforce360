@@ -1,14 +1,20 @@
 -- Phase 7: Development & QA (Engineering module)
 
--- Enums
-CREATE TYPE "ReleaseStatus" AS ENUM ('PLANNING', 'IN_PROGRESS', 'TESTING', 'STAGING', 'RELEASED', 'ROLLED_BACK');
-CREATE TYPE "ReleaseType" AS ENUM ('MAJOR', 'MINOR', 'PATCH', 'HOTFIX');
-CREATE TYPE "TestCaseStatus" AS ENUM ('DRAFT', 'READY', 'PASSED', 'FAILED', 'BLOCKED', 'SKIPPED');
-CREATE TYPE "TestCasePriority" AS ENUM ('LOW', 'MEDIUM', 'HIGH', 'CRITICAL');
-CREATE TYPE "TrainingStatus" AS ENUM ('NOT_STARTED', 'IN_PROGRESS', 'COMPLETED', 'EXPIRED');
+-- Enums (idempotent so a retried failed reset can re-apply this file)
+DO $$ BEGIN CREATE TYPE "ReleaseStatus" AS ENUM ('PLANNING', 'IN_PROGRESS', 'TESTING', 'STAGING', 'RELEASED', 'ROLLED_BACK'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN CREATE TYPE "ReleaseType" AS ENUM ('MAJOR', 'MINOR', 'PATCH', 'HOTFIX'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN CREATE TYPE "TestCaseStatus" AS ENUM ('DRAFT', 'READY', 'PASSED', 'FAILED', 'BLOCKED', 'SKIPPED'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN CREATE TYPE "TestCasePriority" AS ENUM ('LOW', 'MEDIUM', 'HIGH', 'CRITICAL'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN CREATE TYPE "TrainingStatus" AS ENUM ('NOT_STARTED', 'IN_PROGRESS', 'COMPLETED', 'EXPIRED'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
--- Add release_id to tasks if projects table exists
-ALTER TABLE "tasks" ADD COLUMN IF NOT EXISTS "release_id" TEXT;
+-- Link tasks to releases when the Phase 6 `tasks` table exists.
+-- Guarded: a migrate reset used to fail here because Phase 5/6 had no migration.
+DO $$
+BEGIN
+  IF to_regclass('public.tasks') IS NOT NULL THEN
+    ALTER TABLE "tasks" ADD COLUMN IF NOT EXISTS "release_id" TEXT;
+  END IF;
+END $$;
 
 CREATE TABLE IF NOT EXISTS "releases" (
     "id" TEXT NOT NULL,
@@ -156,7 +162,12 @@ CREATE INDEX IF NOT EXISTS "code_reviews_author_id_idx" ON "code_reviews"("autho
 CREATE INDEX IF NOT EXISTS "code_reviews_reviewer_id_idx" ON "code_reviews"("reviewer_id");
 CREATE INDEX IF NOT EXISTS "code_reviews_status_idx" ON "code_reviews"("status");
 
-CREATE INDEX IF NOT EXISTS "tasks_release_id_idx" ON "tasks"("release_id");
+DO $$
+BEGIN
+  IF to_regclass('public.tasks') IS NOT NULL THEN
+    CREATE INDEX IF NOT EXISTS "tasks_release_id_idx" ON "tasks"("release_id");
+  END IF;
+END $$;
 
 -- Foreign keys (idempotent via DO blocks would be verbose; assume fresh migration)
 ALTER TABLE "releases" DROP CONSTRAINT IF EXISTS "releases_project_id_fkey";
@@ -189,7 +200,12 @@ ALTER TABLE "training_enrollments" DROP CONSTRAINT IF EXISTS "training_enrollmen
 ALTER TABLE "training_enrollments" ADD CONSTRAINT "training_enrollments_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 ALTER TABLE "code_reviews" DROP CONSTRAINT IF EXISTS "code_reviews_task_id_fkey";
-ALTER TABLE "code_reviews" ADD CONSTRAINT "code_reviews_task_id_fkey" FOREIGN KEY ("task_id") REFERENCES "tasks"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+DO $$
+BEGIN
+  IF to_regclass('public.tasks') IS NOT NULL THEN
+    ALTER TABLE "code_reviews" ADD CONSTRAINT "code_reviews_task_id_fkey" FOREIGN KEY ("task_id") REFERENCES "tasks"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+  END IF;
+END $$;
 ALTER TABLE "code_reviews" DROP CONSTRAINT IF EXISTS "code_reviews_project_id_fkey";
 ALTER TABLE "code_reviews" ADD CONSTRAINT "code_reviews_project_id_fkey" FOREIGN KEY ("project_id") REFERENCES "projects"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 ALTER TABLE "code_reviews" DROP CONSTRAINT IF EXISTS "code_reviews_author_id_fkey";
@@ -197,5 +213,10 @@ ALTER TABLE "code_reviews" ADD CONSTRAINT "code_reviews_author_id_fkey" FOREIGN 
 ALTER TABLE "code_reviews" DROP CONSTRAINT IF EXISTS "code_reviews_reviewer_id_fkey";
 ALTER TABLE "code_reviews" ADD CONSTRAINT "code_reviews_reviewer_id_fkey" FOREIGN KEY ("reviewer_id") REFERENCES "users"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
-ALTER TABLE "tasks" DROP CONSTRAINT IF EXISTS "tasks_release_id_fkey";
-ALTER TABLE "tasks" ADD CONSTRAINT "tasks_release_id_fkey" FOREIGN KEY ("release_id") REFERENCES "releases"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+DO $$
+BEGIN
+  IF to_regclass('public.tasks') IS NOT NULL THEN
+    ALTER TABLE "tasks" DROP CONSTRAINT IF EXISTS "tasks_release_id_fkey";
+    ALTER TABLE "tasks" ADD CONSTRAINT "tasks_release_id_fkey" FOREIGN KEY ("release_id") REFERENCES "releases"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+  END IF;
+END $$;

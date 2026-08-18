@@ -81,6 +81,12 @@ export interface Lead {
     proposals: number;
     communications: number;
   };
+  communications?: ClientCommunication[];
+  project?: {
+    id: string;
+    name: string;
+    code?: string;
+  };
 }
 
 export interface Bid {

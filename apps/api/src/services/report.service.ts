@@ -24,9 +24,18 @@ function parseDateRange(filters: ReportFilters): { from?: Date; to?: Date } {
   return { from, to };
 }
 
-function deptUserFilter(departmentId?: string): Prisma.UserWhereInput | undefined {
+async function employeeIdsForDepartment(departmentId?: string): Promise<string[] | undefined> {
   if (!departmentId) return undefined;
-  return { departmentId };
+  const rows = await prisma.employee.findMany({
+    where: { deletedAt: null, user: { departmentId } },
+    select: { id: true },
+  });
+  return rows.map((r) => r.id);
+}
+
+function employeeIdFilter(ids?: string[]) {
+  if (!ids?.length) return undefined;
+  return { employeeId: { in: ids } };
 }
 
 export function computeNextRunAt(
@@ -92,7 +101,7 @@ export class ReportService {
   }
 
   private async hrKpis(from?: Date, to?: Date, departmentId?: string) {
-    const userFilter = deptUserFilter(departmentId);
+    const employeeIds = await employeeIdsForDepartment(departmentId);
     const dateFilter: Prisma.DateTimeFilter | undefined =
       from || to ? { ...(from ? { gte: from } : {}), ...(to ? { lte: to } : {}) } : undefined;
 
@@ -103,7 +112,7 @@ export class ReportService {
           where: {
             deletedAt: null,
             ...(dateFilter ? { date: dateFilter } : {}),
-            ...(userFilter ? { user: userFilter } : {}),
+            ...employeeIdFilter(employeeIds),
           },
           _count: { _all: true },
         }),
@@ -112,7 +121,7 @@ export class ReportService {
           where: {
             deletedAt: null,
             ...(dateFilter ? { startDate: dateFilter } : {}),
-            ...(userFilter ? { user: userFilter } : {}),
+            ...employeeIdFilter(employeeIds),
           },
           _count: { _all: true },
         }),
@@ -151,7 +160,7 @@ export class ReportService {
         ...(dateFilter ? { issueDate: dateFilter } : {}),
         status: { notIn: ["CANCELLED", "DRAFT"] },
       },
-      select: { status: true, total: true, amountPaid: true },
+      select: { status: true, totalAmount: true, amountPaid: true },
     });
 
     let arOutstanding = 0;
@@ -159,7 +168,7 @@ export class ReportService {
     const byStatus: Record<string, number> = {};
 
     for (const inv of invoices) {
-      const total = Number(inv.total);
+      const total = Number(inv.totalAmount);
       const paid = Number(inv.amountPaid);
       byStatus[inv.status] = (byStatus[inv.status] ?? 0) + 1;
       revenueCollected += paid;
@@ -185,14 +194,14 @@ export class ReportService {
       prisma.payrollRun.count({
         where: {
           deletedAt: null,
-          ...(dateFilter ? { startDate: dateFilter } : {}),
+          ...(dateFilter ? { payPeriodStart: dateFilter } : {}),
         },
       }),
       prisma.payrollRun.groupBy({
         by: ["status"],
         where: {
           deletedAt: null,
-          ...(dateFilter ? { startDate: dateFilter } : {}),
+          ...(dateFilter ? { payPeriodStart: dateFilter } : {}),
         },
         _count: { _all: true },
         _sum: { totalNet: true, totalGross: true },
@@ -241,7 +250,7 @@ export class ReportService {
     const { from, to } = parseDateRange(filters);
     const dateFilter: Prisma.DateTimeFilter | undefined =
       from || to ? { ...(from ? { gte: from } : {}), ...(to ? { lte: to } : {}) } : undefined;
-    const userFilter = deptUserFilter(filters.departmentId);
+    const employeeIds = await employeeIdsForDepartment(filters.departmentId);
 
     switch (type) {
       case "ATTENDANCE": {
@@ -249,14 +258,18 @@ export class ReportService {
           where: {
             deletedAt: null,
             ...(dateFilter ? { date: dateFilter } : {}),
-            ...(userFilter ? { user: userFilter } : {}),
-          },
-          include: {
-            user: { select: { firstName: true, lastName: true, email: true, employeeId: true } },
+            ...employeeIdFilter(employeeIds),
           },
           orderBy: { date: "desc" },
           take: 5000,
         });
+        const employees = await prisma.employee.findMany({
+          where: { id: { in: [...new Set(records.map((r) => r.employeeId))] } },
+          include: {
+            user: { select: { firstName: true, lastName: true, email: true, employeeId: true } },
+          },
+        });
+        const employeeById = new Map(employees.map((e) => [e.id, e]));
         return {
           title: "Attendance Report",
           columns: [
@@ -266,13 +279,16 @@ export class ReportService {
             { key: "status", label: "Status" },
             { key: "hours", label: "Hours" },
           ],
-          rows: records.map((r) => ({
-            date: r.date.toISOString().slice(0, 10),
-            employee: `${r.user.firstName} ${r.user.lastName}`,
-            email: r.user.email,
-            status: r.status,
-            hours: r.hours?.toString() ?? "",
-          })),
+          rows: records.map((r) => {
+            const user = employeeById.get(r.employeeId)?.user;
+            return {
+              date: r.date.toISOString().slice(0, 10),
+              employee: user ? `${user.firstName} ${user.lastName}` : r.employeeId,
+              email: user?.email ?? "",
+              status: r.status,
+              hours: r.workHours?.toString() ?? "",
+            };
+          }),
         };
       }
       case "LEAVE": {
@@ -280,15 +296,19 @@ export class ReportService {
           where: {
             deletedAt: null,
             ...(dateFilter ? { startDate: dateFilter } : {}),
-            ...(userFilter ? { user: userFilter } : {}),
+            ...employeeIdFilter(employeeIds),
           },
           include: {
-            user: { select: { firstName: true, lastName: true, email: true } },
-            policy: { select: { name: true, leaveType: true } },
+            leaveType: { select: { name: true, code: true } },
           },
           orderBy: { startDate: "desc" },
           take: 5000,
         });
+        const employees = await prisma.employee.findMany({
+          where: { id: { in: [...new Set(apps.map((a) => a.employeeId))] } },
+          include: { user: { select: { firstName: true, lastName: true, email: true } } },
+        });
+        const employeeById = new Map(employees.map((e) => [e.id, e]));
         return {
           title: "Leave Report",
           columns: [
@@ -299,14 +319,17 @@ export class ReportService {
             { key: "days", label: "Days" },
             { key: "status", label: "Status" },
           ],
-          rows: apps.map((a) => ({
-            employee: `${a.user.firstName} ${a.user.lastName}`,
-            type: a.policy.name,
-            startDate: a.startDate.toISOString().slice(0, 10),
-            endDate: a.endDate.toISOString().slice(0, 10),
-            days: a.days.toString(),
-            status: a.status,
-          })),
+          rows: apps.map((a) => {
+            const user = employeeById.get(a.employeeId)?.user;
+            return {
+              employee: user ? `${user.firstName} ${user.lastName}` : a.employeeId,
+              type: a.leaveType.name,
+              startDate: a.startDate.toISOString().slice(0, 10),
+              endDate: a.endDate.toISOString().slice(0, 10),
+              days: a.dayCount.toString(),
+              status: a.status,
+            };
+          }),
         };
       }
       case "RECRUITMENT": {
@@ -367,7 +390,7 @@ export class ReportService {
             issueDate: i.issueDate.toISOString().slice(0, 10),
             dueDate: i.dueDate.toISOString().slice(0, 10),
             status: i.status,
-            total: i.total.toString(),
+            total: i.totalAmount.toString(),
             amountPaid: i.amountPaid.toString(),
           })),
         };
@@ -376,9 +399,9 @@ export class ReportService {
         const runs = await prisma.payrollRun.findMany({
           where: {
             deletedAt: null,
-            ...(dateFilter ? { startDate: dateFilter } : {}),
+            ...(dateFilter ? { payPeriodStart: dateFilter } : {}),
           },
-          orderBy: { startDate: "desc" },
+          orderBy: [{ year: "desc" }, { month: "desc" }],
           take: 1000,
         });
         return {
@@ -392,10 +415,10 @@ export class ReportService {
             { key: "net", label: "Net" },
           ],
           rows: runs.map((r) => ({
-            title: r.title,
-            period: r.period,
+            title: `${r.year}-${String(r.month).padStart(2, "0")}`,
+            period: `${r.payPeriodStart.toISOString().slice(0, 10)} – ${r.payPeriodEnd.toISOString().slice(0, 10)}`,
             status: r.status,
-            employees: r.totalEmployees,
+            employees: r.employeeCount,
             gross: r.totalGross.toString(),
             net: r.totalNet.toString(),
           })),

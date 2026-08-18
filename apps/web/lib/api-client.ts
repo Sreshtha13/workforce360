@@ -529,6 +529,8 @@ export const apiClient = {
       status?: string;
       search?: string;
       includeDeleted?: boolean;
+      page?: number;
+      pageSize?: number;
     }) =>
       request<User[]>(
         `/api/users${buildQuery({
@@ -539,6 +541,8 @@ export const apiClient = {
           status: params?.status,
           search: params?.search,
           includeDeleted: params?.includeDeleted ? "true" : undefined,
+          page: params?.page,
+          pageSize: params?.pageSize,
         })}`,
       ),
 
@@ -1156,8 +1160,14 @@ export const apiClient = {
     },
 
     invoices: {
-      list: (params?: { clientId?: string; status?: string; from?: string; to?: string }) =>
-        request<Invoice[]>(`/api/finance/invoices${buildQuery(params)}`),
+      list: (params?: {
+        clientId?: string;
+        status?: string;
+        from?: string;
+        to?: string;
+        page?: number;
+        pageSize?: number;
+      }) => request<Invoice[]>(`/api/finance/invoices${buildQuery(params)}`),
       get: (id: string) => request<Invoice>(`/api/finance/invoices/${id}`),
       create: (data: CreateInvoiceInput) =>
         request<Invoice>("/api/finance/invoices", { method: "POST", body: JSON.stringify(data) }),

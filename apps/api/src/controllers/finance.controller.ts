@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from "express";
 import { financeService } from "../services/finance.service";
 import { sendSuccess } from "../lib/response";
+import { paginationMeta, resolveOptionalPagination } from "../lib/pagination";
 
 export class FinanceController {
   // -- Clients ------------------------------------------------------------
@@ -118,14 +119,24 @@ export class FinanceController {
 
   listInvoices = async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const { clientId, status, from, to } = req.query;
-      const invoices = await financeService.listInvoices({
+      const { clientId, status, from, to, page, pageSize } = req.query;
+      const pagination = resolveOptionalPagination({
+        page: page !== undefined ? Number(page) : undefined,
+        pageSize: pageSize !== undefined ? Number(pageSize) : undefined,
+      });
+      const result = await financeService.listInvoices({
         clientId: clientId as string,
         status: status as string,
         from: from as string,
         to: to as string,
+        pagination: pagination ?? undefined,
       });
-      return sendSuccess(res, invoices);
+      return sendSuccess(
+        res,
+        result.rows,
+        200,
+        pagination ? paginationMeta(pagination, result.total) : null,
+      );
     } catch (error) {
       next(error);
     }
