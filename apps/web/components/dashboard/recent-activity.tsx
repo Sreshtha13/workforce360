@@ -3,7 +3,6 @@
 import Link from "next/link";
 import {
   Briefcase,
-  CalendarOff,
   CheckCircle2,
   Clock,
   FileText,
@@ -12,7 +11,6 @@ import {
 import type { AdminDashboard } from "@/types/phase2";
 import { cn } from "@/lib/utils";
 import { fadeInUp } from "@/lib/design-system";
-import { Badge } from "@/components/ui/badge";
 import { GlassCard } from "@/components/dashboard/glass-card";
 
 const activityIcons: Record<string, typeof CheckCircle2> = {

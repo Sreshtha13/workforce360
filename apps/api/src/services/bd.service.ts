@@ -1,4 +1,4 @@
-import type { LeadStatus, BidStatus, ProposalStatus } from "@prisma/client";
+import type { Prisma, LeadStatus, BidStatus, ProposalStatus } from "@prisma/client";
 import { BdRepository } from "../repositories/bd.repository";
 import { writeAuditLog } from "../lib/audit";
 import { prisma } from "../lib/prisma";
@@ -63,7 +63,7 @@ export class BdService {
     assignedToId?: string;
     expectedCloseDate?: string;
   }) {
-    const data: any = {
+    const data: Prisma.LeadCreateInput = {
       title: input.title,
       description: input.description,
       status: input.status ?? "NEW",
@@ -104,7 +104,7 @@ export class BdService {
     const lead = await this.repo.findLeadById(id);
     if (!lead) throw new Error("Lead not found");
 
-    const data: any = { ...input };
+    const data = { ...input } as Prisma.LeadUpdateInput;
     if (input.expectedCloseDate) {
       data.expectedCloseDate = new Date(input.expectedCloseDate);
     }
@@ -189,7 +189,7 @@ export class BdService {
     deadline?: string;
     notes?: string;
   }) {
-    const data: any = {
+    const data: Prisma.BidCreateInput = {
       title: input.title,
       description: input.description,
       amount: input.amount,
@@ -217,7 +217,7 @@ export class BdService {
       notes: string | null;
     }>,
   ) {
-    const data: any = { ...input };
+    const data = { ...input } as Prisma.BidUpdateInput;
     if (input.submittedAt) data.submittedAt = new Date(input.submittedAt);
     if (input.deadline) data.deadline = new Date(input.deadline);
     return this.repo.updateBid(id, data);
@@ -244,7 +244,7 @@ export class BdService {
     validUntil?: string;
     notes?: string;
   }) {
-    const data: any = {
+    const data: Prisma.ProposalCreateInput = {
       title: input.title,
       description: input.description,
       content: input.content,
@@ -280,7 +280,7 @@ export class BdService {
       notes: string | null;
     }>,
   ) {
-    const data: any = { ...input };
+    const data = { ...input } as Prisma.ProposalUpdateInput;
     if (input.sentAt) data.sentAt = new Date(input.sentAt);
     if (input.validUntil) data.validUntil = new Date(input.validUntil);
     if (input.acceptedAt) data.acceptedAt = new Date(input.acceptedAt);
@@ -301,7 +301,7 @@ export class BdService {
     direction?: string;
     timestamp?: string;
   }) {
-    const data: any = {
+    const data: Prisma.ClientCommunicationCreateInput = {
       subject: input.subject,
       body: input.body,
       channel: input.channel ?? "email",
@@ -339,7 +339,7 @@ export class BdService {
     isPublished?: boolean;
     sortOrder?: number;
   }) {
-    const data: any = {
+    const data: Prisma.PortfolioItemCreateInput = {
       ...input,
       completedAt: input.completedAt ? new Date(input.completedAt) : undefined,
       isPublished: input.isPublished ?? false,
@@ -364,7 +364,7 @@ export class BdService {
       sortOrder: number;
     }>,
   ) {
-    const data: any = { ...input };
+    const data = { ...input } as Prisma.PortfolioItemUpdateInput;
     if (input.completedAt) data.completedAt = new Date(input.completedAt);
     return this.repo.updatePortfolioItem(id, data);
   }

@@ -13,7 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Plus, Calendar, CheckCircle, XCircle, Clock } from "lucide-react";
-import { LeaveStatus, type LeavePolicy } from "@/types/attendance";
+import { LeaveStatus } from "@/types/attendance";
 
 export default function LeavePage() {
   const [isOpen, setIsOpen] = useState(false);
@@ -105,9 +105,13 @@ export default function LeavePage() {
             <div className="space-y-4 py-4">
               <div className="space-y-2">
                 <Label>Leave Type</Label>
-                <Select value={selectedPolicy} onValueChange={setSelectedPolicy}>
+                <Select
+                  value={selectedPolicy}
+                  onValueChange={setSelectedPolicy}
+                  disabled={policiesLoading}
+                >
                   <SelectTrigger>
-                    <SelectValue placeholder="Select leave type" />
+                    <SelectValue placeholder={policiesLoading ? "Loading..." : "Select leave type"} />
                   </SelectTrigger>
                   <SelectContent>
                     {policies?.filter(p => p.isActive).map((policy) => (

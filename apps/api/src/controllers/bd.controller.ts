@@ -1,4 +1,5 @@
 import type { Request, Response } from "express";
+import type { BidStatus, LeadStatus, ProposalStatus } from "@prisma/client";
 import { sendSuccess, sendError } from "../lib/response";
 import { bdService } from "../services/bd.service";
 
@@ -57,7 +58,9 @@ export class BdController {
 
   listLeads = async (req: Request, res: Response): Promise<void> => {
     try {
-      const leads = await bdService.listLeads(req.query as any);
+      const leads = await bdService.listLeads(
+        req.query as { status?: LeadStatus; assignedToId?: string; search?: string },
+      );
       sendSuccess(res, leads);
     } catch (error) {
       sendError(res, 500, {
@@ -114,7 +117,7 @@ export class BdController {
 
   listBids = async (req: Request, res: Response): Promise<void> => {
     try {
-      const bids = await bdService.listBids(req.query as any);
+      const bids = await bdService.listBids(req.query as { leadId?: string; status?: BidStatus });
       sendSuccess(res, bids);
     } catch (error) {
       sendError(res, 500, {
@@ -166,7 +169,9 @@ export class BdController {
 
   listProposals = async (req: Request, res: Response): Promise<void> => {
     try {
-      const proposals = await bdService.listProposals(req.query as any);
+      const proposals = await bdService.listProposals(
+        req.query as { leadId?: string; bidId?: string; status?: ProposalStatus },
+      );
       sendSuccess(res, proposals);
     } catch (error) {
       sendError(res, 500, {
@@ -218,7 +223,9 @@ export class BdController {
 
   listCommunications = async (req: Request, res: Response): Promise<void> => {
     try {
-      const communications = await bdService.listCommunications(req.query as any);
+      const communications = await bdService.listCommunications(
+        req.query as { leadId?: string; contactId?: string },
+      );
       sendSuccess(res, communications);
     } catch (error) {
       sendError(res, 500, {
@@ -242,7 +249,9 @@ export class BdController {
 
   listPortfolio = async (req: Request, res: Response): Promise<void> => {
     try {
-      const portfolio = await bdService.listPortfolio(req.query as any);
+      const portfolio = await bdService.listPortfolio(
+        req.query as { isPublished?: boolean; category?: string },
+      );
       sendSuccess(res, portfolio);
     } catch (error) {
       sendError(res, 500, {

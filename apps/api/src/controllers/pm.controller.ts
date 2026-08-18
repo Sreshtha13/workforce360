@@ -1,11 +1,14 @@
 import type { Request, Response } from "express";
+import type { ProjectStatus, SprintStatus, TaskStatus } from "@prisma/client";
 import { sendSuccess, sendError } from "../lib/response";
 import { pmService } from "../services/pm.service";
 
 export class PmController {
   listProjects = async (req: Request, res: Response): Promise<void> => {
     try {
-      const projects = await pmService.listProjects(req.query as any);
+      const projects = await pmService.listProjects(
+        req.query as { status?: ProjectStatus; managerId?: string; search?: string },
+      );
       sendSuccess(res, projects);
     } catch (error) {
       sendError(res, 500, {
@@ -62,7 +65,7 @@ export class PmController {
 
   listMilestones = async (req: Request, res: Response): Promise<void> => {
     try {
-      const milestones = await pmService.listMilestones(req.query as any);
+      const milestones = await pmService.listMilestones(req.query as { projectId?: string });
       sendSuccess(res, milestones);
     } catch (error) {
       sendError(res, 500, {
@@ -114,7 +117,16 @@ export class PmController {
 
   listTasks = async (req: Request, res: Response): Promise<void> => {
     try {
-      const tasks = await pmService.listTasks(req.query as any);
+      const tasks = await pmService.listTasks(
+        req.query as {
+          projectId?: string;
+          milestoneId?: string;
+          sprintId?: string;
+          assigneeId?: string;
+          status?: TaskStatus;
+          search?: string;
+        },
+      );
       sendSuccess(res, tasks);
     } catch (error) {
       sendError(res, 500, {
@@ -171,7 +183,9 @@ export class PmController {
 
   listSprints = async (req: Request, res: Response): Promise<void> => {
     try {
-      const sprints = await pmService.listSprints(req.query as any);
+      const sprints = await pmService.listSprints(
+        req.query as { projectId?: string; status?: SprintStatus },
+      );
       sendSuccess(res, sprints);
     } catch (error) {
       sendError(res, 500, {
@@ -223,7 +237,9 @@ export class PmController {
 
   listTimeEntries = async (req: Request, res: Response): Promise<void> => {
     try {
-      const entries = await pmService.listTimeEntries(req.query as any);
+      const entries = await pmService.listTimeEntries(
+        req.query as { taskId?: string; userId?: string; startDate?: string; endDate?: string },
+      );
       sendSuccess(res, entries);
     } catch (error) {
       sendError(res, 500, {
@@ -271,7 +287,9 @@ export class PmController {
 
   listTeamAllocations = async (req: Request, res: Response): Promise<void> => {
     try {
-      const allocations = await pmService.listTeamAllocations(req.query as any);
+      const allocations = await pmService.listTeamAllocations(
+        req.query as { projectId?: string; userId?: string },
+      );
       sendSuccess(res, allocations);
     } catch (error) {
       sendError(res, 500, {

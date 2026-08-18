@@ -2,7 +2,6 @@
 
 import { use } from "react";
 import { useQuery } from "@tanstack/react-query";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { apiClient } from "@/lib/api-client";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";

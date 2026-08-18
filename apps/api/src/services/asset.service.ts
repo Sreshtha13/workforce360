@@ -1,3 +1,4 @@
+import type { Prisma, AssetStatus, AssetHistoryAction } from "@prisma/client";
 import { AssetRepository } from "../repositories/asset.repository";
 import { AppError } from "../lib/app-error";
 import { writeAuditLog } from "../lib/audit";
@@ -226,8 +227,8 @@ export class AssetService {
     employeeId?: string;
     category?: string;
   }) {
-    const where: any = {};
-    if (filters.status) where.status = filters.status;
+    const where: Prisma.AssetWhereInput = {};
+    if (filters.status) where.status = filters.status as AssetStatus;
     if (filters.employeeId) where.employeeId = filters.employeeId;
     if (filters.category) where.category = filters.category;
     return this.assetRepo.findManyAssets(where);
@@ -246,10 +247,10 @@ export class AssetService {
     employeeId?: string;
     action?: string;
   }) {
-    const where: any = {};
+    const where: Prisma.AssetHistoryWhereInput = {};
     if (filters.assetId) where.assetId = filters.assetId;
     if (filters.employeeId) where.employeeId = filters.employeeId;
-    if (filters.action) where.action = filters.action;
+    if (filters.action) where.action = filters.action as AssetHistoryAction;
     return this.assetRepo.findManyAssetHistory(where);
   }
 

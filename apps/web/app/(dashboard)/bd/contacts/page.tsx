@@ -14,7 +14,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sh
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import type { Contact, CreateContactInput } from "@/types/bd";
+import type { CreateContactInput } from "@/types/bd";
 
 export default function BdContactsPage() {
   const [search, debouncedSearch, setSearch] = useDebouncedValue("", 300);

@@ -84,7 +84,7 @@ export default function AttendancePage() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Clock className="h-5 w-5" />
-            Today's Attendance
+            Today&apos;s Attendance
           </CardTitle>
           <CardDescription>{format(new Date(), "EEEE, MMMM d, yyyy")}</CardDescription>
         </CardHeader>
@@ -124,7 +124,7 @@ export default function AttendancePage() {
             </div>
           ) : (
             <div className="space-y-4">
-              <p className="text-muted-foreground">You haven't checked in today</p>
+              <p className="text-muted-foreground">You haven&apos;t checked in today</p>
               <Button
                 onClick={() => checkInMutation.mutate()}
                 disabled={checkInMutation.isPending}
@@ -139,7 +139,9 @@ export default function AttendancePage() {
       </Card>
 
       {/* Monthly Statistics */}
-      {stats && (
+      {monthLoading ? (
+        <div>Loading monthly statistics...</div>
+      ) : stats ? (
         <div className="grid gap-4 md:grid-cols-4">
           <Card>
             <CardHeader className="pb-3">
@@ -174,7 +176,7 @@ export default function AttendancePage() {
             </CardContent>
           </Card>
         </div>
-      )}
+      ) : null}
 
       {/* Calendar View */}
       <Card>

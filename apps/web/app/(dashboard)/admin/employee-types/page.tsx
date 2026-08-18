@@ -68,7 +68,7 @@ export default function EmployeeTypesPage() {
     enabled: !!usersSheetTarget && canReadUsers && canView,
   });
 
-  const allUsers = (usersQuery.data ?? []) as User[];
+  const allUsers = useMemo(() => (usersQuery.data ?? []) as User[], [usersQuery.data]);
 
   const assignedUsers = useMemo(() => {
     if (!usersSheetTarget) return [];

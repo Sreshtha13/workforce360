@@ -80,7 +80,7 @@ export default function OfficesPage() {
     enabled: !!assignTarget && canReadUsers && canView,
   });
 
-  const allUsers = (usersQuery.data ?? []) as User[];
+  const allUsers = useMemo(() => (usersQuery.data ?? []) as User[], [usersQuery.data]);
 
   const assignedUsers = useMemo(() => {
     if (!assignTarget) return [];

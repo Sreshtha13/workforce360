@@ -1,7 +1,6 @@
-import type { ProjectStatus, TaskStatus, TaskPriority, SprintStatus } from "@prisma/client";
+import type { Prisma, ProjectStatus, TaskStatus, TaskPriority, SprintStatus } from "@prisma/client";
 import { PmRepository } from "../repositories/pm.repository";
 import { writeAuditLog } from "../lib/audit";
-import { prisma } from "../lib/prisma";
 
 export class PmService {
   private repo = new PmRepository();
@@ -28,7 +27,7 @@ export class PmService {
     clientName?: string;
     clientContactId?: string;
   }) {
-    const data: any = {
+    const data: Prisma.ProjectCreateInput = {
       name: input.name,
       code: input.code,
       description: input.description,
@@ -73,7 +72,7 @@ export class PmService {
     const project = await this.repo.findProjectById(id);
     if (!project) throw new Error("Project not found");
 
-    const data: any = { ...input };
+    const data = { ...input } as Prisma.ProjectUpdateInput;
     if (input.startDate) data.startDate = new Date(input.startDate);
     if (input.endDate) data.endDate = new Date(input.endDate);
 
@@ -106,7 +105,7 @@ export class PmService {
     dueDate?: string;
     sortOrder?: number;
   }) {
-    const data: any = {
+    const data: Prisma.MilestoneCreateInput = {
       title: input.title,
       description: input.description,
       dueDate: input.dueDate ? new Date(input.dueDate) : undefined,
@@ -127,7 +126,7 @@ export class PmService {
       sortOrder: number;
     }>,
   ) {
-    const data: any = { ...input };
+    const data = { ...input } as Prisma.MilestoneUpdateInput;
     if (input.dueDate) data.dueDate = new Date(input.dueDate);
     if (input.completedAt) data.completedAt = new Date(input.completedAt);
     return this.repo.updateMilestone(id, data);
@@ -162,7 +161,7 @@ export class PmService {
     dueDate?: string;
     sortOrder?: number;
   }) {
-    const data: any = {
+    const data: Prisma.TaskCreateInput = {
       title: input.title,
       description: input.description,
       status: input.status ?? "TODO",
@@ -210,7 +209,7 @@ export class PmService {
     const task = await this.repo.findTaskById(id);
     if (!task) throw new Error("Task not found");
 
-    const data: any = { ...input };
+    const data = { ...input } as Prisma.TaskUpdateInput;
     if (input.dueDate) data.dueDate = new Date(input.dueDate);
     if (input.completedAt) data.completedAt = new Date(input.completedAt);
 
@@ -248,7 +247,7 @@ export class PmService {
     startDate?: string;
     endDate?: string;
   }) {
-    const data: any = {
+    const data: Prisma.SprintCreateInput = {
       name: input.name,
       goal: input.goal,
       status: input.status ?? "PLANNING",
@@ -271,7 +270,7 @@ export class PmService {
       completedAt: string | null;
     }>,
   ) {
-    const data: any = { ...input };
+    const data = { ...input } as Prisma.SprintUpdateInput;
     if (input.startDate) data.startDate = new Date(input.startDate);
     if (input.endDate) data.endDate = new Date(input.endDate);
     if (input.completedAt) data.completedAt = new Date(input.completedAt);
@@ -279,7 +278,10 @@ export class PmService {
   }
 
   listTimeEntries(filters?: { taskId?: string; userId?: string; startDate?: string; endDate?: string }) {
-    const parsedFilters: any = { ...filters };
+    const parsedFilters: { taskId?: string; userId?: string; startDate?: Date; endDate?: Date } = {
+      taskId: filters?.taskId,
+      userId: filters?.userId,
+    };
     if (filters?.startDate) parsedFilters.startDate = new Date(filters.startDate);
     if (filters?.endDate) parsedFilters.endDate = new Date(filters.endDate);
     return this.repo.listTimeEntries(parsedFilters);
@@ -292,7 +294,7 @@ export class PmService {
     date: string;
     description?: string;
   }) {
-    const data: any = {
+    const data: Prisma.TaskTimeEntryCreateInput = {
       hours: input.hours,
       date: new Date(input.date),
       description: input.description,
@@ -319,13 +321,13 @@ export class PmService {
       description: string | null;
     }>,
   ) {
-    const data: any = { ...input };
+    const data = { ...input } as Prisma.TaskTimeEntryUpdateInput;
     if (input.date) data.date = new Date(input.date);
     return this.repo.updateTimeEntry(id, data);
   }
 
   async createComment(input: { taskId: string; userId: string; content: string }) {
-    const data: any = {
+    const data: Prisma.TaskCommentCreateInput = {
       content: input.content,
       task: { connect: { id: input.taskId } },
       user: { connect: { id: input.userId } },
@@ -344,7 +346,7 @@ export class PmService {
     role?: string;
     allocatedHours?: number;
   }) {
-    const data: any = {
+    const data: Prisma.ProjectTeamAllocationCreateInput = {
       role: input.role,
       allocatedHours: input.allocatedHours,
       project: { connect: { id: input.projectId } },
@@ -362,7 +364,7 @@ export class PmService {
       leftAt: string | null;
     }>,
   ) {
-    const data: any = { ...input };
+    const data = { ...input } as Prisma.ProjectTeamAllocationUpdateInput;
     if (input.leftAt) data.leftAt = new Date(input.leftAt);
     return this.repo.updateTeamAllocation(id, data);
   }
@@ -378,7 +380,7 @@ export class PmService {
     description?: string;
     date: string;
   }) {
-    const data: any = {
+    const data: Prisma.ProjectBudgetTrackingCreateInput = {
       category: input.category,
       amount: input.amount,
       description: input.description,
@@ -398,7 +400,7 @@ export class PmService {
       date: string;
     }>,
   ) {
-    const data: any = { ...input };
+    const data = { ...input } as Prisma.ProjectBudgetTrackingUpdateInput;
     if (input.date) data.date = new Date(input.date);
     return this.repo.updateBudgetEntry(id, data);
   }

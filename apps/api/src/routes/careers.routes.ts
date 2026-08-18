@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { CareersController } from "../controllers/recruitment.controller";
-import { optionalAuth, requireAuth } from "../middleware/auth";
+import { optionalAuth } from "../middleware/auth";
 import { validate } from "../middleware/validate";
 import { candidateRegisterSchema, applyJobSchema } from "../schemas/phase2.schema";
 

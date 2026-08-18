@@ -45,10 +45,6 @@ export function PermissionMatrix({
   const expandAll = () => setExpandedModules(new Set(matrix.map((m) => m.module)));
   const collapseAll = () => setExpandedModules(new Set());
 
-  const setSelected = (ids: string[]) => {
-    if (!readOnly && onChange) onChange(ids);
-  };
-
   const togglePermission = (id: string) => {
     if (readOnly || !onChange) return;
     const next = new Set(selectedSet);
