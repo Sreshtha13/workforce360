@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiClient } from "@/lib/api-client";
@@ -12,6 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { LeadPipelineBoard } from "@/components/bd/lead-pipeline-board";
 import type { Lead, LeadStatus, CreateLeadInput } from "@/types/bd";
 
 const LEAD_STATUSES: LeadStatus[] = ["NEW", "CONTACTED", "QUALIFIED", "PROPOSAL_SENT", "NEGOTIATION", "WON", "LOST"];
@@ -107,52 +107,13 @@ export default function BdLeadsPage() {
         }
       />
 
-      <div className="flex gap-4 overflow-x-auto pb-4">
-        {LEAD_STATUSES.map((status) => (
-          <div
-            key={status}
-            className="flex-shrink-0 w-80 rounded-lg border bg-card"
-          >
-            <div className={`px-4 py-3 rounded-t-lg ${STATUS_COLORS[status]}`}>
-              <h3 className="font-semibold">
-                {STATUS_LABELS[status]}
-                <span className="ml-2 text-sm font-normal">
-                  ({groupedLeads[status].length})
-                </span>
-              </h3>
-            </div>
-            <div className="p-2 space-y-2 max-h-[calc(100vh-20rem)] overflow-y-auto">
-              {groupedLeads[status].map((lead) => (
-                <Link
-                  key={lead.id}
-                  href={`/bd/leads/${lead.id}`}
-                  className="block p-3 rounded-lg border bg-background hover:shadow-md transition-shadow"
-                >
-                  <h4 className="font-medium mb-1">{lead.title}</h4>
-                  {lead.companyName && (
-                    <p className="text-sm text-muted-foreground mb-2">{lead.companyName}</p>
-                  )}
-                  {lead.value && (
-                    <p className="text-sm font-semibold text-brand-600 dark:text-brand-400">
-                      {lead.currency} {parseFloat(lead.value).toLocaleString()}
-                    </p>
-                  )}
-                  {lead.assignedTo && (
-                    <p className="text-xs text-muted-foreground mt-2">
-                      Assigned to: {lead.assignedTo.firstName} {lead.assignedTo.lastName}
-                    </p>
-                  )}
-                </Link>
-              ))}
-              {groupedLeads[status].length === 0 && (
-                <p className="text-sm text-muted-foreground text-center py-8">
-                  No leads in this stage
-                </p>
-              )}
-            </div>
-          </div>
-        ))}
-      </div>
+      <LeadPipelineBoard
+        columns={LEAD_STATUSES}
+        columnLabels={STATUS_LABELS}
+        columnColors={STATUS_COLORS}
+        grouped={groupedLeads}
+        onStatusChange={(id, status) => updateStatusMutation.mutate({ id, status })}
+      />
 
       <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
         <SheetContent>

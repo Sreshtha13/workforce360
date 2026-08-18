@@ -7,6 +7,7 @@ import { apiClient } from "@/lib/api-client";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { LoadingState, ErrorState } from "@/components/admin/admin-states";
 import { Badge } from "@/components/ui/badge";
+import { ProjectMilestones } from "@/components/pm/project-milestones";
 import { GlassCard } from "@/components/dashboard/glass-card";
 
 export default function ProjectOverviewPage({ params }: { params: Promise<{ id: string }> }) {
@@ -124,6 +125,8 @@ export default function ProjectOverviewPage({ params }: { params: Promise<{ id: 
           </section>
         )}
       </div>
+
+      <ProjectMilestones projectId={projectId} />
     </div>
   );
 }

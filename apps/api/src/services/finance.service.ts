@@ -502,15 +502,15 @@ export class FinanceService {
     actorId: string,
   ) {
     let reimbursement = await this.financeRepo.createReimbursement({
-      userId: employeeId,
+      employeeId,
       category: data.category,
       description: data.description,
       amount: data.amount,
       currency: data.currency,
+      expenseDate: new Date(data.expenseDate),
       receiptFileId: data.receiptFileId,
       status: "PENDING",
-      notes: `Expense date: ${data.expenseDate}`,
-    } as Prisma.ReimbursementUncheckedCreateInput);
+    });
 
     if (data.approverIds && data.approverIds.length > 0) {
       const approval = await this.approvalService.createApprovalRequest(
