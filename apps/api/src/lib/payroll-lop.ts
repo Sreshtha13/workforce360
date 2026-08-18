@@ -75,7 +75,7 @@ export function leaveDayKeysInPeriod(
     startDate: Date;
     endDate: Date;
     status: string;
-    policy: { leaveType: string };
+    leaveType: { code: string | null; name: string };
   }>,
   periodStart: Date,
   periodEnd: Date,
@@ -84,8 +84,9 @@ export function leaveDayKeysInPeriod(
   const keys = new Set<string>();
   for (const app of applications) {
     if (app.status !== "APPROVED") continue;
-    if (unpaidOnly && app.policy.leaveType !== "UNPAID") continue;
-    if (!unpaidOnly && app.policy.leaveType === "UNPAID") continue;
+    const leaveCode = (app.leaveType.code ?? app.leaveType.name).toUpperCase();
+    if (unpaidOnly && leaveCode !== "UNPAID") continue;
+    if (!unpaidOnly && leaveCode === "UNPAID") continue;
 
     const cursor = new Date(app.startDate);
     cursor.setUTCHours(0, 0, 0, 0);
@@ -191,66 +192,64 @@ export async function computeBatchEmployeeLop(
 
   const employees = await prisma.employee.findMany({
     where: { id: { in: employeeIds }, deletedAt: null },
-    select: { id: true, userId: true },
+    select: { id: true },
   });
-  const userIdByEmployee = new Map(employees.map((e) => [e.id, e.userId]));
-  const userIds = employees.map((e) => e.userId);
+  const validEmployeeIds = employees.map((e) => e.id);
 
   const [attendanceRecords, leaveApplications] = await Promise.all([
     prisma.attendanceRecord.findMany({
       where: {
-        userId: { in: userIds },
+        employeeId: { in: validEmployeeIds },
         date: { gte: periodStart, lte: periodEnd },
         deletedAt: null,
         status: { in: ["ABSENT", "HALF_DAY"] },
       },
-      select: { userId: true, date: true, status: true },
+      select: { employeeId: true, date: true, status: true },
     }),
     prisma.leaveApplication.findMany({
       where: {
-        userId: { in: userIds },
+        employeeId: { in: validEmployeeIds },
         status: "APPROVED",
         deletedAt: null,
         startDate: { lte: periodEnd },
         endDate: { gte: periodStart },
       },
       select: {
-        userId: true,
+        employeeId: true,
         startDate: true,
         endDate: true,
         status: true,
-        policy: { select: { leaveType: true } },
+        leaveType: { select: { code: true, name: true } },
       },
     }),
   ]);
 
-  const attendanceByUser = new Map<string, AttendanceLopInput[]>();
+  const attendanceByEmployee = new Map<string, AttendanceLopInput[]>();
   for (const row of attendanceRecords) {
-    const list = attendanceByUser.get(row.userId) ?? [];
+    const list = attendanceByEmployee.get(row.employeeId) ?? [];
     list.push({ date: row.date, status: row.status });
-    attendanceByUser.set(row.userId, list);
+    attendanceByEmployee.set(row.employeeId, list);
   }
 
-  const leaveByUser = new Map<string, typeof leaveApplications>();
+  const leaveByEmployee = new Map<string, typeof leaveApplications>();
   for (const row of leaveApplications) {
-    const list = leaveByUser.get(row.userId) ?? [];
+    const list = leaveByEmployee.get(row.employeeId) ?? [];
     list.push(row);
-    leaveByUser.set(row.userId, list);
+    leaveByEmployee.set(row.employeeId, list);
   }
 
   for (const employeeId of employeeIds) {
-    const userId = userIdByEmployee.get(employeeId);
-    if (!userId) {
+    if (!validEmployeeIds.includes(employeeId)) {
       result.set(employeeId, { workingDays, lopDays: 0, paidDays: workingDays });
       continue;
     }
 
-    const userLeaves = leaveByUser.get(userId) ?? [];
-    const paidLeaveKeys = leaveDayKeysInPeriod(userLeaves, periodStart, periodEnd, false);
-    const unpaidLeaveKeys = leaveDayKeysInPeriod(userLeaves, periodStart, periodEnd, true);
+    const employeeLeaves = leaveByEmployee.get(employeeId) ?? [];
+    const paidLeaveKeys = leaveDayKeysInPeriod(employeeLeaves, periodStart, periodEnd, false);
+    const unpaidLeaveKeys = leaveDayKeysInPeriod(employeeLeaves, periodStart, periodEnd, true);
 
     const attendanceLop = lopDaysFromAttendance(
-      attendanceByUser.get(userId) ?? [],
+      attendanceByEmployee.get(employeeId) ?? [],
       paidLeaveKeys,
       workingDayKeys,
     );

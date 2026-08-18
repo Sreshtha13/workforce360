@@ -8,6 +8,7 @@ import {
   CreditCard,
   Database,
   DollarSign,
+  ListTodo,
   FileBarChart,
   FileText,
   Headphones,
@@ -16,6 +17,7 @@ import {
   Link2,
   MapPin,
   Megaphone,
+  MessageSquare,
   BookOpen,
   Receipt,
   ScrollText,
@@ -284,6 +286,18 @@ export const bdNav: NavItem[] = [
     icon: Handshake,
     permissions: ["bd.proposal.read", "bd.proposal.create", "bd.proposal.update"],
   },
+  {
+    label: "Communications",
+    href: "/bd/communications",
+    icon: MessageSquare,
+    permissions: ["bd.communication.read", "bd.communication.create"],
+  },
+  {
+    label: "Portfolio",
+    href: "/bd/portfolio",
+    icon: Briefcase,
+    permissions: ["bd.portfolio.read", "bd.portfolio.create", "bd.portfolio.update"],
+  },
 ];
 
 export const engineeringNav: NavItem[] = [
@@ -342,6 +356,18 @@ export const pmNav: NavItem[] = [
     href: "/pm/projects",
     icon: Briefcase,
     permissions: ["pm.project.read", "pm.project.create", "pm.project.update"],
+  },
+  {
+    label: "My Tasks",
+    href: "/pm/tasks",
+    icon: ListTodo,
+    permissions: ["pm.task.read", "pm.task.update"],
+  },
+  {
+    label: "Reports",
+    href: "/pm/reports",
+    icon: FileBarChart,
+    permissions: ["pm.project.read", "report.read"],
   },
   {
     label: "Documents",

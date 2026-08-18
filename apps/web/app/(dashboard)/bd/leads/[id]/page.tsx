@@ -10,6 +10,7 @@ import { LoadingState, ErrorState } from "@/components/admin/admin-states";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { LeadCommunications } from "@/components/bd/lead-communications";
 import type { LeadStatus } from "@/types/bd";
 
 const STATUS_LABELS: Record<LeadStatus, string> = {
@@ -45,6 +46,8 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
   }
 
   const lead = query.data;
+  const communications = lead.communications ?? [];
+  const linkedProject = lead.project;
 
   return (
     <div className="space-y-6">
@@ -124,8 +127,22 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
               View proposals
             </Link>
           </div>
+          {linkedProject && (
+            <p className="text-sm">
+              PM project:{" "}
+              <Link href={`/pm/projects/${linkedProject.id}`} className="text-brand-700 hover:underline">
+                {linkedProject.name}
+              </Link>
+            </p>
+          )}
         </section>
       </div>
+
+      <LeadCommunications
+        leadId={lead.id}
+        contactId={lead.contactId}
+        communications={communications}
+      />
     </div>
   );
 }

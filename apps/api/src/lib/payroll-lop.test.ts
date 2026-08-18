@@ -62,7 +62,7 @@ describe("payroll-lop", () => {
           startDate: new Date("2024-01-04T00:00:00.000Z"),
           endDate: new Date("2024-01-05T00:00:00.000Z"),
           status: "APPROVED",
-          policy: { leaveType: "UNPAID" },
+          leaveType: { code: "UNPAID", name: "Unpaid" },
         },
       ],
       periodStart,
