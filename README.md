@@ -64,7 +64,7 @@ See [CODING_STANDARDS.md](./CODING_STANDARDS.md) for naming, API envelope (`{ da
 | `/api/audit-logs`, `/api/security-events` | Audit & security |
 | `/api/settings`, `/api/admin` | System administration |
 | `/api/integrations` | Integration registry & webhooks |
-| `/api/docs` | OpenAPI / Swagger UI |
+| `/api/docs` | OpenAPI / Scalar API reference |
 
 ---
 
@@ -116,7 +116,7 @@ npm run dev:web
 
 Open [http://localhost:3000](http://localhost:3000). The home page calls `GET /api/health` through the typed client and shows DB connectivity.
 
-- **API docs:** [http://localhost:4000/api/docs](http://localhost:4000/api/docs) (Swagger UI)
+- **API docs:** [http://localhost:4000/api/docs](http://localhost:4000/api/docs) (Scalar)
 - Without Postgres, the API still starts and returns `{ status: "degraded", database.connected: false }`.
 
 ---

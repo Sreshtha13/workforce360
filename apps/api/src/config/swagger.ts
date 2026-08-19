@@ -34,7 +34,7 @@ Production-grade ERP API — Express, Prisma, PostgreSQL.
 ## Authentication
 Cookie (recommended): POST /api/auth/login — browser stores httpOnly cookies.
 
-Bearer: Copy accessToken from login response, then Authorize in Swagger UI.
+Bearer: Copy accessToken from login response, then Authorize in the API docs UI.
 
 Demo: admin@workforce360.com / Admin@123
 

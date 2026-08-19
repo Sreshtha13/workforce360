@@ -16,10 +16,22 @@ const paymentWebhookController = new PaymentWebhookController();
 export function createApp() {
   const app = express();
 
-  // Relax CSP for Swagger UI assets in development
+  // Scalar API docs load from jsDelivr; relax CSP in dev and allow the CDN in production.
   app.use(
     helmet({
-      contentSecurityPolicy: env.NODE_ENV === "production" ? undefined : false,
+      contentSecurityPolicy:
+        env.NODE_ENV === "production"
+          ? {
+              directives: {
+                defaultSrc: ["'self'"],
+                scriptSrc: ["'self'", "'unsafe-inline'", "https://cdn.jsdelivr.net"],
+                styleSrc: ["'self'", "'unsafe-inline'", "https://cdn.jsdelivr.net"],
+                imgSrc: ["'self'", "data:", "https:"],
+                fontSrc: ["'self'", "https://cdn.jsdelivr.net", "data:"],
+                connectSrc: ["'self'"],
+              },
+            }
+          : false,
       crossOriginEmbedderPolicy: false,
     }),
   );
