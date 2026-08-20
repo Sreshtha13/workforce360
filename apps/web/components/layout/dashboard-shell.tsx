@@ -32,7 +32,6 @@ import { cn } from "@/lib/utils";
 import { Breadcrumbs, buildBreadcrumbs } from "@/components/design-system/breadcrumbs";
 import { ThemeToggle } from "@/components/design-system/theme-toggle";
 import { GlobalSearch } from "@/components/dashboard/global-search";
-import { WorkspaceSelector } from "@/components/layout/workspace-selector";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -85,7 +84,7 @@ export function DashboardShell({ children }: { children: ReactNode }) {
 
   const sidebar = (
     <>
-      <div className="flex items-center gap-3 px-4 py-5">
+      <div className="flex shrink-0 items-center gap-3 px-4 py-5">
         <span className="inline-flex size-10 items-center justify-center rounded-xl bg-gradient-to-br from-brand-600 to-brand-700 text-sm font-bold text-white shadow-lg shadow-brand-600/25 ring-1 ring-white/20">
           W
         </span>
@@ -97,11 +96,12 @@ export function DashboardShell({ children }: { children: ReactNode }) {
         </div>
       </div>
 
-      <WorkspaceSelector />
-
       <Separator className="bg-white/10 dark:bg-white/5" />
 
-      <nav className="flex flex-1 flex-col gap-1 overflow-y-auto p-3" aria-label="Modules">
+      <nav
+        className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto overscroll-y-contain p-3"
+        aria-label="Modules"
+      >
         {visibleMain.map((item) => (
           <SidebarLink
             key={item.href}
@@ -423,7 +423,7 @@ export function DashboardShell({ children }: { children: ReactNode }) {
         )}
       </nav>
 
-      <div className="border-t border-white/10 p-3 dark:border-white/5">
+      <div className="shrink-0 border-t border-white/10 p-3 dark:border-white/5">
         <div className="flex items-center gap-3 rounded-xl bg-white/30 p-3 dark:bg-white/5">
           <Avatar size="sm">
             <AvatarFallback className="bg-brand-100 text-xs font-semibold text-brand-800 dark:bg-brand-900/50 dark:text-brand-200">
@@ -442,22 +442,22 @@ export function DashboardShell({ children }: { children: ReactNode }) {
   );
 
   return (
-    <div className="app-canvas flex min-h-screen">
+    <div className="app-canvas flex h-dvh overflow-hidden p-3 gap-3">
       <aside
         className={cn(
-          "hidden w-[272px] shrink-0 md:flex md:flex-col",
+          "hidden w-[272px] shrink-0 overflow-hidden md:flex md:min-h-0 md:flex-col",
           glass.nav,
-          "m-3 mr-0 rounded-2xl",
+          "rounded-2xl",
         )}
         aria-label="Primary"
       >
         {sidebar}
       </aside>
 
-      <div className="flex min-w-0 flex-1 flex-col">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-3 overflow-hidden">
         <header
           className={cn(
-            "sticky top-0 z-40 mx-3 mt-3 flex h-14 items-center gap-3 rounded-2xl px-4 md:px-6",
+            "z-40 flex h-14 shrink-0 items-center gap-3 rounded-2xl px-4 md:px-6",
             glass.nav,
             motion.fadeInDown,
           )}
@@ -473,7 +473,7 @@ export function DashboardShell({ children }: { children: ReactNode }) {
               <SheetHeader className="sr-only">
                 <SheetTitle>Navigation</SheetTitle>
               </SheetHeader>
-              <div className="flex h-full flex-col">{sidebar}</div>
+              <div className="flex h-full min-h-0 flex-col overflow-hidden">{sidebar}</div>
             </SheetContent>
           </Sheet>
 
@@ -523,7 +523,9 @@ export function DashboardShell({ children }: { children: ReactNode }) {
           </div>
         </header>
 
-        <main className="flex-1 p-4 md:p-6 lg:p-8">{children}</main>
+        <main className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain p-4 md:p-6 lg:p-8">
+          {children}
+        </main>
       </div>
     </div>
   );
