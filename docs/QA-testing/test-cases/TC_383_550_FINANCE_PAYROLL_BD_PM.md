@@ -35,6 +35,37 @@ Create a **BD/PM-capable user** (or use admin) for `/bd/*` and `/pm/*`. Employee
 Continue from **TC-382** (`approvalRequestId` on a PENDING request).
 
 ---
+## Table of Contents
+
+### Test suite index (all documents)
+
+Quick links to every test-case file. See [INDEX.md](./INDEX.md) for execution order and credentials.
+
+| Document | TC range | Count | Scope |
+|----------|----------|-------|-------|
+| [TC_001_070_AUTH.md](./TC_001_070_AUTH.md) | TC-001 – TC-070 | 70 | Infrastructure & Authentication |
+| [TC_071_150_RBAC_USERS_ORG.md](./TC_071_150_RBAC_USERS_ORG.md) | TC-071 – TC-150 | 80 | RBAC, Users & Organization |
+| [TC_151_250_ADMIN_HR.md](./TC_151_250_ADMIN_HR.md) | TC-151 – TC-250 | 100 | Admin, Careers & HR |
+| [TC_251_382_PORTAL_ATTENDANCE.md](./TC_251_382_PORTAL_ATTENDANCE.md) | TC-251 – TC-382 | 132 | Portal, Attendance & Leave |
+| **TC_383_550_FINANCE_PAYROLL_BD_PM.md** (this document) | TC-383 – TC-550 | 168 | Finance, Payroll, BD & PM |
+| [TC_551_690_ENGINEERING_E2E.md](./TC_551_690_ENGINEERING_E2E.md) | TC-551 – TC-690 | 140 | Engineering, E2E & Cross-cutting |
+
+### This document (TC-383 – TC-550)
+
+| Module | Features | Test cases | Count |
+|--------|----------|------------|-------|
+| Approvals | Workflows, Requests, Delegations | TC-383 – TC-400 | 18 |
+| Assets | Asset CRUD, Assign, Return | TC-401 – TC-412 | 12 |
+| Finance | Clients & Invoices; Payment Webhooks; Payments; Reimbursements | TC-413 – TC-458 | 46 |
+| Payroll | Payroll Runs & Payslips; Salary Structures & Revisions | TC-459 – TC-490 | 32 |
+| Business Development | Contacts & Leads | TC-491 | 1 |
+| BD | Bids, Proposals, Communications; Portfolio & Pipeline | TC-492 – TC-521 | 30 |
+| BD / PM | — | TC-522 | 1 |
+| Project Management | Projects & Milestones | TC-523 | 1 |
+| PM | Tasks, Sprints, Kanban | TC-524 – TC-550 | 27 |
+
+---
+
 
 ## TC-383 — Approve request at current level
 

@@ -1,6 +1,6 @@
 # Workforce 360 ERP — Test Case Index (TC-001 to TC-690)
 
-All **690 executable test cases** are ready. Open the file for your TC range.
+All **690 executable test cases** are ready. Each file opens with a **Table of Contents** (suite index + module/feature breakdown for that document).
 
 | File | TC IDs | Count |
 |------|--------|-------|

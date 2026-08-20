@@ -9,6 +9,40 @@
 > There is **no dedicated PM / Developer / QA seed user**. For PM and Engineering cases, use Super Admin **or** create a user and assign `pm.*` / `engineering.*` permissions first.
 
 ---
+## Table of Contents
+
+### Test suite index (all documents)
+
+Quick links to every test-case file. See [INDEX.md](./INDEX.md) for execution order and credentials.
+
+| Document | TC range | Count | Scope |
+|----------|----------|-------|-------|
+| [TC_001_070_AUTH.md](./TC_001_070_AUTH.md) | TC-001 – TC-070 | 70 | Infrastructure & Authentication |
+| [TC_071_150_RBAC_USERS_ORG.md](./TC_071_150_RBAC_USERS_ORG.md) | TC-071 – TC-150 | 80 | RBAC, Users & Organization |
+| [TC_151_250_ADMIN_HR.md](./TC_151_250_ADMIN_HR.md) | TC-151 – TC-250 | 100 | Admin, Careers & HR |
+| [TC_251_382_PORTAL_ATTENDANCE.md](./TC_251_382_PORTAL_ATTENDANCE.md) | TC-251 – TC-382 | 132 | Portal, Attendance & Leave |
+| [TC_383_550_FINANCE_PAYROLL_BD_PM.md](./TC_383_550_FINANCE_PAYROLL_BD_PM.md) | TC-383 – TC-550 | 168 | Finance, Payroll, BD & PM |
+| **TC_551_690_ENGINEERING_E2E.md** (this document) | TC-551 – TC-690 | 140 | Engineering, E2E & Cross-cutting |
+
+### This document (TC-551 – TC-690)
+
+| Module | Feature | Test cases | Count |
+|--------|---------|------------|-------|
+| Project Management | Tasks, Sprints, Kanban | TC-551 – TC-556 | 6 |
+| Project Management | Time Entries & Budget | TC-557 – TC-574 | 18 |
+| Engineering | Releases & Test Cases | TC-575 – TC-584 | 10 |
+| Engineering | Docs, Training, Code Reviews | TC-585 – TC-596 | 12 |
+| Documents | Categories, Versions, Permissions | TC-597 – TC-606 | 10 |
+| Helpdesk | Tickets, SLA, Knowledge Base | TC-607 – TC-616 | 10 |
+| Notifications | In-app, Announcements, Prefs | TC-617 – TC-624 | 8 |
+| Reports | KPIs, Export, Schedules | TC-625 – TC-634 | 10 |
+| Storage | Presign Upload & Confirm | TC-635 – TC-644 | 10 |
+| Cross-cutting | UI States, Navigation, Responsive | TC-645 – TC-658 | 14 |
+| Cross-cutting | Error Handling & Concurrency | TC-659 – TC-670 | 12 |
+| E2E Journeys | End-to-end business workflows | TC-671 – TC-690 | 20 |
+
+---
+
 
 ## Shared setup (reuse across this file)
 

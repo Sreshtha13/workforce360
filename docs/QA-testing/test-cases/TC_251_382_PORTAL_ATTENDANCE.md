@@ -31,6 +31,44 @@ Create an **employee** user (role `employee`, with `portal.read` / `portal.updat
 - Portal leave calls `/api/leave/policies` and body `policyId` — API uses `/api/leave/types` and `leaveTypeId`.
 
 ---
+## Table of Contents
+
+### Test suite index (all documents)
+
+Quick links to every test-case file. See [INDEX.md](./INDEX.md) for execution order and credentials.
+
+| Document | TC range | Count | Scope |
+|----------|----------|-------|-------|
+| [TC_001_070_AUTH.md](./TC_001_070_AUTH.md) | TC-001 – TC-070 | 70 | Infrastructure & Authentication |
+| [TC_071_150_RBAC_USERS_ORG.md](./TC_071_150_RBAC_USERS_ORG.md) | TC-071 – TC-150 | 80 | RBAC, Users & Organization |
+| [TC_151_250_ADMIN_HR.md](./TC_151_250_ADMIN_HR.md) | TC-151 – TC-250 | 100 | Admin, Careers & HR |
+| **TC_251_382_PORTAL_ATTENDANCE.md** (this document) | TC-251 – TC-382 | 132 | Portal, Attendance & Leave |
+| [TC_383_550_FINANCE_PAYROLL_BD_PM.md](./TC_383_550_FINANCE_PAYROLL_BD_PM.md) | TC-383 – TC-550 | 168 | Finance, Payroll, BD & PM |
+| [TC_551_690_ENGINEERING_E2E.md](./TC_551_690_ENGINEERING_E2E.md) | TC-551 – TC-690 | 140 | Engineering, E2E & Cross-cutting |
+
+### This document (TC-251 – TC-382)
+
+| Module | Feature | Test cases | Count |
+|--------|---------|------------|-------|
+| HR Operations | Assets (HR view) | TC-251 – TC-258 | 8 |
+| HR Operations | Tickets (HR view) | TC-259 – TC-266 | 8 |
+| Employee Portal | Dashboard & Profile | TC-267 – TC-276 | 10 |
+| Employee Portal | Attendance Clock In/Out | TC-277 – TC-289 | 13 |
+| Employee Portal / Attendance | Attendance Clock In/Out | TC-290 | 1 |
+| Employee Portal | Leave Applications | TC-291 – TC-305 | 15 |
+| Employee Portal / Leave | Leave Applications | TC-306 | 1 |
+| Employee Portal | Payslips & Downloads | TC-307 – TC-314 | 8 |
+| Employee Portal | Support Tickets | TC-315 – TC-320 | 6 |
+| Employee Portal | Policies & Documents | TC-321 – TC-326 | 6 |
+| Employee Portal | Notifications & Preferences | TC-327 – TC-332 | 6 |
+| Employee Portal | Security (MFA, Devices) | TC-333 – TC-340 | 8 |
+| Attendance | Shifts & Holidays | TC-341 – TC-350 | 10 |
+| Attendance | Records & Corrections | TC-351 – TC-364 | 14 |
+| Leave | Types, Balances, Applications | TC-365 – TC-380 | 16 |
+| Approvals | Workflows, Requests, Delegations | TC-381 – TC-382 | 2 |
+
+---
+
 
 ## Shared setup
 

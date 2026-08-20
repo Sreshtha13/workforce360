@@ -27,6 +27,36 @@
 **Seed careers jobs:** `/careers/senior-software-engineer`, `/careers/hr-coordinator`
 
 ---
+## Table of Contents
+
+### Test suite index (all documents)
+
+Quick links to every test-case file. See [INDEX.md](./INDEX.md) for execution order and credentials.
+
+| Document | TC range | Count | Scope |
+|----------|----------|-------|-------|
+| [TC_001_070_AUTH.md](./TC_001_070_AUTH.md) | TC-001 – TC-070 | 70 | Infrastructure & Authentication |
+| [TC_071_150_RBAC_USERS_ORG.md](./TC_071_150_RBAC_USERS_ORG.md) | TC-071 – TC-150 | 80 | RBAC, Users & Organization |
+| **TC_151_250_ADMIN_HR.md** (this document) | TC-151 – TC-250 | 100 | Admin, Careers & HR |
+| [TC_251_382_PORTAL_ATTENDANCE.md](./TC_251_382_PORTAL_ATTENDANCE.md) | TC-251 – TC-382 | 132 | Portal, Attendance & Leave |
+| [TC_383_550_FINANCE_PAYROLL_BD_PM.md](./TC_383_550_FINANCE_PAYROLL_BD_PM.md) | TC-383 – TC-550 | 168 | Finance, Payroll, BD & PM |
+| [TC_551_690_ENGINEERING_E2E.md](./TC_551_690_ENGINEERING_E2E.md) | TC-551 – TC-690 | 140 | Engineering, E2E & Cross-cutting |
+
+### This document (TC-151 – TC-250)
+
+| Module | Feature | Test cases | Count |
+|--------|---------|------------|-------|
+| Admin Dashboard | Dashboard & Global Search | TC-151 – TC-158 | 8 |
+| Admin | Settings, Templates, Integrations | TC-159 – TC-168 | 10 |
+| Admin | Audit Logs & Security Events | TC-169 – TC-176 | 8 |
+| Public Careers | Job Listings & Apply | TC-177 – TC-188 | 12 |
+| Recruitment | Jobs, Candidates, Pipeline | TC-189 – TC-208 | 20 |
+| Recruitment | Interviews, Assessments, Offers | TC-209 – TC-220 | 12 |
+| HR Operations | Employees & Lifecycle | TC-221 – TC-238 | 18 |
+| HR Operations | Policies & Acknowledgements | TC-239 – TC-250 | 12 |
+
+---
+
 
 ## Shared setup
 

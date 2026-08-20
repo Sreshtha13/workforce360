@@ -36,6 +36,33 @@ Create an **employee** (role `employee`) and a **developer** (role `developer`, 
 - Headcount is **display metrics** (`vacantPositions`); **not enforced** on user assign
 
 ---
+## Table of Contents
+
+### Test suite index (all documents)
+
+Quick links to every test-case file. See [INDEX.md](./INDEX.md) for execution order and credentials.
+
+| Document | TC range | Count | Scope |
+|----------|----------|-------|-------|
+| [TC_001_070_AUTH.md](./TC_001_070_AUTH.md) | TC-001 – TC-070 | 70 | Infrastructure & Authentication |
+| **TC_071_150_RBAC_USERS_ORG.md** (this document) | TC-071 – TC-150 | 80 | RBAC, Users & Organization |
+| [TC_151_250_ADMIN_HR.md](./TC_151_250_ADMIN_HR.md) | TC-151 – TC-250 | 100 | Admin, Careers & HR |
+| [TC_251_382_PORTAL_ATTENDANCE.md](./TC_251_382_PORTAL_ATTENDANCE.md) | TC-251 – TC-382 | 132 | Portal, Attendance & Leave |
+| [TC_383_550_FINANCE_PAYROLL_BD_PM.md](./TC_383_550_FINANCE_PAYROLL_BD_PM.md) | TC-383 – TC-550 | 168 | Finance, Payroll, BD & PM |
+| [TC_551_690_ENGINEERING_E2E.md](./TC_551_690_ENGINEERING_E2E.md) | TC-551 – TC-690 | 140 | Engineering, E2E & Cross-cutting |
+
+### This document (TC-071 – TC-150)
+
+| Module | Feature | Test cases | Count |
+|--------|---------|------------|-------|
+| RBAC | Roles & Permissions | TC-071 – TC-086 | 16 |
+| RBAC | Permission Enforcement | TC-087 – TC-106 | 20 |
+| Users | User CRUD & Sessions | TC-107 – TC-124 | 18 |
+| Organization | Departments, Teams, Designations | TC-125 – TC-140 | 16 |
+| Organization | Offices, Employee Types, Statuses | TC-141 – TC-150 | 10 |
+
+---
+
 
 ## TC-071 — Super Admin can list all roles
 
